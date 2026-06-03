@@ -1,0 +1,552 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import {
+  User, Armchair, CreditCard, CheckCircle2, ChevronLeft, Bus,
+  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { SeatMap, type SeatId } from '@/components/public/seat-map'
+import {
+  getBusById, getBoardingStops, getDroppingStops,
+  getPrice, LUGGAGE_OPTIONS, ALL_STOPS,
+  type StopCode, type LuggageOption,
+} from '@/lib/data/bus-config'
+
+const STEPS = [
+  { label: 'Pasajeros',  icon: User },
+  { label: 'Asientos',   icon: Armchair },
+  { label: 'Pago',       icon: CreditCard },
+  { label: 'Listo',      icon: CheckCircle2 },
+]
+
+interface Passenger {
+  name: string
+  type: 'adult' | 'child'
+}
+
+export function BookingFlow({ tripId }: { tripId: string }) {
+  const params = useSearchParams()
+  const router = useRouter()
+
+  const origin      = (params.get('origin')      || 'LA')  as StopCode
+  const destination = (params.get('destination') || 'OTY') as StopCode
+  const date        = params.get('date')      || ''
+  const passCount   = Number(params.get('passengers')) || 1
+  const tripType    = params.get('tripType')  || 'one_way'
+
+  const bus         = getBusById(tripId)
+  const boardingStops = bus ? getBoardingStops(bus) : []
+
+  const [step, setStep]   = useState(0)
+  const [passengers, setPassengers] = useState<Passenger[]>(
+    Array.from({ length: passCount }, () => ({ name: '', type: 'adult' }))
+  )
+  const [boardingStop, setBoardingStop] = useState<StopCode>(origin)
+  const [luggage, setLuggage]           = useState<LuggageOption>(LUGGAGE_OPTIONS[0])
+  const [selectedSeats, setSelectedSeats] = useState<Record<number, SeatId>>({})
+
+  const [cardNumber, setCardNumber] = useState('')
+  const [cardName, setCardName]     = useState('')
+  const [expiry, setExpiry]         = useState('')
+  const [cvv, setCvv]               = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [bookingRef, setBookingRef] = useState('')
+
+  const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
+    setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
+  }
+
+  // Dynamic pricing
+  const pricing = useMemo(() => getPrice(boardingStop, destination), [boardingStop, destination])
+  const adultPrice = Math.round(pricing.adult * (tripType === 'round_trip' ? 1.5 : 1))
+  const childPrice = Math.round(pricing.child * (tripType === 'round_trip' ? 1.5 : 1))
+
+  const passengersTotal = passengers.reduce((sum, p) => sum + (p.type === 'adult' ? adultPrice : childPrice), 0)
+  const luggageTotal    = luggage.price * passCount
+  const grandTotal      = passengersTotal + luggageTotal
+
+  const boardingStopInfo = bus?.stops.find(s => s.code === boardingStop)
+  const destStopInfo     = bus?.stops.find(s => s.code === destination)
+
+  const canStep0 = passengers.every(p => p.name.trim().length >= 2)
+  const canStep1 = Object.keys(selectedSeats).length === passCount
+  const canStep2 = cardNumber.length >= 19 && !!cardName && expiry.length >= 5 && cvv.length >= 3
+
+  const handlePay = async () => {
+    setLoading(true)
+    await new Promise(r => setTimeout(r, 2000))
+    setBookingRef('TEO' + Math.random().toString(36).substr(2, 8).toUpperCase())
+    setStep(3)
+    setLoading(false)
+  }
+
+  const TripBar = () => (
+    <div className="bg-[#0f2c5c] rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="w-10 h-10 rounded-xl bg-[#c01515]/20 flex items-center justify-center shrink-0">
+        <Bus className="w-5 h-5 text-white" />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 text-white font-bold text-sm">
+          <MapPin className="w-3.5 h-3.5 text-[#c01515]" />
+          {ALL_STOPS[boardingStop]?.name} → {ALL_STOPS[destination]?.name}
+        </div>
+        <div className="flex flex-wrap gap-3 mt-1 text-white/50 text-xs">
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {date} · {bus?.departs || ''} · {tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida'}
+          </span>
+          <span>{passCount} pasajero{passCount > 1 ? 's' : ''}</span>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-white font-black text-2xl">${grandTotal}</div>
+        <div className="flex items-center gap-1 text-white/40 text-xs justify-end mt-0.5">
+          <Star className="w-3 h-3 fill-[#c8a951] text-[#c8a951]" />
+          {grandTotal} pts
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+
+      {/* Steps */}
+      <div className="flex items-center mb-8">
+        {STEPS.map((s, i) => (
+          <div key={s.label} className="flex items-center flex-1 last:flex-none">
+            <div className="flex items-center gap-2">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                i < step   ? 'bg-[#c01515] text-white' :
+                i === step ? 'bg-[#0f2c5c] text-white ring-2 ring-[#c01515]/60 ring-offset-2' :
+                             'bg-slate-200 text-slate-400'
+              }`}>
+                {i < step ? <CheckCircle2 className="w-5 h-5" /> : <s.icon className="w-4 h-4" />}
+              </div>
+              <span className={`text-xs font-bold hidden sm:block ${i === step ? 'text-[#0f2c5c]' : 'text-slate-400'}`}>
+                {s.label}
+              </span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div className={`flex-1 h-px mx-3 transition-all ${i < step ? 'bg-[#c01515]' : 'bg-slate-200'}`} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <TripBar />
+
+      {/* ── STEP 0: Passengers + Boarding stop + Luggage ── */}
+      {step === 0 && (
+        <div className="space-y-4">
+
+          {/* Boarding stop selection */}
+          {boardingStops.length > 1 && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#c01515]" />
+                ¿En qué parada abordas?
+              </h2>
+              <p className="text-slate-400 text-sm mb-4">El precio varía según la parada de abordaje.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {boardingStops.map(stop => {
+                  const p = getPrice(stop.code as StopCode, destination)
+                  const price = Math.round(p.adult * (tripType === 'round_trip' ? 1.5 : 1))
+                  const selected = boardingStop === stop.code
+                  return (
+                    <button
+                      key={stop.code}
+                      onClick={() => setBoardingStop(stop.code as StopCode)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        selected
+                          ? 'border-[#c01515] bg-red-50'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className={`flex items-center gap-2 font-bold text-sm ${selected ? 'text-[#c01515]' : 'text-slate-700'}`}>
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? 'border-[#c01515] bg-[#c01515]' : 'border-slate-300'}`}>
+                              {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                            {ALL_STOPS[stop.code as StopCode]?.name}
+                          </div>
+                          <p className="text-slate-400 text-xs mt-1 ml-6 font-mono">{stop.time}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`font-black text-lg ${selected ? 'text-[#c01515]' : 'text-slate-700'}`}>${price}</p>
+                          <p className="text-slate-400 text-[10px]">
+                            {tripType === 'round_trip' ? 'adulto I+V (−25%)' : 'adulto solo ida'}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Passengers */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+              <User className="w-5 h-5 text-[#c01515]" />
+              Datos de los pasajeros
+            </h2>
+            <p className="text-slate-400 text-sm mb-6">Ingresa el nombre como aparece en la identificación.</p>
+            <div className="space-y-4">
+              {passengers.map((p, i) => (
+                <div key={i} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-[#c01515]/10 border border-[#c01515]/20 flex items-center justify-center text-[#c01515] text-xs font-black">{i + 1}</div>
+                      <span className="text-slate-600 text-sm font-semibold">Pasajero {i + 1}</span>
+                    </div>
+                    <span className="font-bold text-[#c01515] text-sm">
+                      ${p.type === 'adult' ? adultPrice : childPrice}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre completo</Label>
+                      <Input value={p.name} onChange={e => updatePassenger(i, 'name', e.target.value)}
+                        placeholder="Nombre Apellido"
+                        className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de pasajero</Label>
+                      <select value={p.type} onChange={e => updatePassenger(i, 'type', e.target.value)}
+                        className="w-full mt-1.5 appearance-none bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515]">
+                        <option value="adult">Adulto — ${adultPrice}</option>
+                        <option value="child">Menor (0–11 años) — ${childPrice}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Luggage */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+              <Luggage className="w-5 h-5 text-[#c01515]" />
+              Equipaje
+            </h2>
+            <p className="text-slate-400 text-sm mb-4">El equipaje de mano siempre es gratuito. Agrega maletas si necesitas.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {LUGGAGE_OPTIONS.map(opt => {
+                const selected = luggage.id === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setLuggage(opt)}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      selected ? 'border-[#c01515] bg-red-50' : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{opt.icon}</span>
+                        <div>
+                          <p className={`font-bold text-sm ${selected ? 'text-[#c01515]' : 'text-slate-700'}`}>{opt.label}</p>
+                          <p className="text-slate-400 text-xs">{opt.description}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        {opt.price === 0
+                          ? <span className="text-emerald-600 font-bold text-sm">Gratis</span>
+                          : <span className={`font-black text-lg ${selected ? 'text-[#c01515]' : 'text-slate-700'}`}>+${opt.price}</span>
+                        }
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            {luggage.price > 0 && (
+              <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                +${luggage.price} × {passCount} pasajero{passCount > 1 ? 's' : ''} = ${luggageTotal} de equipaje
+              </p>
+            )}
+          </div>
+
+          {/* Price summary */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Resumen de precio</p>
+            <div className="space-y-1.5 text-sm">
+              {tripType === 'round_trip' && (
+                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                  <span>Precio por pasajero (ida y vuelta con 25% desc.)</span>
+                  <span className="text-emerald-600 font-bold">−25%</span>
+                </div>
+              )}
+              {passengers.map((p, i) => {
+                const basePrice   = p.type === 'adult' ? pricing.adult : pricing.child
+                const finalPrice  = p.type === 'adult' ? adultPrice    : childPrice
+                const savings     = tripType === 'round_trip' ? Math.round(basePrice * 2 - finalPrice) : 0
+                return (
+                  <div key={i} className="flex justify-between text-slate-600">
+                    <span>
+                      {p.name || `Pasajero ${i+1}`}{' '}
+                      <span className="text-slate-400">({p.type === 'adult' ? 'Adulto' : 'Menor'})</span>
+                    </span>
+                    <div className="text-right">
+                      <span className="font-semibold">${finalPrice}</span>
+                      {savings > 0 && (
+                        <span className="ml-1.5 text-emerald-600 text-xs font-bold">−${savings}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              {luggage.price > 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Equipaje ({luggage.label})</span>
+                  <span className="font-semibold">+${luggageTotal}</span>
+                </div>
+              )}
+              {tripType === 'round_trip' && (
+                <div className="flex justify-between text-emerald-700 text-xs font-bold bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                  <span>Ahorro total ida y vuelta (25% desc.)</span>
+                  <span>−${Math.round(passengers.reduce((s, p) => s + (p.type === 'adult' ? pricing.adult : pricing.child) * 2, 0) - passengersTotal)}</span>
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-800 text-base">
+                <span>Total{tripType === 'round_trip' ? ' (ida y vuelta)' : ''}</span>
+                <span className="text-[#c01515]">${grandTotal}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button disabled={!canStep0} onClick={() => setStep(1)}
+              className="bg-[#c01515] hover:bg-[#a01010] text-white font-black px-6 rounded-xl disabled:opacity-40">
+              Elegir asientos
+              <Armchair className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 1: Seat selection ── */}
+      {step === 1 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+            <Armchair className="w-5 h-5 text-[#c01515]" />
+            Selecciona tus asientos
+          </h2>
+          <p className="text-slate-400 text-sm mb-6">
+            Bus de 14 filas × 4 columnas (A B | C D). Haz click en el asiento que quieras.
+          </p>
+
+          <SeatMap
+            passengers={passengers}
+            onChange={seats => setSelectedSeats(seats)}
+          />
+
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-100">
+            <button onClick={() => setStep(0)} className="flex items-center gap-1 text-slate-400 hover:text-slate-600 text-sm transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              Regresar
+            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-slate-400 text-sm">
+                {Object.keys(selectedSeats).length}/{passCount} asientos
+              </span>
+              <Button disabled={!canStep1} onClick={() => setStep(2)}
+                className="bg-[#c01515] hover:bg-[#a01010] text-white font-black px-6 rounded-xl disabled:opacity-40">
+                Continuar al pago
+                <CreditCard className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 2: Payment ── */}
+      {step === 2 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-[#c01515]" />
+            Información de pago
+          </h2>
+          <p className="text-slate-400 text-sm mb-6">Pago seguro con cifrado SSL de 256 bits.</p>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre en la tarjeta</Label>
+              <Input value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Juan García"
+                className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Número de tarjeta</Label>
+              <div className="relative mt-1.5">
+                <Input value={cardNumber}
+                  onChange={e => setCardNumber(e.target.value.replace(/\D/g,'').slice(0,16).replace(/(\d{4})/g,'$1 ').trim())}
+                  placeholder="0000 0000 0000 0000" maxLength={19}
+                  className="rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 pr-12 font-mono" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                  <div className="w-6 h-4 rounded-sm bg-blue-600 opacity-80" />
+                  <div className="w-6 h-4 rounded-sm bg-red-500 opacity-80 -ml-2" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vencimiento</Label>
+                <Input value={expiry}
+                  onChange={e => { let v = e.target.value.replace(/\D/g,'').slice(0,4); if(v.length>=3) v=v.slice(0,2)+'/'+v.slice(2); setExpiry(v) }}
+                  placeholder="MM/AA" maxLength={5}
+                  className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">CVV</Label>
+                <Input value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g,'').slice(0,4))}
+                  placeholder="•••" maxLength={4} type="password"
+                  className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 font-mono" />
+              </div>
+            </div>
+          </div>
+
+          {/* Order summary */}
+          <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-1.5">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Resumen del pedido</h3>
+            <div className="flex justify-between text-sm text-slate-500">
+              <span>Parada de abordaje</span>
+              <span className="font-semibold text-slate-700">{ALL_STOPS[boardingStop]?.name} · {boardingStopInfo?.time}</span>
+            </div>
+            <div className="flex justify-between text-sm text-slate-500">
+              <span>Destino</span>
+              <span className="font-semibold text-slate-700">{ALL_STOPS[destination]?.name} · {destStopInfo?.time}</span>
+            </div>
+            <div className="border-t border-slate-200 pt-2 mt-1" />
+            {passengers.map((p, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-slate-500">
+                  {p.name || `Pasajero ${i+1}`}
+                  {selectedSeats[i] && <span className="ml-1.5 font-bold text-[#c01515]">· Asiento {selectedSeats[i]}</span>}
+                  <span className="ml-1 text-slate-400">({p.type === 'adult' ? 'Adulto' : 'Menor'})</span>
+                </span>
+                <span className="font-semibold text-slate-700">${p.type === 'adult' ? adultPrice : childPrice}</span>
+              </div>
+            ))}
+            {luggage.price > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 flex items-center gap-1">
+                  <Luggage className="w-3 h-3" /> {luggage.label}
+                </span>
+                <span className="font-semibold text-slate-700">+${luggageTotal}</span>
+              </div>
+            )}
+            <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-800">
+              <span>Total a pagar</span>
+              <span className="text-[#c01515]">${grandTotal}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-6">
+            <button onClick={() => setStep(1)} className="flex items-center gap-1 text-slate-400 hover:text-slate-600 text-sm transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              Regresar
+            </button>
+            <Button onClick={handlePay} disabled={loading || !canStep2}
+              className="bg-[#c01515] hover:bg-[#a01010] text-white font-black px-8 rounded-xl disabled:opacity-40">
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Procesando...
+                </span>
+              ) : <>Pagar ${grandTotal} <CheckCircle2 className="w-4 h-4 ml-2" /></>}
+            </Button>
+          </div>
+          <p className="text-center text-slate-400 text-xs mt-4">🔒 Pago cifrado SSL 256-bit</p>
+        </div>
+      )}
+
+      {/* ── STEP 3: Confirmation ── */}
+      {step === 3 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+          <div className="w-20 h-20 rounded-full bg-emerald-50 border-4 border-emerald-200 flex items-center justify-center mx-auto mb-6 animate-float">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+          </div>
+
+          <h2 className="font-display font-black text-2xl text-[#0f2c5c] mb-2">¡Reservación confirmada!</h2>
+          <p className="text-slate-500 text-sm mb-6">Tu boleto fue enviado a tu correo.</p>
+
+          <div className="inline-block bg-[#0f2c5c] rounded-2xl px-8 py-4 mb-6">
+            <p className="text-white/50 text-xs mb-1 uppercase tracking-widest">Número de reservación</p>
+            <p className="text-[#c8a951] font-black text-2xl tracking-widest">{bookingRef}</p>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-2 border border-slate-200">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Bus</span>
+              <span className="font-semibold">{bus?.name || tripId}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Aborda en</span>
+              <span className="font-semibold">{ALL_STOPS[boardingStop]?.name} · {boardingStopInfo?.time}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Llega a</span>
+              <span className="font-semibold">{ALL_STOPS[destination]?.name} · {destStopInfo?.time}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Fecha</span>
+              <span className="font-semibold">{date}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Tipo</span>
+              <span className="font-semibold">{tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida'}</span>
+            </div>
+            {luggage.price > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Equipaje</span>
+                <span className="font-semibold">{luggage.label}</span>
+              </div>
+            )}
+            <div className="border-t border-slate-200 pt-2 mt-2 space-y-1">
+              {passengers.map((p, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-slate-500">{p.name}</span>
+                  <span className="font-bold text-[#c01515] flex items-center gap-1">
+                    <Armchair className="w-3.5 h-3.5" />
+                    Asiento {selectedSeats[i] || '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between text-sm border-t border-slate-200 pt-2 mt-2">
+              <span className="text-slate-500 font-bold">Total pagado</span>
+              <span className="font-black text-[#0f2c5c]">${grandTotal}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-[#c8a951]" /> Puntos ganados
+              </span>
+              <span className="font-bold text-[#c8a951]">+{grandTotal} pts</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 justify-center flex-wrap">
+            <Button variant="outline" className="rounded-xl border-slate-200 text-slate-600 text-sm">
+              📄 Descargar PDF
+            </Button>
+            <Button onClick={() => router.push('/')} className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl text-sm">
+              Volver al inicio
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
