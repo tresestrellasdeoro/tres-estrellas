@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserRole = 'customer' | 'driver' | 'admin' | 'super_admin'
+export type UserRole = 'customer' | 'driver' | 'cajero' | 'admin' | 'super_admin'
 export type TripStatus = 'scheduled' | 'boarding' | 'in_transit' | 'arrived' | 'cancelled' | 'delayed'
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'refunded' | 'used'
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'

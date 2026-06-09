@@ -7,6 +7,7 @@ export async function middleware(request: NextRequest) {
   const protectedCustomer = pathname.startsWith('/dashboard') || pathname.startsWith('/mis-tickets') || pathname.startsWith('/puntos') || pathname.startsWith('/perfil')
   const protectedAdmin    = pathname.startsWith('/admin')
   const protectedDriver   = pathname.startsWith('/conductor')
+  const protectedStaff    = pathname.startsWith('/personal')
   const authPages         = pathname.startsWith('/auth')
 
   // Allow admin with local session cookie (no Supabase required)
@@ -44,7 +45,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user && !adminCookie?.value && (protectedCustomer || protectedAdmin || protectedDriver)) {
+  if (!user && !adminCookie?.value && (protectedCustomer || protectedAdmin || protectedDriver || protectedStaff)) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('next', pathname)
