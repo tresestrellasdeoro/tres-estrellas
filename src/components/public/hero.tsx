@@ -59,16 +59,14 @@ export function Hero() {
         {/* Logo */}
         <div className="flex justify-center mb-8 animate-fade-up">
           <Link href="/">
-            <div className="bg-white rounded-3xl px-8 py-5 shadow-2xl shadow-black/40 inline-block">
-              <Image
-                src="/logo.png"
-                alt="Tres Estrellas de Oro"
-                width={200}
-                height={160}
-                className="h-36 w-auto object-contain"
-                priority
-              />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Tres Estrellas de Oro"
+              width={200}
+              height={160}
+              className="h-36 w-auto object-contain drop-shadow-2xl"
+              priority
+            />
           </Link>
         </div>
 
