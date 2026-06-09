@@ -1,7 +1,9 @@
+'use client'
+
+import { useState } from 'react'
 import { MapPin, Phone, Building2, Navigation } from 'lucide-react'
 
 const TERMINALS = [
-  // ── California ──
   {
     id:      'LA',
     city:    'Los Angeles',
@@ -68,7 +70,6 @@ const TERMINALS = [
     region:  'ca',
     mapQ:    'Sacramento+CA',
   },
-  // ── Tijuana / México ──
   {
     id:      'OTY',
     city:    'Garita de Otay',
@@ -102,7 +103,6 @@ const TERMINALS = [
     region:  'mx',
     mapQ:    'Xicotencatl+229+Tijuana+BC+Mexico',
   },
-  // ── Otros estados ──
   {
     id:      'PHX',
     city:    'Phoenix',
@@ -139,18 +139,20 @@ const TERMINALS = [
 ]
 
 const TYPE_STYLES = {
-  terminal: { bg: 'bg-[#c01515]',    text: 'text-white',        label: 'Terminal'     },
-  office:   { bg: 'bg-[#0f2c5c]',    text: 'text-white',        label: 'Oficina'      },
-  stop:     { bg: 'bg-slate-200',     text: 'text-slate-600',    label: 'Parada'       },
+  terminal: { bg: 'bg-[#c01515]', text: 'text-white',     label: 'Terminal' },
+  office:   { bg: 'bg-[#0f2c5c]', text: 'text-white',     label: 'Oficina'  },
+  stop:     { bg: 'bg-slate-200',  text: 'text-slate-600', label: 'Parada'   },
 }
 
 const REGIONS = [
-  { key: 'ca',    label: 'California',         color: 'bg-[#0f2c5c]' },
-  { key: 'mx',    label: 'Tijuana · México',    color: 'bg-[#c01515]' },
-  { key: 'other', label: 'Arizona · Texas',     color: 'bg-slate-600' },
+  { key: 'ca',    label: 'California',       color: 'bg-[#0f2c5c]' },
+  { key: 'mx',    label: 'Tijuana · México',  color: 'bg-[#c01515]' },
+  { key: 'other', label: 'Arizona · Texas',   color: 'bg-slate-600' },
 ]
 
 export function TerminalsSection() {
+  const [selected, setSelected] = useState(TERMINALS[0])
+
   return (
     <section id="terminales" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -169,51 +171,70 @@ export function TerminalsSection() {
           </p>
         </div>
 
-        {/* Map + main terminal */}
+        {/* Map + main terminals */}
         <div className="grid lg:grid-cols-2 gap-6 mb-10">
-          {/* Embedded map — LA terminal */}
+          {/* Embedded map — updates on selection */}
           <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-72 lg:h-auto">
             <iframe
-              src="https://maps.google.com/maps?q=614+E+7th+St+Los+Angeles+CA&output=embed"
+              key={selected.id}
+              src={`https://maps.google.com/maps?q=${selected.mapQ}&output=embed`}
               width="100%"
               height="100%"
               style={{ border: 0, minHeight: '280px' }}
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Terminal Los Angeles"
+              title={selected.city}
             />
           </div>
 
-          {/* Main terminals detail */}
+          {/* Main terminals — clickable to update map */}
           <div className="space-y-3">
-            {TERMINALS.filter(t => t.type === 'terminal').map(t => (
-              <div key={t.id} className="flex items-start gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-4 hover:border-[#c01515]/30 hover:shadow-md transition-all group">
-                <div className="w-10 h-10 rounded-xl bg-[#c01515] flex items-center justify-center shrink-0">
-                  <Building2 className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-black text-[#0f2c5c] text-sm">{t.city}</p>
-                    <span className="text-[10px] font-bold bg-[#c01515] text-white px-2 py-0.5 rounded-full">{t.label}</span>
+            {TERMINALS.filter(t => t.type === 'terminal').map(t => {
+              const isActive = selected.id === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setSelected(t)}
+                  className={`w-full text-left flex items-start gap-4 rounded-2xl p-4 border transition-all group ${
+                    isActive
+                      ? 'bg-red-50 border-[#c01515] shadow-md'
+                      : 'bg-slate-50 border-slate-200 hover:border-[#c01515]/40 hover:shadow-md'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                    isActive ? 'bg-[#c01515]' : 'bg-slate-200 group-hover:bg-[#c01515]'
+                  }`}>
+                    <Building2 className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
                   </div>
-                  <p className="text-slate-500 text-xs leading-relaxed mb-2">{t.address}</p>
-                  <div className="flex items-center gap-3">
-                    <a href={`tel:${t.tel}`} className="flex items-center gap-1 text-[#c01515] text-xs font-semibold hover:underline">
-                      <Phone className="w-3 h-3" /> {t.phone}
-                    </a>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${t.mapQ}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-slate-400 text-xs hover:text-[#0f2c5c] transition-colors"
-                    >
-                      <Navigation className="w-3 h-3" /> Cómo llegar
-                    </a>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-black text-[#0f2c5c] text-sm">{t.city}</p>
+                      <span className="text-[10px] font-bold bg-[#c01515] text-white px-2 py-0.5 rounded-full">{t.label}</span>
+                    </div>
+                    <p className="text-slate-500 text-xs leading-relaxed mb-2">{t.address}</p>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`tel:${t.tel}`}
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 text-[#c01515] text-xs font-semibold hover:underline"
+                      >
+                        <Phone className="w-3 h-3" /> {t.phone}
+                      </a>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${t.mapQ}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 text-slate-400 text-xs hover:text-[#0f2c5c] transition-colors"
+                      >
+                        <Navigation className="w-3 h-3" /> Cómo llegar
+                      </a>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -233,21 +254,27 @@ export function TerminalsSection() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {locations.map(t => {
                   const ts = TYPE_STYLES[t.type as keyof typeof TYPE_STYLES]
+                  const isActive = selected.id === t.id
                   return (
-                    <a
+                    <button
                       key={t.id}
-                      href={`https://www.google.com/maps/search/?api=1&query=${t.mapQ}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-start gap-3 p-4 bg-white border border-slate-200 rounded-2xl hover:border-[#c01515]/40 hover:shadow-md transition-all group"
+                      onClick={() => {
+                        setSelected(t)
+                        document.getElementById('terminales')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                      className={`w-full text-left flex items-start gap-3 p-4 rounded-2xl border transition-all group ${
+                        isActive
+                          ? 'bg-red-50 border-[#c01515] shadow-md'
+                          : 'bg-white border-slate-200 hover:border-[#c01515]/40 hover:shadow-md'
+                      }`}
                     >
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${ts.bg}`}>
-                        <MapPin className={`w-4 h-4 ${ts.text}`} />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-[#c01515]' : ts.bg}`}>
+                        <MapPin className={`w-4 h-4 ${isActive ? 'text-white' : ts.text}`} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                           <p className="font-bold text-slate-800 text-sm">{t.city}</p>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${ts.bg} ${ts.text}`}>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isActive ? 'bg-[#c01515] text-white' : `${ts.bg} ${ts.text}`}`}>
                             {ts.label}
                           </span>
                         </div>
@@ -256,7 +283,7 @@ export function TerminalsSection() {
                           <p className="text-[#c01515] text-xs font-semibold mt-1">{t.phone}</p>
                         )}
                       </div>
-                    </a>
+                    </button>
                   )
                 })}
               </div>
