@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Phone, Mail, MapPin, Star, ExternalLink } from 'lucide-react'
+import { Phone, Star, Bus } from 'lucide-react'
 import { TresEstrellasLogo } from './logo'
 
 const PHONES = [
@@ -39,8 +39,8 @@ export function Footer() {
             <ul className="space-y-2">
               {['3:20 AM', '7:20 AM', '9:20 AM', '11:20 AM', '1:20 PM', '3:20 PM', '5:20 PM', '7:20 PM'].map(t => (
                 <li key={t}>
-                  <Link href="/buscar?origin=LA&destination=OTY" className="text-white/45 text-xs hover:text-[#c8a951] transition-colors flex items-center gap-1.5">
-                    <span className="w-1 h-1 rounded-full bg-[#c01515]" />
+                  <Link href="/buscar?origin=LA&destination=OTY" className="text-white/45 text-xs hover:text-[#c8a951] transition-colors flex items-center gap-1.5 group">
+                    <Bus className="w-3 h-3 text-[#c01515] group-hover:text-[#c8a951] transition-colors shrink-0" />
                     Salida {t}
                   </Link>
                 </li>
@@ -56,8 +56,8 @@ export function Footer() {
             <ul className="space-y-2">
               {['11:30 AM', '1:30 PM', '3:30 PM', '7:30 PM'].map(t => (
                 <li key={t}>
-                  <Link href="/buscar?origin=OTY&destination=LA" className="text-white/45 text-xs hover:text-[#c8a951] transition-colors flex items-center gap-1.5">
-                    <span className="w-1 h-1 rounded-full bg-[#c8a951]" />
+                  <Link href="/buscar?origin=OTY&destination=LA" className="text-white/45 text-xs hover:text-[#c8a951] transition-colors flex items-center gap-1.5 group">
+                    <Bus className="w-3 h-3 text-[#c8a951] group-hover:text-[#c8a951] transition-colors shrink-0" />
                     Salida {t}
                   </Link>
                 </li>
