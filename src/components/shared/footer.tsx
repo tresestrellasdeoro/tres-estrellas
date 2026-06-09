@@ -1,6 +1,6 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Phone, Star, Bus } from 'lucide-react'
-import { TresEstrellasLogo } from './logo'
 
 const PHONES = [
   { num: '+1 (213) 275-1402', loc: 'Los Angeles',    href: 'tel:+12132751402' },
@@ -17,9 +17,15 @@ export function Footer() {
 
           {/* Logo & Brand */}
           <div className="md:col-span-1">
-            <div className="bg-white rounded-2xl p-4 inline-block mb-4">
-              <TresEstrellasLogo size="sm" href="/" />
-            </div>
+            <Link href="/" className="inline-block mb-4">
+              <Image
+                src="/logo.png"
+                alt="Tres Estrellas de Oro"
+                width={120}
+                height={80}
+                className="h-16 w-auto object-contain drop-shadow-lg"
+              />
+            </Link>
             <p className="text-white/45 text-xs leading-relaxed">
               Transporte seguro y cómodo entre Los Angeles y Tijuana. 12 salidas diarias, todos los días del año.
             </p>
