@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, ArrowRight, ArrowLeftRight, Phone, ShieldCheck, Smartphone, Star, Wifi, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,12 @@ const STOPS = [
   { value: 'OTY', label: 'Garita de Otay — Tijuana' },
 ]
 
+const BG_IMAGES = [
+  'https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/bbbbnmm.jpg',
+  'https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/bbnnmm.jpg',
+  'https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/nnbbbb.jpg',
+]
+
 export function Hero() {
   const router = useRouter()
   const [origin, setOrigin]           = useState('LA')
@@ -23,6 +29,14 @@ export function Hero() {
   const [date, setDate]               = useState(format(new Date(), 'yyyy-MM-dd'))
   const [passengers, setPassengers]   = useState(1)
   const [tripType, setTripType]       = useState<'one_way' | 'round_trip'>('one_way')
+  const [bgIndex, setBgIndex]         = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBgIndex(i => (i + 1) % BG_IMAGES.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   const swapStops = () => {
     setOrigin(destination)
@@ -38,15 +52,17 @@ export function Hero() {
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-20">
-      {/* Background photo */}
+      {/* Background slideshow */}
       <div className="absolute inset-0">
-        <Image
-          src="/hero-bg.jpg"
-          alt="Bus Tres Estrellas de Oro"
-          fill
-          className="object-cover object-center"
-          priority
-        />
+        {BG_IMAGES.map((src, i) => (
+          <img
+            key={src}
+            src={src}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000"
+            style={{ opacity: i === bgIndex ? 1 : 0 }}
+          />
+        ))}
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0a1e42]/85 via-[#0a1e42]/75 to-[#0a1e42]/90" />
       </div>
