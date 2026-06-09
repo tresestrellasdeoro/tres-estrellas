@@ -54,9 +54,14 @@ export default function PaqueteoPage() {
     <div className="bg-slate-50 min-h-screen">
 
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#0a1e42] to-[#0f2c5c] pt-28 pb-20 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 pointer-events-none select-none flex items-center justify-center">
-          <Package className="w-[32rem] h-[32rem] text-white" />
+      <div className="pt-28 pb-20 px-4 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img
+            src="https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/ChatGPT%20Image%208%20jun%202026,%2011_09_53%20p.m..png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0a1e42]/80 to-[#0f2c5c]/75" />
         </div>
         <div className="max-w-4xl mx-auto text-center relative">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mb-5">
