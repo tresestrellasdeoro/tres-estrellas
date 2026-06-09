@@ -49,12 +49,14 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [luggage, setLuggage]           = useState<LuggageOption>(LUGGAGE_OPTIONS[0])
   const [selectedSeats, setSelectedSeats] = useState<Record<number, SeatId>>({})
 
+  const [email, setEmail]           = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [cardName, setCardName]     = useState('')
   const [expiry, setExpiry]         = useState('')
   const [cvv, setCvv]               = useState('')
   const [loading, setLoading]       = useState(false)
   const [bookingRef, setBookingRef] = useState('')
+  const [bookingError, setBookingError] = useState('')
 
   const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
     setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -72,16 +74,42 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const boardingStopInfo = bus?.stops.find(s => s.code === boardingStop)
   const destStopInfo     = bus?.stops.find(s => s.code === destination)
 
-  const canStep0 = passengers.every(p => p.name.trim().length >= 2)
+  const canStep0 = passengers.every(p => p.name.trim().length >= 2) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const canStep1 = Object.keys(selectedSeats).length === passCount
   const canStep2 = cardNumber.length >= 19 && !!cardName && expiry.length >= 5 && cvv.length >= 3
 
   const handlePay = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 2000))
-    setBookingRef('TEO' + Math.random().toString(36).substr(2, 8).toUpperCase())
-    setStep(3)
-    setLoading(false)
+    setBookingError('')
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_type:        tripType,
+          total_amount:       grandTotal,
+          guest_email:        email,
+          origin_name:        ALL_STOPS[boardingStop]?.name || boardingStop,
+          destination_name:   ALL_STOPS[destination]?.name || destination,
+          boarding_stop_name: ALL_STOPS[boardingStop]?.name || boardingStop,
+          date,
+          departure_time:     bus?.departs || '',
+          passengers: passengers.map(p => ({
+            full_name:      p.name,
+            passenger_type: p.type,
+            price:          p.type === 'adult' ? adultPrice : childPrice,
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al procesar')
+      setBookingRef(data.booking_number)
+      setStep(3)
+    } catch (err: any) {
+      setBookingError(err.message || 'Error al procesar la reservación')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const TripBar = () => (
@@ -228,6 +256,25 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Email for ticket delivery */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#c01515]" />
+              ¿A dónde enviamos tu boleto?
+            </h2>
+            <p className="text-slate-400 text-sm mb-4">Recibirás tu boleto digital con código QR en este correo.</p>
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Correo electrónico</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="tucorreo@ejemplo.com"
+                className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20"
+              />
             </div>
           </div>
 
@@ -469,6 +516,9 @@ export function BookingFlow({ tripId }: { tripId: string }) {
             </Button>
           </div>
           <p className="text-center text-slate-400 text-xs mt-4">🔒 Pago cifrado SSL 256-bit</p>
+          {bookingError && (
+            <p className="text-center text-red-600 text-sm mt-3 font-semibold">{bookingError}</p>
+          )}
         </div>
       )}
 
@@ -480,7 +530,8 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           </div>
 
           <h2 className="font-display font-black text-2xl text-[#0f2c5c] mb-2">¡Reservación confirmada!</h2>
-          <p className="text-slate-500 text-sm mb-6">Tu boleto fue enviado a tu correo.</p>
+          <p className="text-slate-500 text-sm mb-2">Tu boleto con código QR fue enviado a:</p>
+          <p className="text-[#c01515] font-bold text-sm mb-6">{email}</p>
 
           <div className="inline-block bg-[#0f2c5c] rounded-2xl px-8 py-4 mb-6">
             <p className="text-white/50 text-xs mb-1 uppercase tracking-widest">Número de reservación</p>
