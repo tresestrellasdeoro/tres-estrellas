@@ -23,11 +23,7 @@ const AMENITY_ICONS: Record<string, { icon: React.ReactNode; label: string }> = 
   reclining_seats: { icon: <span className="text-xs">🪑</span>,   label: 'Reclinables' },
 }
 
-const INIT_FLEET = [
-  { id: '1', plate: 'CA-TEO-001', model: 'Prevost X3-45', brand: 'Prevost', year: 2022, capacity: 56, amenities: ['wifi','ac','restroom','usb','reclining_seats'], is_active: true },
-  { id: '2', plate: 'CA-TEO-002', model: 'MCI J4500',     brand: 'MCI',     year: 2021, capacity: 56, amenities: ['wifi','ac','restroom','usb','reclining_seats'], is_active: true },
-  { id: '3', plate: 'CA-TEO-003', model: 'Volvo 9700',    brand: 'Volvo',   year: 2023, capacity: 56, amenities: ['wifi','ac','restroom','usb','reclining_seats','entertainment'], is_active: true },
-]
+const INIT_FLEET: { id: string; plate: string; model: string; brand: string; year: number; capacity: number; amenities: string[]; is_active: boolean }[] = []
 
 export default function BusesPage() {
   const [tab, setTab] = useState<Tab>('flota')
