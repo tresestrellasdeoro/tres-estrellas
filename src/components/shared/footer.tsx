@@ -103,14 +103,6 @@ export function Footer() {
               <p className="text-white/45 text-[11px] leading-relaxed">
                 Llama a cualquiera de nuestros números o visita nuestra terminal más cercana.
               </p>
-              <a
-                href="https://mediumaquamarine-raven-425194.hostingersite.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 flex items-center gap-1 text-[#c8a951] text-xs hover:text-[#e8c97a] transition-colors"
-              >
-                Sitio web oficial <ExternalLink className="w-3 h-3" />
-              </a>
             </div>
           </div>
         </div>
