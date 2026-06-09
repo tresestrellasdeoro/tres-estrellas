@@ -117,9 +117,11 @@ export async function POST(req: NextRequest) {
     color: { dark: '#0a1e42', light: '#ffffff' },
   })
 
-  // Send email (non-blocking on failure)
+  // Send email
+  let emailStatus = 'sent'
+  let emailError  = ''
   try {
-    await resend.emails.send({
+    const emailResult = await resend.emails.send({
       from:    'Tres Estrellas de Oro <onboarding@resend.dev>',
       to:      guest_email,
       subject: `🎫 Tu boleto ${booking.booking_number} — ${origin_name} → ${destination_name}`,
@@ -136,13 +138,22 @@ export async function POST(req: NextRequest) {
         tripType:        ticket_type,
       }),
     })
-  } catch (e) {
-    console.error('Email send error:', e)
+    if (emailResult.error) {
+      emailStatus = 'failed'
+      emailError  = JSON.stringify(emailResult.error)
+      console.error('Resend error:', emailResult.error)
+    }
+  } catch (e: any) {
+    emailStatus = 'failed'
+    emailError  = e?.message || String(e)
+    console.error('Email exception:', e)
   }
 
   return NextResponse.json({
     booking_id:     booking.id,
     booking_number: booking.booking_number,
+    email_status:   emailStatus,
+    email_error:    emailError || undefined,
   }, { status: 201 })
 }
 

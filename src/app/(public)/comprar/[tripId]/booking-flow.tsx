@@ -104,6 +104,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al procesar')
       setBookingRef(data.booking_number)
+      if (data.email_error) setBookingError(`Reservación creada, pero el email falló: ${data.email_error}`)
       setStep(3)
     } catch (err: any) {
       setBookingError(err.message || 'Error al procesar la reservación')
