@@ -8,21 +8,6 @@ const ROWS    = 14
 const COLUMNS = ['A', 'B', 'C', 'D'] as const
 type Column   = typeof COLUMNS[number]
 
-// Some seats are pre-occupied (demo) — replace with real DB data
-const DEMO_OCCUPIED = [
-  'A1','B1','C1',
-  'A2','D2',
-  'B3','C3','D3',
-  'A5','B5',
-  'C6','D6',
-  'A7','B7','C7','D7',
-  'A9','D9',
-  'B10','C10',
-  'A11','B11','C11',
-  'D12',
-  'A13',
-  'B14','C14',
-]
 
 export type SeatId = string // e.g. "A3", "C12"
 
@@ -33,7 +18,7 @@ interface SeatMapProps {
   onComplete?:   (seats: Record<number, SeatId>) => void
 }
 
-export function SeatMap({ passengers, occupiedSeats = DEMO_OCCUPIED, onChange, onComplete }: SeatMapProps) {
+export function SeatMap({ passengers, occupiedSeats = [], onChange, onComplete }: SeatMapProps) {
   // selectedSeats[passengerIndex] = seatId
   const [selectedSeats, setSelectedSeats] = useState<Record<number, SeatId>>({})
   const [activePassenger, setActivePassenger] = useState(0)
