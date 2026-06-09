@@ -54,7 +54,7 @@ export default function PaqueteoPage() {
     <div className="bg-slate-50 min-h-screen">
 
       {/* Hero */}
-      <div className="pt-28 pb-20 px-4 relative overflow-hidden">
+      <div className="pt-28 pb-20 px-4 relative overflow-hidden min-h-[600px] flex items-center">
         <div className="absolute inset-0">
           <img
             src="https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/ChatGPT%20Image%208%20jun%202026,%2011_09_53%20p.m..png"
