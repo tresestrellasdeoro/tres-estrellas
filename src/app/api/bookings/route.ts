@@ -43,34 +43,10 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Try to link to authenticated user
+  // Try to link to authenticated user (optional)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  let customerId: string | null = user?.id ?? null
-
-  // For guest checkout: find or create a profile by email
-  if (!customerId) {
-    const { data: existing } = await service
-      .from('profiles')
-      .select('id')
-      .eq('email', guest_email)
-      .maybeSingle()
-
-    if (existing) {
-      customerId = existing.id
-    } else {
-      const { data: newUser } = await service.auth.admin.createUser({
-        email: guest_email,
-        email_confirm: true,
-        user_metadata: { full_name: passengers[0].full_name },
-      })
-      customerId = newUser?.user?.id ?? null
-    }
-  }
-
-  if (!customerId) {
-    return NextResponse.json({ error: 'No se pudo identificar al cliente' }, { status: 500 })
-  }
+  const customerId: string | null = user?.id ?? null
 
   // Get any real trip to satisfy FK constraint (demo mode)
   const { data: tripData } = await service
@@ -83,17 +59,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No hay viajes en el sistema. Ejecuta el seed SQL.' }, { status: 404 })
   }
 
-  // Create booking
+  // Create booking (customer_id is optional for guest checkout)
+  const bookingInsert: Record<string, unknown> = {
+    trip_id:      tripData.id,
+    ticket_type,
+    status:       'confirmed',
+    total_amount,
+    points_earned: Math.floor(total_amount),
+    guest_email,
+  }
+  if (customerId) bookingInsert.customer_id = customerId
+
   const { data: booking, error: bookingError } = await service
     .from('bookings')
-    .insert({
-      trip_id:      tripData.id,
-      customer_id:  customerId,
-      ticket_type,
-      status:       'confirmed',
-      total_amount,
-      points_earned: Math.floor(total_amount),
-    })
+    .insert(bookingInsert)
     .select('id, booking_number')
     .single()
 
