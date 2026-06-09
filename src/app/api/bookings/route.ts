@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   let emailError  = ''
   try {
     const emailResult = await resend.emails.send({
-      from:    'Tres Estrellas de Oro <onboarding@resend.dev>',
+      from:    'Tres Estrellas de Oro <boletos@tresestrellasdeoroinc.com>',
       to:      guest_email,
       subject: `🎫 Tu boleto ${booking.booking_number} — ${origin_name} → ${destination_name}`,
       html:    ticketEmailHtml({
