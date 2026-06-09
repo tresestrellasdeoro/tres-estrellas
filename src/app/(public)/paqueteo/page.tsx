@@ -59,7 +59,12 @@ export default function PaqueteoPage() {
           <img
             src="https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/ChatGPT%20Image%208%20jun%202026,%2011_09_53%20p.m..png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            className="hidden sm:block w-full h-full object-cover object-center"
+          />
+          <img
+            src="https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/Screen-Shot-2025-06-27-at-9.15.40-PM.png"
+            alt=""
+            className="block sm:hidden w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-[#0a1e42]/80 to-[#0f2c5c]/75" />
         </div>
