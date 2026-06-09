@@ -79,16 +79,14 @@ function BusSVG() {
 export function LogoNavbar() {
   return (
     <Link href="/" className="flex items-center">
-      <div className="bg-white rounded-xl px-2.5 py-1">
-        <Image
-          src="/logo.png"
-          alt="Tres Estrellas de Oro"
-          width={90}
-          height={60}
-          className="h-9 w-auto object-contain"
-          priority
-        />
-      </div>
+      <Image
+        src="/logo.png"
+        alt="Tres Estrellas de Oro"
+        width={90}
+        height={60}
+        className="h-9 w-auto object-contain drop-shadow-md"
+        priority
+      />
     </Link>
   )
 }
