@@ -4,8 +4,9 @@ import { useState, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   User, Armchair, CreditCard, CheckCircle2, ChevronLeft, Bus,
-  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Banknote,
+  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Banknote, Download,
 } from 'lucide-react'
+import { generateTicketPdf } from '@/lib/pdf/ticket-pdf'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -663,8 +664,27 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           </div>
 
           <div className="flex gap-3 justify-center flex-wrap">
-            <Button variant="outline" className="rounded-xl border-slate-200 text-slate-600 text-sm">
-              📄 Descargar PDF
+            <Button
+              variant="outline"
+              onClick={() => generateTicketPdf({
+                bookingNumber:  bookingRef,
+                passengerNames: passengers.map(p => p.name),
+                selectedSeats,
+                origin:         ALL_STOPS[boardingStop]?.name || boardingStop,
+                destination:    ALL_STOPS[destination]?.name  || destination,
+                boardingStop:   ALL_STOPS[boardingStop]?.name || boardingStop,
+                boardingTime:   boardingStopInfo?.time || '',
+                date,
+                departureTime:  bus?.departs || '',
+                tripType,
+                total:          grandTotal,
+                paymentMethod,
+                email,
+              })}
+              className="rounded-xl border-slate-200 text-slate-600 text-sm flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Descargar PDF
             </Button>
             <Button onClick={() => router.push('/')} className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl text-sm">
               Volver al inicio
