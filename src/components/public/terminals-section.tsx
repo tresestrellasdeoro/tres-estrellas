@@ -174,7 +174,7 @@ export function TerminalsSection() {
           {/* Embedded map — LA terminal */}
           <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-72 lg:h-auto">
             <iframe
-              src="https://www.google.com/maps/embed/v1/place?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFmBWY&q=614+E+7th+St+Los+Angeles+CA"
+              src="https://maps.google.com/maps?q=614+E+7th+St+Los+Angeles+CA&output=embed"
               width="100%"
               height="100%"
               style={{ border: 0, minHeight: '280px' }}
