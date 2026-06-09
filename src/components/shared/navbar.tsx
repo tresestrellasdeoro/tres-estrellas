@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useRef } from 'react'
-import { Menu, X, Star, LogIn, Phone, ChevronDown, Info, ShieldAlert, ShieldCheck, Package } from 'lucide-react'
+import { Menu, X, Star, LogIn, Phone, ChevronDown, Info, ShieldAlert, ShieldCheck, Package, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LogoNavbar } from './logo'
 
@@ -37,6 +37,10 @@ export function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-5">
+            <Link href="/" className="text-white/75 hover:text-white text-sm font-medium transition-colors flex items-center gap-1">
+              <Home className="w-3.5 h-3.5" />
+              Home
+            </Link>
             <Link href="/buscar" className="text-white/75 hover:text-white text-sm font-medium transition-colors">Horarios</Link>
             <Link href="/#rutas" className="text-white/75 hover:text-white text-sm font-medium transition-colors">Rutas</Link>
             <Link href="/#terminales" className="text-white/75 hover:text-white text-sm font-medium transition-colors">Terminales</Link>
@@ -122,6 +126,9 @@ export function Navbar() {
       {/* Mobile menu */}
       {open && (
         <div className="md:hidden border-t border-white/10 bg-[#0f2c5c] px-4 py-4 flex flex-col gap-3">
+          <Link href="/" className="text-white/80 text-sm font-medium py-2 flex items-center gap-2" onClick={() => setOpen(false)}>
+            <Home className="w-3.5 h-3.5 text-[#c8a951]" /> Home
+          </Link>
           <Link href="/buscar" className="text-white/80 text-sm font-medium py-2" onClick={() => setOpen(false)}>Horarios</Link>
           <Link href="/#rutas" className="text-white/80 text-sm font-medium py-2" onClick={() => setOpen(false)}>Rutas</Link>
           <Link href="/paqueteo" className="text-white/80 text-sm font-medium py-2 flex items-center gap-2" onClick={() => setOpen(false)}>

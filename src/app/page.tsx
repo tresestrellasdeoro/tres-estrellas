@@ -5,6 +5,7 @@ import { RoutesSection } from '@/components/public/routes-section'
 import { TerminalsSection } from '@/components/public/terminals-section'
 import { AmenitiesSection } from '@/components/public/amenities-section'
 import { LoyaltySection } from '@/components/public/loyalty-section'
+import { Chatbot } from '@/components/public/chatbot'
 
 export default function HomePage() {
   return (
@@ -16,6 +17,7 @@ export default function HomePage() {
       <AmenitiesSection />
       <LoyaltySection />
       <Footer />
+      <Chatbot />
     </>
   )
 }
