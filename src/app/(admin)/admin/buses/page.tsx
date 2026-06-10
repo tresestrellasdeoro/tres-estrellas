@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Bus, Plus, Search, Wifi, Wind, Bath, Usb, Tv2, Pencil, ToggleLeft,
   ToggleRight, Trash2, MapPin, DollarSign, Luggage, Clock, Save, X, ChevronDown,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -29,11 +30,21 @@ export default function BusesPage() {
   const [tab, setTab] = useState<Tab>('flota')
 
   // Flota state
-  const [fleet, setFleet]     = useState(INIT_FLEET)
-  const [search, setSearch]   = useState('')
-  const [open, setOpen]       = useState(false)
-  const [editing, setEditing] = useState<typeof INIT_FLEET[0] | null>(null)
-  const [form, setForm]       = useState({ plate: '', model: '', brand: '', year: 2024, capacity: 56, amenities: ['wifi','ac','restroom'] as string[] })
+  const [fleet, setFleet]       = useState(INIT_FLEET)
+  const [fleetLoading, setFleetLoading] = useState(true)
+  const [search, setSearch]     = useState('')
+  const [open, setOpen]         = useState(false)
+  const [editing, setEditing]   = useState<typeof INIT_FLEET[0] | null>(null)
+  const [form, setForm]         = useState({ plate: '', model: '', brand: '', year: 2024, capacity: 56, amenities: ['wifi','ac','restroom'] as string[] })
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('buses').select('id, plate, model, brand, year, capacity, amenities, is_active').order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data) setFleet(data as typeof INIT_FLEET)
+        setFleetLoading(false)
+      })
+  }, [])
 
   // Tarifas state
   const [prices, setPrices] = useState(ROUTE_PRICES)
@@ -57,13 +68,28 @@ export default function BusesPage() {
   const toggleAmenity = (a: string) =>
     setForm(p => ({ ...p, amenities: p.amenities.includes(a) ? p.amenities.filter(x => x !== a) : [...p.amenities, a] }))
 
-  const saveFleet = () => {
+  const saveFleet = async () => {
+    const supabase = createClient()
     if (editing) {
+      await supabase.from('buses').update(form).eq('id', editing.id)
       setFleet(prev => prev.map(b => b.id === editing.id ? { ...b, ...form } : b))
     } else {
-      setFleet(prev => [...prev, { ...form, id: String(Date.now()), is_active: true }])
+      const { data } = await supabase.from('buses').insert({ ...form, is_active: true }).select('id, plate, model, brand, year, capacity, amenities, is_active').single()
+      if (data) setFleet(prev => [...prev, data as typeof INIT_FLEET[0]])
     }
     setOpen(false)
+  }
+
+  const toggleActive = async (id: string, current: boolean) => {
+    const supabase = createClient()
+    await supabase.from('buses').update({ is_active: !current }).eq('id', id)
+    setFleet(prev => prev.map(b => b.id === id ? { ...b, is_active: !current } : b))
+  }
+
+  const deleteBus = async (id: string) => {
+    const supabase = createClient()
+    await supabase.from('buses').delete().eq('id', id)
+    setFleet(prev => prev.filter(b => b.id !== id))
   }
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -110,6 +136,16 @@ export default function BusesPage() {
             </Button>
           </div>
 
+          {fleetLoading && (
+            <div className="text-center py-16 text-slate-400 text-sm">Cargando flota...</div>
+          )}
+
+          {!fleetLoading && filtered.length === 0 && (
+            <div className="text-center py-16 text-slate-400 text-sm">
+              No hay autobuses registrados. Agrega el primero con el botón de arriba.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map(bus => (
               <div key={bus.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${bus.is_active ? 'border-slate-200 hover:shadow-md' : 'border-slate-200 opacity-60'}`}>
@@ -133,7 +169,7 @@ export default function BusesPage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
-                    <button onClick={() => setFleet(prev => prev.map(b => b.id === bus.id ? { ...b, is_active: !b.is_active } : b))}
+                    <button onClick={() => toggleActive(bus.id, bus.is_active)}
                       className="text-slate-400 hover:text-slate-700 transition-colors">
                       {bus.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5" />}
                     </button>
@@ -141,7 +177,7 @@ export default function BusesPage() {
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setFleet(prev => prev.filter(b => b.id !== bus.id))}
+                    <button onClick={() => deleteBus(bus.id)}
                       className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

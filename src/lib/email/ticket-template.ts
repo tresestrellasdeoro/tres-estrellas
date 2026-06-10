@@ -9,11 +9,17 @@ interface TicketEmailData {
   total: number
   qrDataUrl: string
   tripType: string
+  paymentMethod?: string
+  returnDate?: string
+}
+
+function esc(s: string) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
 export function ticketEmailHtml(d: TicketEmailData): string {
   const passengers = d.passengerNames.map(name =>
-    `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;">👤 ${name}</td></tr>`
+    `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;">👤 ${esc(name)}</td></tr>`
   ).join('')
 
   return `<!DOCTYPE html>
@@ -79,7 +85,7 @@ export function ticketEmailHtml(d: TicketEmailData): string {
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;background:#f9fafb;border-radius:12px;padding:16px;">
               <tr>
                 <td style="padding:6px 16px;width:33%;">
-                  <p style="margin:0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;">Fecha</p>
+                  <p style="margin:0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;">Fecha ida</p>
                   <p style="margin:4px 0 0;color:#111827;font-size:14px;font-weight:700;">${d.date}</p>
                 </td>
                 <td style="padding:6px 16px;width:33%;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
@@ -91,6 +97,16 @@ export function ticketEmailHtml(d: TicketEmailData): string {
                   <p style="margin:4px 0 0;color:#111827;font-size:14px;font-weight:700;">${d.tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida'}</p>
                 </td>
               </tr>
+              ${d.tripType === 'round_trip' && d.returnDate ? `
+              <tr>
+                <td colspan="3" style="padding:0 16px 10px;">
+                  <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;">
+                    <p style="margin:0;color:#1e40af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Regreso</p>
+                    <p style="margin:4px 0 0;color:#1e3a8a;font-size:15px;font-weight:900;">${d.returnDate}</p>
+                    <p style="margin:4px 0 0;color:#3b82f6;font-size:12px;font-weight:600;">⏰ Hora abierta — puedes abordar cualquier autobús disponible ese día</p>
+                  </div>
+                </td>
+              </tr>` : ''}
             </table>
           </td>
         </tr>
@@ -108,8 +124,9 @@ export function ticketEmailHtml(d: TicketEmailData): string {
         <!-- Total -->
         <tr>
           <td style="padding:20px 40px;background:#0f2c5c;text-align:right;">
-            <span style="color:rgba(255,255,255,0.6);font-size:13px;">Total pagado: </span>
+            <span style="color:rgba(255,255,255,0.6);font-size:13px;">${d.paymentMethod === 'cash' ? 'Total a pagar en ventanilla: ' : 'Total pagado: '}</span>
             <span style="color:#c8a951;font-size:22px;font-weight:900;">$${d.total} USD</span>
+            ${d.paymentMethod === 'cash' ? `<br><span style="color:#f59e0b;font-size:12px;font-weight:700;">💵 Pago en efectivo — cobra en taquilla antes de abordar</span>` : ''}
           </td>
         </tr>
 
@@ -120,7 +137,7 @@ export function ticketEmailHtml(d: TicketEmailData): string {
             <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;">
               📞 (213) 275-1402 &nbsp;|&nbsp; (619) 428-5512 &nbsp;|&nbsp; (664) 208-8399
             </p>
-            <p style="margin:6px 0 0;color:#d1d5db;font-size:11px;">tres-estrellas.vercel.app</p>
+            <p style="margin:6px 0 0;color:#d1d5db;font-size:11px;">tresestrellasdeoroinc.com</p>
           </td>
         </tr>
 
