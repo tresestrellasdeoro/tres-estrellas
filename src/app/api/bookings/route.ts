@@ -5,18 +5,31 @@ import { z } from 'zod'
 import QRCode from 'qrcode'
 import { Resend } from 'resend'
 import { ticketEmailHtml } from '@/lib/email/ticket-template'
+import { SquareClient, SquareEnvironment } from 'square'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+const squareConfigured = !!(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID)
+const squareClient = squareConfigured
+  ? new SquareClient({
+      token: process.env.SQUARE_ACCESS_TOKEN!,
+      environment: SquareEnvironment.Production,
+    })
+  : null
 
 const BookingSchema = z.object({
   ticket_type:        z.enum(['one_way', 'round_trip']),
   total_amount:       z.number().positive(),
   guest_email:        z.string().email(),
+  payment_method:     z.enum(['card', 'cash']).default('card'),
+  source_id:          z.string().optional(),
   origin_name:        z.string(),
   destination_name:   z.string(),
+  boarding_stop_code: z.string().optional(),
   boarding_stop_name: z.string(),
   date:               z.string(),
   departure_time:     z.string(),
+  return_date:        z.string().optional(),
   passengers: z.array(z.object({
     full_name:      z.string().min(2),
     passenger_type: z.enum(['adult', 'child', 'senior']),
@@ -33,10 +46,37 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    ticket_type, total_amount, guest_email,
-    origin_name, destination_name, boarding_stop_name,
-    date, departure_time, passengers,
+    ticket_type, total_amount, guest_email, payment_method, source_id,
+    origin_name, destination_name, boarding_stop_code, boarding_stop_name,
+    date, departure_time, return_date, passengers,
   } = parsed.data
+
+  // ── Square payment charge ──────────────────────────────────────────────────
+  let squarePaymentId: string | undefined
+
+  if (payment_method === 'card' && squareConfigured && squareClient) {
+    if (!source_id) {
+      return NextResponse.json({ error: 'Token de pago requerido' }, { status: 400 })
+    }
+    try {
+      const paymentResponse = await squareClient.payments.create({
+        sourceId:       source_id,
+        amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+        locationId:     process.env.SQUARE_LOCATION_ID!,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      const payment = paymentResponse.payment
+      if (!payment || payment.status !== 'COMPLETED') {
+        return NextResponse.json({ error: 'Pago rechazado por el banco' }, { status: 402 })
+      }
+      squarePaymentId = payment.id
+    } catch (e: any) {
+      const detail = e?.errors?.[0]?.detail || e?.message || 'Pago rechazado'
+      console.error('Square payment error:', detail)
+      return NextResponse.json({ error: detail }, { status: 402 })
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const service = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,13 +101,15 @@ export async function POST(req: NextRequest) {
 
   // Create booking (customer_id is optional for guest checkout)
   const bookingInsert: Record<string, unknown> = {
-    trip_id:      tripData.id,
+    trip_id:       tripData.id,
     ticket_type,
-    status:       'confirmed',
+    status:        'confirmed',
     total_amount,
+    payment_method,
     points_earned: Math.floor(total_amount),
     guest_email,
   }
+  if (return_date) bookingInsert.return_date = return_date
   if (customerId) bookingInsert.customer_id = customerId
 
   const { data: booking, error: bookingError } = await service
@@ -78,19 +120,39 @@ export async function POST(req: NextRequest) {
 
   if (bookingError || !booking) {
     console.error('Booking error:', bookingError)
+    // Reembolsar el cobro de Square si el booking falló
+    if (squarePaymentId && squareClient) {
+      try {
+        await squareClient.refunds.refundPayment({
+          paymentId:      squarePaymentId,
+          amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+          idempotencyKey: crypto.randomUUID(),
+          reason:         'Booking creation failed — automatic refund',
+        })
+        console.log('Square refund issued for payment:', squarePaymentId)
+      } catch (refundErr: any) {
+        console.error('Refund failed for payment', squarePaymentId, refundErr)
+      }
+    }
     return NextResponse.json({ error: 'Error al crear la reservación' }, { status: 500 })
   }
 
-  // Get terminal_id for the boarding stop
-  const { data: stopData } = await service
+  // Get terminal_id for the boarding stop (fallback to first available stop)
+  const stopCode = boarding_stop_code || 'LA'
+  let { data: stopData } = await service
     .from('stops')
     .select('id')
-    .eq('code', 'LA')
-    .single()
+    .eq('code', stopCode)
+    .maybeSingle()
+
+  if (!stopData) {
+    const { data: anyStop } = await service.from('stops').select('id').limit(1).maybeSingle()
+    stopData = anyStop
+  }
 
   const terminalId = stopData?.id
   if (!terminalId) {
-    return NextResponse.json({ error: 'Terminal no encontrada' }, { status: 500 })
+    return NextResponse.json({ error: 'No hay terminales configuradas en el sistema' }, { status: 500 })
   }
 
   // Create passengers
@@ -107,6 +169,19 @@ export async function POST(req: NextRequest) {
   if (passError) {
     console.error('Passengers error:', passError)
     await service.from('bookings').delete().eq('id', booking.id)
+    if (squarePaymentId && squareClient) {
+      try {
+        await squareClient.refunds.refundPayment({
+          paymentId:      squarePaymentId,
+          amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+          idempotencyKey: crypto.randomUUID(),
+          reason:         'Passenger creation failed — automatic refund',
+        })
+        console.log('Square refund issued for payment:', squarePaymentId)
+      } catch (refundErr: any) {
+        console.error('Refund failed for payment', squarePaymentId, refundErr)
+      }
+    }
     return NextResponse.json({ error: 'Error al registrar los pasajeros' }, { status: 500 })
   }
 
@@ -136,6 +211,8 @@ export async function POST(req: NextRequest) {
         total:           total_amount,
         qrDataUrl,
         tripType:        ticket_type,
+        paymentMethod:   payment_method,
+        returnDate:      return_date,
       }),
     })
     if (emailResult.error) {

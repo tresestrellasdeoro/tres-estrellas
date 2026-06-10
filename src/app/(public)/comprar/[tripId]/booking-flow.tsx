@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   User, Armchair, CreditCard, CheckCircle2, ChevronLeft, Bus,
-  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Banknote, Download,
+  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Banknote, Download, CalendarDays,
 } from 'lucide-react'
 import { generateTicketPdf } from '@/lib/pdf/ticket-pdf'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SeatMap, type SeatId } from '@/components/public/seat-map'
+import { SquareCard, type SquareCardHandle } from '@/components/public/square-card'
 import {
   getBusById, getBoardingStops, getDroppingStops,
   getPrice, LUGGAGE_OPTIONS, ALL_STOPS,
@@ -30,8 +31,9 @@ interface Passenger {
 }
 
 export function BookingFlow({ tripId }: { tripId: string }) {
-  const params = useSearchParams()
-  const router = useRouter()
+  const params      = useSearchParams()
+  const router      = useRouter()
+  const squareRef   = useRef<SquareCardHandle>(null)
 
   const origin      = (params.get('origin')      || 'LA')  as StopCode
   const destination = (params.get('destination') || 'OTY') as StopCode
@@ -50,15 +52,13 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [luggage, setLuggage]           = useState<LuggageOption>(LUGGAGE_OPTIONS[0])
   const [selectedSeats, setSelectedSeats] = useState<Record<number, SeatId>>({})
 
+  const [returnDate, setReturnDate]  = useState('')
   const [email, setEmail]           = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card')
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardName, setCardName]     = useState('')
-  const [expiry, setExpiry]         = useState('')
-  const [cvv, setCvv]               = useState('')
-  const [loading, setLoading]       = useState(false)
-  const [bookingRef, setBookingRef] = useState('')
+  const [loading, setLoading]         = useState(false)
+  const [bookingRef, setBookingRef]   = useState('')
   const [bookingError, setBookingError] = useState('')
+  const [squareReady, setSquareReady] = useState(false)
 
   const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
     setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -77,13 +77,21 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const destStopInfo     = bus?.stops.find(s => s.code === destination)
 
   const canStep0 = passengers.every(p => p.name.trim().length >= 2) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    && (tripType !== 'round_trip' || returnDate !== '')
   const canStep1 = Object.keys(selectedSeats).length === passCount
-  const canStep2 = paymentMethod === 'cash' || (cardNumber.length >= 19 && !!cardName && expiry.length >= 5 && cvv.length >= 3)
+  const canStep2 = paymentMethod === 'cash' || squareReady
 
   const handlePay = async () => {
     setLoading(true)
     setBookingError('')
     try {
+      // Tokenize card with Square before hitting our API
+      let sourceId: string | undefined
+      if (paymentMethod === 'card') {
+        if (!squareRef.current) throw new Error('El formulario de pago no está listo. Espera un momento y vuelve a intentar.')
+        sourceId = await squareRef.current.tokenize()
+      }
+
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,11 +99,15 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           ticket_type:        tripType,
           total_amount:       grandTotal,
           guest_email:        email,
+          payment_method:     paymentMethod,
+          source_id:          sourceId,
           origin_name:        ALL_STOPS[boardingStop]?.name || boardingStop,
           destination_name:   ALL_STOPS[destination]?.name || destination,
+          boarding_stop_code: boardingStop,
           boarding_stop_name: ALL_STOPS[boardingStop]?.name || boardingStop,
           date,
           departure_time:     bus?.departs || '',
+          return_date:        tripType === 'round_trip' ? returnDate : undefined,
           passengers: passengers.map(p => ({
             full_name:      p.name,
             passenger_type: p.type,
@@ -280,6 +292,34 @@ export function BookingFlow({ tripId }: { tripId: string }) {
               />
             </div>
           </div>
+
+          {/* Return date (round-trip only) */}
+          {tripType === 'round_trip' && (
+            <div className="bg-white rounded-2xl border border-blue-200 p-6 shadow-sm">
+              <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-blue-600" />
+                Fecha de regreso
+              </h2>
+              <p className="text-slate-400 text-sm mb-4">
+                Elige el día en que planeas regresar. <span className="font-semibold text-blue-600">La hora es abierta</span> — puedes abordar cualquier autobús disponible ese día.
+              </p>
+              <input
+                type="date"
+                value={returnDate}
+                min={date ? (() => { const d = new Date(date + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })() : ''}
+                onChange={e => setReturnDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50"
+              />
+              {returnDate && (
+                <div className="mt-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+                  <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+                  <p className="text-blue-700 text-sm font-semibold">
+                    Regreso el <span className="font-black">{returnDate}</span> · Hora abierta — aborda el bus que más te convenga
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Luggage */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -468,42 +508,16 @@ export function BookingFlow({ tripId }: { tripId: string }) {
             </button>
           </div>
 
-          {/* Card form */}
+          {/* Square card form */}
           {paymentMethod === 'card' && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre en la tarjeta</Label>
-                <Input value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Juan García"
-                  className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20" />
-              </div>
-              <div>
-                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Número de tarjeta</Label>
-                <div className="relative mt-1.5">
-                  <Input value={cardNumber}
-                    onChange={e => setCardNumber(e.target.value.replace(/\D/g,'').slice(0,16).replace(/(\d{4})/g,'$1 ').trim())}
-                    placeholder="0000 0000 0000 0000" maxLength={19}
-                    className="rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 pr-12 font-mono" />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                    <div className="w-6 h-4 rounded-sm bg-blue-600 opacity-80" />
-                    <div className="w-6 h-4 rounded-sm bg-red-500 opacity-80 -ml-2" />
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vencimiento</Label>
-                  <Input value={expiry}
-                    onChange={e => { let v = e.target.value.replace(/\D/g,'').slice(0,4); if(v.length>=3) v=v.slice(0,2)+'/'+v.slice(2); setExpiry(v) }}
-                    placeholder="MM/AA" maxLength={5}
-                    className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 font-mono" />
-                </div>
-                <div>
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">CVV</Label>
-                  <Input value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g,'').slice(0,4))}
-                    placeholder="•••" maxLength={4} type="password"
-                    className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20 font-mono" />
-                </div>
-              </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                Datos de tarjeta
+              </Label>
+              <SquareCard ref={squareRef} onReady={() => setSquareReady(true)} />
+              <p className="text-slate-400 text-xs mt-2 flex items-center gap-1">
+                🔒 Formulario cifrado por Square — tus datos nunca tocan nuestros servidores
+              </p>
             </div>
           )}
 
@@ -577,9 +591,6 @@ export function BookingFlow({ tripId }: { tripId: string }) {
               }
             </Button>
           </div>
-          {paymentMethod === 'card' && (
-            <p className="text-center text-slate-400 text-xs mt-4">🔒 Pago cifrado SSL 256-bit</p>
-          )}
           {bookingError && (
             <p className="text-center text-red-600 text-sm mt-3 font-semibold">{bookingError}</p>
           )}
@@ -623,6 +634,14 @@ export function BookingFlow({ tripId }: { tripId: string }) {
               <span className="text-slate-500">Tipo</span>
               <span className="font-semibold">{tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida'}</span>
             </div>
+            {tripType === 'round_trip' && returnDate && (
+              <div className="flex justify-between text-sm bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mt-1">
+                <span className="text-blue-600 font-semibold flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> Regreso
+                </span>
+                <span className="font-black text-blue-700">{returnDate} · Hora abierta</span>
+              </div>
+            )}
             {luggage.price > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Equipaje</span>
@@ -680,6 +699,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 total:          grandTotal,
                 paymentMethod,
                 email,
+                returnDate:     tripType === 'round_trip' ? returnDate : undefined,
               })}
               className="rounded-xl border-slate-200 text-slate-600 text-sm flex items-center gap-2"
             >
