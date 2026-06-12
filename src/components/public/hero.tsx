@@ -100,7 +100,7 @@ export function Hero() {
         <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight mb-1 animate-fade-up-1">
           Transporte Los Angeles ↔ Tijuana
         </h1>
-        <p className="font-display text-lg sm:text-xl font-bold text-[#c8a951] mb-2 animate-fade-up-1">
+        <p className="font-display text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight mb-1 animate-fade-up-1">
           y Tijuana ↔ Los Angeles
         </p>
         <p className="text-white/60 text-base max-w-xl mx-auto mb-3 animate-fade-up-2">
