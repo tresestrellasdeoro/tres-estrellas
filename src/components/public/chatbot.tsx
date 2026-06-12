@@ -32,7 +32,7 @@ const FAQS = [
   },
   {
     keywords: ['cancelar', 'cancelacion', 'cancelación', 'reembolso', 'devolver', 'cambiar', 'cambio'],
-    answer: `❓ Para cancelaciones o cambios de fecha, comunícate directamente con nosotros por teléfono:\n\n📞 **(213) 275-1402** — Los Angeles\n📞 **(323) 588-9188** — Huntington Park\n📞 **(619) 428-5512** — San Ysidro\n📞 **(664) 208-8399** — Tijuana\n\nTe atenderemos con gusto para ayudarte con tu reservación.`,
+    answer: `❓ Para cancelaciones o cambios de fecha, comunícate directamente con nosotros por teléfono:\n\n📞 **(213) 624-5524** — Los Angeles\n📞 **(323) 588-9188** — Huntington Park\n📞 **(619) 428-5512** — San Ysidro\n📞 **(664) 208-8399** — Tijuana\n\nTe atenderemos con gusto para ayudarte con tu reservación.`,
     quickReplies: ['¿Cómo compro?', '¿Dónde están las terminales?'],
   },
   {
@@ -67,12 +67,12 @@ const FAQS = [
   },
   {
     keywords: ['contacto', 'telefono', 'teléfono', 'llamar', 'comunicar', 'whatsapp', 'ayuda', 'soporte'],
-    answer: `📞 **Contáctanos:**\n\n🇺🇸 **(213) 275-1402** — Los Angeles\n🇺🇸 **(323) 588-9188** — Huntington Park\n🇺🇸 **(619) 428-5512** — San Ysidro\n🇲🇽 **(664) 208-8399** — Tijuana\n\nEstamos disponibles todos los días. ¡Con gusto te ayudamos!`,
+    answer: `📞 **Contáctanos:**\n\n🇺🇸 **(213) 624-5524** — Los Angeles\n🇺🇸 **(323) 588-9188** — Huntington Park\n🇺🇸 **(619) 428-5512** — San Ysidro\n🇲🇽 **(664) 208-8399** — Tijuana\n\nEstamos disponibles todos los días. ¡Con gusto te ayudamos!`,
     quickReplies: ['¿Cómo compro?', '¿Dónde están las terminales?'],
   },
   {
     keywords: ['niño', 'niños', 'menor', 'menores', 'bebe', 'bebé', 'infantil', 'hijo', 'hijos'],
-    answer: `👶 **Viaje con menores:**\n\n• Los niños de **0 a 11 años** tienen tarifa de menor (~$5-10 menos que adulto)\n• Los menores deben viajar acompañados de un adulto\n• Se debe ingresar el nombre completo del menor al comprar\n\n¿Necesitas ayuda para reservar? Llámanos al **(213) 275-1402**.`,
+    answer: `👶 **Viaje con menores:**\n\n• Los niños de **0 a 11 años** tienen tarifa de menor (~$5-10 menos que adulto)\n• Los menores deben viajar acompañados de un adulto\n• Se debe ingresar el nombre completo del menor al comprar\n\n¿Necesitas ayuda para reservar? Llámanos al **(213) 624-5524**.`,
     quickReplies: ['¿Cuánto cuesta?', '¿Cómo compro?'],
   },
 ]
@@ -88,7 +88,7 @@ const QUICK_TOPICS = [
   '¿Puedo cancelar?',
 ]
 
-const FALLBACK = `Lo siento, no encontré información exacta sobre eso 😅\n\nPuedes llamarnos directamente:\n📞 **(213) 275-1402** — Los Angeles\n📞 **(664) 208-8399** — Tijuana\n\nO prueba preguntando sobre: horarios, precios, equipaje, boletos o terminales.`
+const FALLBACK = `Lo siento, no encontré información exacta sobre eso 😅\n\nPuedes llamarnos directamente:\n📞 **(213) 624-5524** — Los Angeles\n📞 **(664) 208-8399** — Tijuana\n\nO prueba preguntando sobre: horarios, precios, equipaje, boletos o terminales.`
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function findAnswer(text: string): { answer: string; quickReplies: string[] } {

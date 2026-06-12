@@ -3,7 +3,8 @@ import Image from 'next/image'
 import { Phone, Star, Bus } from 'lucide-react'
 
 const PHONES = [
-  { num: '+1 (213) 275-1402', loc: 'Los Angeles',    href: 'tel:+12132751402' },
+  { num: '+1 800 337-8745',   loc: 'Línea gratuita', href: 'tel:+18003378745' },
+  { num: '+1 (213) 624-5524', loc: 'Los Angeles',    href: 'tel:+12136245524' },
   { num: '+1 (323) 588-9188', loc: 'Huntington Park',href: 'tel:+13235889188' },
   { num: '+1 (619) 428-5512', loc: 'San Ysidro',     href: 'tel:+16194285512' },
   { num: '+52 (664) 208-8399',loc: 'Tijuana, México', href: 'tel:+526642088399' },

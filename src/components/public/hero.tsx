@@ -110,12 +110,13 @@ export function Hero() {
         {/* Phones */}
         <div className="flex flex-wrap justify-center gap-4 mb-8 animate-fade-up-2">
           {[
-            { num: '(213) 275-1402', loc: 'Los Angeles' },
-            { num: '(323) 588-9188', loc: 'Huntington Park' },
-            { num: '(619) 428-5512', loc: 'San Ysidro' },
-            { num: '(664) 208-8399', loc: 'México' },
+            { num: '1 800 337-8745',  loc: 'Línea gratuita', href: 'tel:+18003378745' },
+            { num: '(213) 624-5524',  loc: 'Los Angeles',    href: 'tel:+12136245524' },
+            { num: '(323) 588-9188',  loc: 'Huntington Park',href: 'tel:+13235889188' },
+            { num: '(619) 428-5512',  loc: 'San Ysidro',     href: 'tel:+16194285512' },
+            { num: '(664) 208-8399',  loc: 'México',         href: 'tel:+526642088399' },
           ].map(p => (
-            <a key={p.num} href={`tel:+1${p.num.replace(/\D/g,'')}`}
+            <a key={p.num} href={p.href}
               className="flex items-center gap-1.5 text-white/55 hover:text-[#c8a951] text-xs transition-colors">
               <Phone className="w-3 h-3" />
               {p.num} <span className="text-white/30">·</span> {p.loc}

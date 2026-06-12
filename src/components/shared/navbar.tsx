@@ -15,8 +15,11 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0f2c5c]/97 backdrop-blur-md border-b border-white/10">
       {/* Top bar */}
       <div className="hidden md:flex items-center justify-end gap-6 px-6 py-1 bg-[#0a1e42] border-b border-white/8">
-        <a href="tel:+12132751402" className="flex items-center gap-1.5 text-white/55 hover:text-white text-[11px] transition-colors">
-          <Phone className="w-3 h-3" /> (213) 275-1402
+        <a href="tel:+18003378745" className="flex items-center gap-1.5 text-[#c8a951] hover:text-white text-[11px] transition-colors font-bold">
+          <Phone className="w-3 h-3" /> 1 800 337-8745
+        </a>
+        <a href="tel:+12136245524" className="flex items-center gap-1.5 text-white/55 hover:text-white text-[11px] transition-colors">
+          <Phone className="w-3 h-3" /> (213) 624-5524
         </a>
         <a href="tel:+13235889188" className="flex items-center gap-1.5 text-white/55 hover:text-white text-[11px] transition-colors">
           <Phone className="w-3 h-3" /> (323) 588-9188
@@ -148,8 +151,8 @@ export function Navbar() {
           </div>
           <Link href="/#lealtad" className="text-white/80 text-sm font-medium py-2" onClick={() => setOpen(false)}>Puntos de lealtad</Link>
           <div className="border-t border-white/10 pt-3 space-y-2">
-            <a href="tel:+12132751402" className="flex items-center gap-2 text-white/60 text-sm">
-              <Phone className="w-4 h-4 text-[#c8a951]" /> (213) 275-1402
+            <a href="tel:+12136245524" className="flex items-center gap-2 text-white/60 text-sm">
+              <Phone className="w-4 h-4 text-[#c8a951]" /> (213) 624-5524
             </a>
             <a href="tel:+13235889188" className="flex items-center gap-2 text-white/60 text-sm">
               <Phone className="w-4 h-4 text-[#c8a951]" /> (323) 588-9188

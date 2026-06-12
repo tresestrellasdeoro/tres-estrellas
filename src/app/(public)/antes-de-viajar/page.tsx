@@ -191,7 +191,7 @@ export default function AntesDeViajarPage() {
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             {[
-              { city: 'Los Angeles, CA',       label: 'Terminal Los Angeles',    phone: '(213) 275-1402' },
+              { city: 'Los Angeles, CA',       label: 'Terminal Los Angeles',    phone: '(213) 624-5524' },
               { city: 'Huntington Park, CA',   label: 'Terminal Huntington Park', phone: '(323) 588-9188' },
               { city: 'San Ysidro, CA',        label: 'Terminal San Ysidro',     phone: '(619) 428-5512' },
               { city: 'Tijuana, BC México',    label: 'Garita de Otay / Aeropuerto', phone: '(664) 208-8399' },

@@ -218,7 +218,7 @@ export async function generateTicketPdf(d: TicketPdfData) {
   doc.setTextColor(150, 160, 180)
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
-  doc.text('(213) 275-1402  ·  (323) 588-9188  ·  (619) 428-5512  ·  (664) 208-8399', W / 2, 287, { align: 'center' })
+  doc.text('1 800 337-8745  ·  (213) 624-5524  ·  (619) 428-5512  ·  (664) 208-8399', W / 2, 287, { align: 'center' })
   doc.text('tresestrellasdeoroinc.com', W / 2, 292, { align: 'center' })
 
   doc.save(`boleto-${d.bookingNumber}.pdf`)

@@ -43,7 +43,7 @@ const SERVICES = [
 ]
 
 const TERMINALS = [
-  { city: 'Los Angeles, CA',     phone: '(213) 275-1402', tel: '+12132751402' },
+  { city: 'Los Angeles, CA',     phone: '(213) 624-5524', tel: '+12136245524' },
   { city: 'Huntington Park, CA', phone: '(323) 588-9188', tel: '+13235889188' },
   { city: 'San Ysidro, CA',      phone: '(619) 428-5512', tel: '+16194285512' },
   { city: 'Garita de Otay, MX',  phone: '(664) 208-8399', tel: '+526642088399' },
@@ -80,7 +80,7 @@ export default function PaqueteoPage() {
             Más de <strong className="text-white">30 años</strong> conectando familias, comunidades y oportunidades entre Los Angeles y Tijuana.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="tel:+12132751402">
+            <a href="tel:+12136245524">
               <Button className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold px-6">
                 <Phone className="w-4 h-4 mr-2" />
                 Cotizar ahora
@@ -264,10 +264,10 @@ export default function PaqueteoPage() {
             Llámanos para una cotización gratuita o visita cualquier terminal con tu paquete.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="tel:+12132751402">
+            <a href="tel:+12136245524">
               <Button className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold px-6">
                 <Phone className="w-4 h-4 mr-2" />
-                (213) 275-1402 · LA
+                (213) 624-5524 · LA
               </Button>
             </a>
             <a href="tel:+13235889188">

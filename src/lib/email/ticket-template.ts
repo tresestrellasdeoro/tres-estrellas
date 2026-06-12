@@ -135,7 +135,7 @@ export function ticketEmailHtml(d: TicketEmailData): string {
           <td style="padding:24px 40px;text-align:center;border-top:1px solid #f0f0f0;">
             <p style="margin:0;color:#9ca3af;font-size:12px;">Tres Estrellas de Oro Inc. · Los Angeles ↔ Tijuana</p>
             <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;">
-              📞 (213) 275-1402 &nbsp;|&nbsp; (619) 428-5512 &nbsp;|&nbsp; (664) 208-8399
+              📞 1 800 337-8745 &nbsp;|&nbsp; (213) 624-5524 &nbsp;|&nbsp; (619) 428-5512 &nbsp;|&nbsp; (664) 208-8399
             </p>
             <p style="margin:6px 0 0;color:#d1d5db;font-size:11px;">tresestrellasdeoroinc.com</p>
           </td>
