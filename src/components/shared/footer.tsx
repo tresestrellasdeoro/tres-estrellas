@@ -76,11 +76,11 @@ export function Footer() {
               {[
                 { label: 'Horarios', href: '/buscar' },
                 { label: 'Puntos de lealtad', href: '/#lealtad' },
-                { label: 'Antes de viajar', href: '#' },
-                { label: 'Restricciones', href: '#' },
-                { label: 'Envío de paquetes', href: '#' },
+                { label: 'Antes de viajar', href: '/antes-de-viajar' },
+                { label: 'Restricciones', href: '/restricciones' },
+                { label: 'Envío de paquetes', href: '/paqueteo' },
               ].map(item => (
-                <li key={item.href}>
+                <li key={item.label}>
                   <Link href={item.href} className="text-white/45 text-xs hover:text-white/80 transition-colors">{item.label}</Link>
                 </li>
               ))}

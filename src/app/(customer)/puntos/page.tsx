@@ -12,13 +12,13 @@ const TIERS = [
   { key: 'platinum', emoji: '💎', name: 'Platino', min: 5000, max: 99999,discount: 20, perks: ['20% descuento', 'VIP Lounge', 'Asistente dedicado'] },
 ]
 
-const DEMO_TRANSACTIONS = [
-  { id:'1', type:'earned',   points:35,   description:'Viaje LA → LTI',          created_at:'2024-06-01T10:00:00Z' },
-  { id:'2', type:'earned',   points:70,   description:'Viaje LA → LTI (ida+vuelta)',created_at:'2024-05-20T08:30:00Z' },
-  { id:'3', type:'bonus',    points:50,   description:'Bono de bienvenida',       created_at:'2024-05-01T00:00:00Z' },
-  { id:'4', type:'redeemed', points:-100, description:'Descuento canjeado',       created_at:'2024-04-15T14:00:00Z' },
-  { id:'5', type:'earned',   points:38,   description:'Viaje LA → ATI',           created_at:'2024-04-10T09:00:00Z' },
-]
+interface LoyaltyTx {
+  id: string
+  type: string
+  points: number
+  description: string
+  created_at: string
+}
 
 export default async function PuntosPage() {
   const supabase = await createClient()
@@ -27,7 +27,7 @@ export default async function PuntosPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single() as { data: Profile | null }
 
-  let transactions = DEMO_TRANSACTIONS
+  let transactions: LoyaltyTx[] = []
   try {
     const { data } = await supabase
       .from('loyalty_transactions')
@@ -35,7 +35,7 @@ export default async function PuntosPage() {
       .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20)
-    if (data && data.length > 0) transactions = data as typeof DEMO_TRANSACTIONS
+    if (data && data.length > 0) transactions = data as LoyaltyTx[]
   } catch {}
 
   const pts  = profile?.loyalty_points || 0
@@ -154,31 +154,39 @@ export default async function PuntosPage() {
         <div className="p-5 border-b border-slate-100">
           <h2 className="font-bold text-slate-800">Historial de puntos</h2>
         </div>
-        <div className="divide-y divide-slate-100">
-          {transactions.map(tx => (
-            <div key={tx.id} className="px-5 py-3.5 flex items-center gap-4">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                tx.type === 'earned'   ? 'bg-emerald-50' :
-                tx.type === 'bonus'   ? 'bg-[rgba(240,180,41,0.1)]' :
-                                        'bg-red-50'
-              }`}>
-                {tx.type === 'earned' && <Bus className="w-4 h-4 text-emerald-600" />}
-                {tx.type === 'bonus'  && <Star className="w-4 h-4 text-[#d97706]" />}
-                {tx.type === 'redeemed' && <Gift className="w-4 h-4 text-red-500" />}
+        {transactions.length === 0 ? (
+          <div className="py-14 text-center px-6">
+            <Star className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="font-semibold text-slate-500 text-sm">Sin movimientos aún</p>
+            <p className="text-slate-400 text-xs mt-1">Tus puntos aparecerán aquí después de cada viaje.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {transactions.map(tx => (
+              <div key={tx.id} className="px-5 py-3.5 flex items-center gap-4">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  tx.type === 'earned'   ? 'bg-emerald-50' :
+                  tx.type === 'bonus'   ? 'bg-[rgba(240,180,41,0.1)]' :
+                                          'bg-red-50'
+                }`}>
+                  {tx.type === 'earned'   && <Bus className="w-4 h-4 text-emerald-600" />}
+                  {tx.type === 'bonus'    && <Star className="w-4 h-4 text-[#d97706]" />}
+                  {tx.type === 'redeemed' && <Gift className="w-4 h-4 text-red-500" />}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-700 text-sm">{tx.description}</p>
+                  <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3" />
+                    {new Date(tx.created_at).toLocaleDateString('es-MX')}
+                  </p>
+                </div>
+                <div className={`font-black text-sm ${tx.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {tx.points > 0 ? '+' : ''}{tx.points} pts
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-slate-700 text-sm">{tx.description}</p>
-                <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
-                  <Clock className="w-3 h-3" />
-                  {new Date(tx.created_at).toLocaleDateString('es-MX')}
-                </p>
-              </div>
-              <div className={`font-black text-sm ${tx.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {tx.points > 0 ? '+' : ''}{tx.points} pts
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

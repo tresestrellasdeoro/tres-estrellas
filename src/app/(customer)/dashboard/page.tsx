@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single() as { data: Profile | null }
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('*, trip:trips(departure_date, departure_time, schedule:schedules(route:routes(origin_stop:stops!routes_origin_stop_id_fkey(name), destination_stop:stops!routes_destination_stop_id_fkey(name))))')
+    .select('id, booking_number, status, total_amount, created_at')
     .eq('customer_id', user.id)
     .order('created_at', { ascending: false })
     .limit(3)
@@ -108,11 +108,9 @@ export default async function DashboardPage() {
                   <Bus className="w-5 h-5 text-slate-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-800 text-sm truncate">
-                    {b.trip?.schedule?.route?.origin_stop?.name} → {b.trip?.schedule?.route?.destination_stop?.name}
-                  </p>
+                  <p className="font-semibold text-slate-800 text-sm font-mono tracking-wider">{b.booking_number}</p>
                   <div className="flex gap-3 mt-0.5 text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{b.trip?.departure_date}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(b.created_at).toLocaleDateString('es-MX')}</span>
                     <span className="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">{b.status}</span>
                   </div>
                 </div>

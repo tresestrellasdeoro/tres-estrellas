@@ -150,12 +150,15 @@ CREATE TABLE bookings (
   id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   booking_number TEXT NOT NULL UNIQUE,
   trip_id        UUID NOT NULL REFERENCES trips(id),
-  customer_id    UUID NOT NULL REFERENCES profiles(id),
+  customer_id    UUID REFERENCES profiles(id),           -- nullable: guest checkout
   return_trip_id UUID REFERENCES trips(id),
   ticket_type    ticket_type NOT NULL DEFAULT 'one_way',
-  status         booking_status NOT NULL DEFAULT 'pending',
+  status         booking_status NOT NULL DEFAULT 'confirmed',
   total_amount   DECIMAL(8,2) NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'card',
+  guest_email    TEXT,
   points_earned  INT NOT NULL DEFAULT 0,
+  return_date    DATE,                                    -- fecha de regreso (hora abierta)
   notes          TEXT,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -179,16 +182,18 @@ CREATE TRIGGER set_booking_number
 -- PASAJEROS
 -- ============================================================
 CREATE TABLE passengers (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  booking_id     UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-  full_name      TEXT NOT NULL,
-  passenger_type passenger_type NOT NULL DEFAULT 'adult',
-  seat_number    TEXT,
-  qr_code        TEXT NOT NULL UNIQUE,
-  price          DECIMAL(8,2) NOT NULL,
-  terminal_id    UUID NOT NULL REFERENCES stops(id),
-  checked_in     BOOLEAN NOT NULL DEFAULT false,
-  checked_in_at  TIMESTAMPTZ
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  booking_id            UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  full_name             TEXT NOT NULL,
+  passenger_type        passenger_type NOT NULL DEFAULT 'adult',
+  seat_number           TEXT,
+  qr_code               TEXT NOT NULL UNIQUE,
+  price                 DECIMAL(8,2) NOT NULL,
+  terminal_id           UUID NOT NULL REFERENCES stops(id),
+  checked_in            BOOLEAN NOT NULL DEFAULT false,
+  checked_in_at         TIMESTAMPTZ,
+  return_checked_in     BOOLEAN NOT NULL DEFAULT false,  -- check-in tramo regreso
+  return_checked_in_at  TIMESTAMPTZ
 );
 
 -- Auto-generar QR code

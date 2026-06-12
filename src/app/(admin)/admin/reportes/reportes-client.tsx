@@ -10,7 +10,7 @@ const PERIOD_MONTHS: Record<string, number> = {
   '1m': 1,
   '3m': 3,
   '6m': 6,
-  '1a': 6, // solo tenemos 6 meses de datos
+  '1a': 12,
 }
 
 export default function ReportesClient({ data }: { data: ReportesData }) {

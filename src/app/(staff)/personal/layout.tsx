@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, Users, ClipboardList, LogOut, Bus, Menu, X } from 'lucide-react'
+import { ScanLine, Users, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_CAJERO = [
   { href: '/personal/validar',       label: 'Validar boleto',    icon: ScanLine },
+  { href: '/personal/venta',         label: 'Nueva venta',       icon: ShoppingCart },
   { href: '/personal/reservaciones', label: 'Reservaciones',     icon: ClipboardList },
 ]
 
@@ -20,9 +21,19 @@ const NAV_BUSERO = [
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
+  const [navItems, setNavItems] = useState(NAV_CAJERO)
 
-  const navItems = NAV_CAJERO
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(supabase.from('profiles') as any).select('role').eq('id', user.id).maybeSingle().then(({ data }: { data: { role: string } | null }) => {
+        if (data?.role === 'driver') setNavItems(NAV_BUSERO)
+      })
+    })
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()

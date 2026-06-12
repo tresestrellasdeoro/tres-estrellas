@@ -84,7 +84,8 @@ export default async function ReportesPage() {
 
   const totalRevenue = monthlyData.reduce((s, d) => s + d.revenue, 0)
   const totalBookings = monthlyData.reduce((s, d) => s + d.bookings, 0)
-  const avgMonthlyRevenue = monthlyData.length > 0 ? Math.round(totalRevenue / monthlyData.length) : 0
+  const activeMonths = monthlyData.filter(d => d.bookings > 0).length || 1
+  const avgMonthlyRevenue = Math.round(totalRevenue / activeMonths)
 
   // Breakdown de métodos de pago
   const paymentCounts: Record<string, number> = {}

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function PasajerosPage() {
+export default function PasajerosStaffPage() {
   redirect('/personal/reservaciones')
 }

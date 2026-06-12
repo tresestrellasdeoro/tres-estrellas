@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient()
 
-  const { data: originStop }      = await supabase.from('stops').select('id').eq('code', origin).single() as { data: { id: string } | null }
-  const { data: destinationStop } = await supabase.from('stops').select('id').eq('code', destination).single() as { data: { id: string } | null }
+  const { data: originStop }      = await supabase.from('stops').select('id').eq('code', origin).maybeSingle() as { data: { id: string } | null }
+  const { data: destinationStop } = await supabase.from('stops').select('id').eq('code', destination).maybeSingle() as { data: { id: string } | null }
 
   if (!originStop || !destinationStop) {
     return NextResponse.json({ error: 'Invalid stops' }, { status: 400 })

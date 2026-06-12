@@ -13,12 +13,10 @@ function getService() {
 
 const ROLE_LABELS: Record<string, string> = {
   cajero: '💰 Cajero',
-  driver: '🚌 Busero',
   admin:  '⚙️ Admin',
 }
 const ROLE_COLORS: Record<string, string> = {
   cajero: 'bg-blue-50 text-blue-700',
-  driver: 'bg-amber-50 text-amber-700',
   admin:  'bg-purple-50 text-purple-700',
 }
 
@@ -28,7 +26,7 @@ export default async function PersonalPage() {
   const { data: staff } = await service
     .from('profiles')
     .select('id, full_name, email, role, created_at')
-    .in('role', ['cajero', 'driver', 'admin'])
+    .in('role', ['cajero', 'admin'])
     .order('created_at', { ascending: false })
 
   return (
@@ -39,7 +37,7 @@ export default async function PersonalPage() {
             <Users className="w-6 h-6 text-[#c01515]" />
             Personal
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Gestiona cajeros y buseros. Solo el admin puede crear usuarios de personal.</p>
+          <p className="text-slate-500 text-sm mt-1">Gestiona cajeros de taquilla. Solo el admin puede crear usuarios de personal.</p>
         </div>
       </div>
 
@@ -55,7 +53,7 @@ export default async function PersonalPage() {
             <div className="p-12 text-center">
               <Users className="w-10 h-10 text-slate-200 mx-auto mb-3" />
               <p className="text-slate-400 font-semibold">Sin personal registrado</p>
-              <p className="text-slate-300 text-sm">Crea el primer cajero o busero con el formulario.</p>
+              <p className="text-slate-300 text-sm">Crea el primer cajero con el formulario.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -89,7 +87,7 @@ export default async function PersonalPage() {
           <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4">
             <p className="text-blue-800 text-xs font-bold mb-1">Acceso del personal</p>
             <p className="text-blue-600 text-xs leading-relaxed">
-              Los cajeros y buseros inician sesión en <span className="font-mono font-bold">/personal</span> con su correo y contraseña. Solo ven el validador de boletos y las reservaciones del día.
+              Los cajeros inician sesión en <span className="font-mono font-bold">/personal</span> con su correo y contraseña. Solo ven el validador de boletos y las reservaciones del día.
             </p>
           </div>
         </div>

@@ -14,6 +14,7 @@ interface TicketPdfData {
   total: number
   paymentMethod: string
   email: string
+  returnDate?: string
 }
 
 export async function generateTicketPdf(d: TicketPdfData) {
@@ -99,9 +100,9 @@ export async function generateTicketPdf(d: TicketPdfData) {
   const infoY = y + 33
   const pillW = (W - margin * 2 - 12) / 3
   ;[
-    { label: 'FECHA',  val: d.date },
-    { label: 'SALIDA', val: d.departureTime },
-    { label: 'TIPO',   val: d.tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida' },
+    { label: 'FECHA IDA', val: d.date },
+    { label: 'SALIDA',    val: d.departureTime },
+    { label: 'TIPO',      val: d.tripType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida' },
   ].forEach((item, i) => {
     const x = margin + i * (pillW + 6)
     doc.setFillColor(225, 230, 240)
@@ -117,6 +118,25 @@ export async function generateTicketPdf(d: TicketPdfData) {
   })
 
   y += 46
+
+  // Return date pill (round-trip only)
+  if (d.tripType === 'round_trip' && d.returnDate) {
+    doc.setFillColor(219, 234, 254)
+    doc.roundedRect(margin, y - 4, W - margin * 2, 14, 2, 2, 'F')
+    doc.setFontSize(7)
+    doc.setTextColor(59, 130, 246)
+    doc.setFont('helvetica', 'normal')
+    doc.text('REGRESO', margin + 6, y + 1)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(30, 58, 138)
+    doc.text(d.returnDate, margin + 6, y + 6)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(59, 130, 246)
+    doc.text('Hora abierta — cualquier autobús disponible ese día', margin + 60, y + 6)
+    y += 18
+  }
 
   // ── Pasajeros ──
   doc.setTextColor(...navy)

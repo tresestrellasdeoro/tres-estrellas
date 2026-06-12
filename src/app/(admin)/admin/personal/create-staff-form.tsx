@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,11 +11,11 @@ export function CreateStaffForm() {
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole]         = useState<'cajero' | 'driver'>('cajero')
   const [showPwd, setShowPwd]   = useState(false)
   const [loading, setLoading]   = useState(false)
   const [success, setSuccess]   = useState('')
   const [error, setError]       = useState('')
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,12 +30,13 @@ export function CreateStaffForm() {
       const res = await fetch('/api/admin/create-staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role: 'cajero' }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
       setSuccess(`Usuario "${name}" creado correctamente.`)
       setName(''); setEmail(''); setPassword('')
+      router.refresh()
     } catch {
       setError('Error de conexión')
     } finally {
@@ -70,20 +72,6 @@ export function CreateStaffForm() {
           </button>
         </div>
       </div>
-      <div>
-        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</Label>
-        <div className="grid grid-cols-2 gap-2 mt-1.5">
-          {(['cajero', 'driver'] as const).map(r => (
-            <button key={r} type="button" onClick={() => setRole(r)}
-              className={`py-2.5 px-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                role === r ? 'border-[#c01515] bg-red-50 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
-              }`}>
-              {r === 'cajero' ? '💰 Cajero' : '🚌 Busero'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {error && <p className="text-red-600 text-xs font-semibold">{error}</p>}
       {success && (
         <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold bg-emerald-50 border border-emerald-200 rounded-xl p-3">

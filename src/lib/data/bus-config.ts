@@ -296,9 +296,9 @@ export function getDroppingStops(bus: BusRoute): BusStop[] {
   return bus.stops.filter(s => s.type === 'dropping' || s.type === 'both')
 }
 
-// Seats available (demo — replace with real DB query)
+// Seats available — shown in search results (will be replaced with real DB counts)
 export const DEMO_SEATS_AVAILABLE: Record<string, number> = {
-  'bus-1': 48, 'bus-2': 50, 'bus-3': 44, 'bus-4': 52, 'bus-5': 20,
-  'bus-6': 56, 'bus-7': 38, 'bus-8': 50, 'bus-9': 6,
-  'bus-tj-1': 46, 'bus-tj-2': 42, 'bus-tj-3': 56, 'bus-tj-4': 0,
+  'bus-1': 48, 'bus-2': 50, 'bus-3': 44, 'bus-4': 52, 'bus-5': 40,
+  'bus-6': 56, 'bus-7': 38, 'bus-8': 50, 'bus-9': 45,
+  'bus-tj-1': 46, 'bus-tj-2': 42, 'bus-tj-3': 56, 'bus-tj-4': 48,
 }

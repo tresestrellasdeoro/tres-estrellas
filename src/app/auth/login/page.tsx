@@ -1,22 +1,63 @@
-import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+'use client'
+
+import { useState, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Mail, Lock, AlertCircle } from 'lucide-react'
+import { Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { Suspense } from 'react'
 
-async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const cookieStore = await cookies()
-  const session     = cookieStore.get('admin_session')
-  const { error }   = await searchParams
+function LoginForm() {
+  const router        = useRouter()
+  const searchParams  = useSearchParams()
+  const nextPath      = searchParams.get('next') || ''
+  const urlError      = searchParams.get('error')
+  const adminFormRef  = useRef<HTMLFormElement>(null)
 
-  if (session?.value) redirect('/admin/dashboard')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw,   setShowPw]   = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState(urlError ? 'Correo o contraseña incorrectos.' : '')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    // 1. Try Supabase auth first (cajeros, buseros, customers)
+    const supabase = createClient()
+    const { data, error: sbError } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (data?.user) {
+      // Get role from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single() as { data: { role: string } | null }
+
+      const role = profile?.role
+      if (role === 'cajero' || role === 'driver') {
+        router.push('/personal/validar')
+      } else if (role === 'admin' || role === 'super_admin') {
+        router.push('/admin/dashboard')
+      } else {
+        router.push(nextPath || '/dashboard')
+      }
+      return
+    }
+
+    // 2. Fallback to admin env-var login (native form POST so cookie is set properly)
+    adminFormRef.current?.submit()
+    // Don't setLoading(false) — page will navigate away if admin login succeeds
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a1e42] to-[#0f2c5c] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
 
-        {/* Logo */}
         <div className="flex justify-center mb-8">
           <Link href="/">
             <div className="bg-white rounded-2xl px-6 py-4 shadow-2xl shadow-black/40 inline-block">
@@ -33,18 +74,18 @@ async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: str
         </div>
 
         <h1 className="text-center font-black text-2xl text-white mb-1">Iniciar sesión</h1>
-        <p className="text-center text-white/45 text-sm mb-6">Panel de administración</p>
+        <p className="text-center text-white/45 text-sm mb-6">Acceso para personal y administración</p>
 
         <div className="bg-white/8 border border-white/12 backdrop-blur-sm rounded-2xl p-6">
 
           {error && (
             <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 rounded-xl p-3 mb-4">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-              <p className="text-red-300 text-sm">Correo o contraseña incorrectos.</p>
+              <p className="text-red-300 text-sm">{error}</p>
             </div>
           )}
 
-          <form method="POST" action="/api/auth/admin-login" className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-white/60 text-xs font-bold uppercase tracking-wider mb-1.5">
                 Correo electrónico
@@ -53,7 +94,8 @@ async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: str
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   type="email"
-                  name="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
                   placeholder="tu@correo.com"
                   required
                   className="w-full pl-10 pr-4 py-3 bg-white/6 border border-white/12 text-white placeholder:text-white/25 rounded-xl focus:outline-none focus:border-[#c8a951]/50 text-sm"
@@ -68,20 +110,34 @@ async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: str
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
-                  type="password"
-                  name="password"
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/6 border border-white/12 text-white placeholder:text-white/25 rounded-xl focus:outline-none focus:border-[#c8a951]/50 text-sm"
+                  className="w-full pl-10 pr-10 py-3 bg-white/6 border border-white/12 text-white placeholder:text-white/25 rounded-xl focus:outline-none focus:border-[#c8a951]/50 text-sm"
                 />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-[#c01515] hover:bg-[#a01010] text-white font-black rounded-xl h-11 text-sm transition-colors mt-2"
+              disabled={loading}
+              className="w-full bg-[#c01515] hover:bg-[#a01010] disabled:opacity-50 text-white font-black rounded-xl h-11 text-sm transition-colors mt-2 flex items-center justify-center gap-2"
             >
-              Iniciar sesión
+              {loading ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Iniciando...
+                </>
+              ) : 'Iniciar sesión'}
             </button>
           </form>
         </div>
@@ -92,14 +148,20 @@ async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: str
           </Link>
         </p>
       </div>
+
+      {/* Hidden native form for admin cookie login fallback */}
+      <form ref={adminFormRef} method="POST" action="/api/auth/admin-login" style={{ display: 'none' }}>
+        <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="password" value={password} />
+      </form>
     </div>
   )
 }
 
-export default function Page(props: { searchParams: Promise<{ error?: string }> }) {
+export default function Page() {
   return (
     <Suspense>
-      <LoginPage {...props} />
+      <LoginForm />
     </Suspense>
   )
 }

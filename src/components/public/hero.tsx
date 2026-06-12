@@ -8,13 +8,7 @@ import { format } from 'date-fns'
 import Image from 'next/image'
 import Link from 'next/link'
 
-const STOPS = [
-  { value: 'LA',  label: 'Los Angeles' },
-  { value: 'HP',  label: 'Huntington Park' },
-  { value: 'SYS', label: 'San Ysidro' },
-  { value: 'TIJ', label: 'Aeropuerto Tijuana' },
-  { value: 'OTY', label: 'Garita de Otay — Tijuana' },
-]
+type StopOption = { value: string; label: string }
 
 const BG_IMAGES = [
   'https://ibsbvkcisqkghrpflrvc.supabase.co/storage/v1/object/public/imagenes/bbbbnmm.jpg',
@@ -24,12 +18,29 @@ const BG_IMAGES = [
 
 export function Hero() {
   const router = useRouter()
+  const [stops, setStops]             = useState<StopOption[]>([])
+  const [stopsLoading, setStopsLoading] = useState(true)
   const [origin, setOrigin]           = useState('LA')
   const [destination, setDestination] = useState('OTY')
   const [date, setDate]               = useState(format(new Date(), 'yyyy-MM-dd'))
   const [passengers, setPassengers]   = useState(1)
   const [tripType, setTripType]       = useState<'one_way' | 'round_trip'>('round_trip')
   const [bgIndex, setBgIndex]         = useState(0)
+
+  useEffect(() => {
+    fetch('/api/stops')
+      .then(r => r.json())
+      .then(({ stops: data }) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: StopOption[] = data.map((s: { code: string; name: string }) => ({ value: s.code, label: s.name }))
+          setStops(mapped)
+          setOrigin(mapped[0]?.value ?? 'LA')
+          setDestination(mapped[mapped.length - 1]?.value ?? 'OTY')
+        }
+      })
+      .catch(() => {/* keep empty, dropdowns disabled */})
+      .finally(() => setStopsLoading(false))
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -143,11 +154,16 @@ export function Hero() {
                 <select
                   value={origin}
                   onChange={e => setOrigin(e.target.value)}
-                  className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#c01515]/30 focus:border-[#c01515] pr-8 cursor-pointer"
+                  disabled={stopsLoading}
+                  className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#c01515]/30 focus:border-[#c01515] pr-8 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {STOPS.filter(s => s.value !== destination).map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
+                  {stopsLoading ? (
+                    <option>Cargando...</option>
+                  ) : (
+                    stops.filter(s => s.value !== destination).map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))
+                  )}
                 </select>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▾</span>
               </div>
@@ -164,11 +180,16 @@ export function Hero() {
                   <select
                     value={destination}
                     onChange={e => setDestination(e.target.value)}
-                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#c01515]/30 focus:border-[#c01515] pr-8 cursor-pointer"
+                    disabled={stopsLoading}
+                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#c01515]/30 focus:border-[#c01515] pr-8 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {STOPS.filter(s => s.value !== origin).map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
+                    {stopsLoading ? (
+                      <option>Cargando...</option>
+                    ) : (
+                      stops.filter(s => s.value !== origin).map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))
+                    )}
                   </select>
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▾</span>
                 </div>
