@@ -38,10 +38,11 @@ export default function BusesPage() {
   const [form, setForm]         = useState({ plate: '', model: '', brand: '', year: 2024, capacity: 56, amenities: ['wifi','ac','restroom'] as string[] })
 
   useEffect(() => {
-    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any
     supabase.from('buses').select('id, plate, model, brand, year, capacity, amenities, is_active').order('created_at', { ascending: true })
-      .then(({ data }) => {
-        if (data) setFleet(data as typeof INIT_FLEET)
+      .then(({ data }: { data: typeof INIT_FLEET | null }) => {
+        if (data) setFleet(data)
         setFleetLoading(false)
       })
   }, [])
@@ -69,7 +70,8 @@ export default function BusesPage() {
     setForm(p => ({ ...p, amenities: p.amenities.includes(a) ? p.amenities.filter(x => x !== a) : [...p.amenities, a] }))
 
   const saveFleet = async () => {
-    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any
     if (editing) {
       await supabase.from('buses').update(form).eq('id', editing.id)
       setFleet(prev => prev.map(b => b.id === editing.id ? { ...b, ...form } : b))
@@ -81,13 +83,15 @@ export default function BusesPage() {
   }
 
   const toggleActive = async (id: string, current: boolean) => {
-    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any
     await supabase.from('buses').update({ is_active: !current }).eq('id', id)
     setFleet(prev => prev.map(b => b.id === id ? { ...b, is_active: !current } : b))
   }
 
   const deleteBus = async (id: string) => {
-    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any
     await supabase.from('buses').delete().eq('id', id)
     setFleet(prev => prev.filter(b => b.id !== id))
   }
