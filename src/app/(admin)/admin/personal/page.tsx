@@ -12,12 +12,16 @@ function getService() {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  cajero: '💰 Cajero',
-  admin:  '⚙️ Admin',
+  cajero:      '💰 Cajero',
+  driver:      '🚌 Busero',
+  admin:       '⚙️ Admin',
+  super_admin: '🔑 Super Admin',
 }
 const ROLE_COLORS: Record<string, string> = {
-  cajero: 'bg-blue-50 text-blue-700',
-  admin:  'bg-purple-50 text-purple-700',
+  cajero:      'bg-blue-50 text-blue-700',
+  driver:      'bg-amber-50 text-amber-700',
+  admin:       'bg-purple-50 text-purple-700',
+  super_admin: 'bg-red-50 text-red-700',
 }
 
 export default async function PersonalPage() {
@@ -26,7 +30,7 @@ export default async function PersonalPage() {
   const { data: staff } = await service
     .from('profiles')
     .select('id, full_name, email, role, created_at')
-    .in('role', ['cajero', 'admin'])
+    .in('role', ['cajero', 'driver', 'admin', 'super_admin'])
     .order('created_at', { ascending: false })
 
   return (
@@ -87,7 +91,7 @@ export default async function PersonalPage() {
           <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4">
             <p className="text-blue-800 text-xs font-bold mb-1">Acceso del personal</p>
             <p className="text-blue-600 text-xs leading-relaxed">
-              Los cajeros inician sesión en <span className="font-mono font-bold">/personal</span> con su correo y contraseña. Solo ven el validador de boletos y las reservaciones del día.
+              El personal inicia sesión en <span className="font-mono font-bold">/auth/login</span> con su correo y contraseña. Los cajeros ven caja y reservaciones; los buseros solo ven el validador y lista de pasajeros.
             </p>
           </div>
         </div>

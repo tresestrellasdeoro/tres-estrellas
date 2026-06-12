@@ -7,14 +7,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 
+const ROLES = [
+  { value: 'cajero', label: '💰 Cajero — acceso a caja y reservaciones' },
+  { value: 'driver', label: '🚌 Busero — acceso a validador y lista de pasajeros' },
+]
+
 export function CreateStaffForm() {
-  const [name, setName]         = useState('')
-  const [email, setEmail]       = useState('')
+  const [name,     setName]     = useState('')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd]   = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const [success, setSuccess]   = useState('')
-  const [error, setError]       = useState('')
+  const [role,     setRole]     = useState<'cajero' | 'driver'>('cajero')
+  const [showPwd,  setShowPwd]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [success,  setSuccess]  = useState('')
+  const [error,    setError]    = useState('')
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,12 +36,12 @@ export function CreateStaffForm() {
       const res = await fetch('/api/admin/create-staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role: 'cajero' }),
+        body: JSON.stringify({ name, email, password, role }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
       setSuccess(`Usuario "${name}" creado correctamente.`)
-      setName(''); setEmail(''); setPassword('')
+      setName(''); setEmail(''); setPassword(''); setRole('cajero')
       router.refresh()
     } catch {
       setError('Error de conexión')
@@ -72,6 +78,33 @@ export function CreateStaffForm() {
           </button>
         </div>
       </div>
+      <div>
+        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</Label>
+        <div className="mt-1.5 space-y-2">
+          {ROLES.map(r => (
+            <label key={r.value}
+              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                role === r.value
+                  ? 'border-[#c01515] bg-red-50'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              <input
+                type="radio"
+                name="role"
+                value={r.value}
+                checked={role === r.value}
+                onChange={() => setRole(r.value as 'cajero' | 'driver')}
+                className="accent-[#c01515]"
+              />
+              <span className={`text-xs font-semibold ${role === r.value ? 'text-[#c01515]' : 'text-slate-600'}`}>
+                {r.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {error && <p className="text-red-600 text-xs font-semibold">{error}</p>}
       {success && (
         <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold bg-emerald-50 border border-emerald-200 rounded-xl p-3">

@@ -36,7 +36,7 @@ function LoginForm() {
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
-        .single() as { data: { role: string } | null }
+        .maybeSingle() as { data: { role: string } | null }
 
       const role = profile?.role
       if (role === 'cajero' || role === 'driver') {
