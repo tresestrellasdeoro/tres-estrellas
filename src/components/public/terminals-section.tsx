@@ -139,15 +139,15 @@ const TERMINALS = [
 ]
 
 const TYPE_STYLES = {
-  terminal: { bg: 'bg-[#c01515]', text: 'text-white',     label: 'Terminal' },
-  office:   { bg: 'bg-[#0f2c5c]', text: 'text-white',     label: 'Oficina'  },
-  stop:     { bg: 'bg-slate-200',  text: 'text-slate-600', label: 'Parada'   },
+  terminal: { bg: 'bg-[#c01515]',  text: 'text-white',     icon: 'bg-[#c01515]'  },
+  office:   { bg: 'bg-[#0f2c5c]',  text: 'text-white',     icon: 'bg-[#0f2c5c]'  },
+  stop:     { bg: 'bg-slate-200',   text: 'text-slate-600', icon: 'bg-slate-400'  },
 }
 
 const REGIONS = [
   { key: 'ca',    label: 'California',       color: 'bg-[#0f2c5c]' },
   { key: 'mx',    label: 'Tijuana · México',  color: 'bg-[#c01515]' },
-  { key: 'other', label: 'Arizona · Texas',   color: 'bg-slate-600' },
+  { key: 'other', label: 'Arizona · Texas',   color: 'bg-slate-500' },
 ]
 
 export function TerminalsSection() {
@@ -158,7 +158,7 @@ export function TerminalsSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
 
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 mb-4">
             <MapPin className="w-3 h-3 text-[#c01515]" />
             <span className="text-[#c01515] text-xs font-bold tracking-wider uppercase">Dónde encontrarnos</span>
@@ -171,79 +171,27 @@ export function TerminalsSection() {
           </p>
         </div>
 
-        {/* Map + main terminals */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-10">
-          {/* Embedded map — updates on selection */}
-          <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-72 lg:h-auto">
-            <iframe
-              key={selected.id}
-              src={`https://maps.google.com/maps?q=${selected.mapQ}&output=embed`}
-              width="100%"
-              height="100%"
-              style={{ border: 0, minHeight: '280px' }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title={selected.city}
-            />
-          </div>
-
-          {/* Main terminals — clickable to update map */}
-          <div className="space-y-3">
-            {TERMINALS.filter(t => t.type === 'terminal').map(t => {
-              const isActive = selected.id === t.id
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setSelected(t)}
-                  className={`w-full text-left flex items-start gap-4 rounded-2xl p-4 border transition-all group ${
-                    isActive
-                      ? 'bg-red-50 border-[#c01515] shadow-md'
-                      : 'bg-slate-50 border-slate-200 hover:border-[#c01515]/40 hover:shadow-md'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                    isActive ? 'bg-[#c01515]' : 'bg-slate-200 group-hover:bg-[#c01515]'
-                  }`}>
-                    <Building2 className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="font-black text-[#0f2c5c] text-sm">{t.city}</p>
-                      <span className="text-[10px] font-bold bg-[#c01515] text-white px-2 py-0.5 rounded-full">{t.label}</span>
-                    </div>
-                    <p className="text-slate-500 text-xs leading-relaxed mb-2">{t.address}</p>
-                    <div className="flex items-center gap-3">
-                      <a
-                        href={`tel:${t.tel}`}
-                        onClick={e => e.stopPropagation()}
-                        className="flex items-center gap-1 text-[#c01515] text-xs font-semibold hover:underline"
-                      >
-                        <Phone className="w-3 h-3" /> {t.phone}
-                      </a>
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${t.mapQ}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="flex items-center gap-1 text-slate-400 text-xs hover:text-[#0f2c5c] transition-colors"
-                      >
-                        <Navigation className="w-3 h-3" /> Cómo llegar
-                      </a>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+        {/* Full-width map */}
+        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm mb-10" style={{ height: '360px' }}>
+          <iframe
+            key={selected.id}
+            src={`https://maps.google.com/maps?q=${selected.mapQ}&output=embed`}
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            title={selected.city}
+          />
         </div>
 
-        {/* All locations by region */}
+        {/* All terminals by region — grid layout */}
         {REGIONS.map(region => {
           const locations = TERMINALS.filter(t => t.region === region.key)
           return (
-            <div key={region.key} className="mb-8">
-              <div className="flex items-center gap-3 mb-4">
+            <div key={region.key} className="mb-10">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="h-px flex-1 bg-slate-200" />
                 <div className={`${region.color} text-white text-xs font-bold px-4 py-1.5 rounded-full`}>
                   {region.label}
@@ -251,7 +199,7 @@ export function TerminalsSection() {
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {locations.map(t => {
                   const ts = TYPE_STYLES[t.type as keyof typeof TYPE_STYLES]
                   const isActive = selected.id === t.id
@@ -262,26 +210,52 @@ export function TerminalsSection() {
                         setSelected(t)
                         document.getElementById('terminales')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                       }}
-                      className={`w-full text-left flex items-start gap-3 p-4 rounded-2xl border transition-all group ${
+                      className={`w-full text-left flex flex-col gap-3 p-4 rounded-2xl border transition-all group ${
                         isActive
                           ? 'bg-red-50 border-[#c01515] shadow-md'
                           : 'bg-white border-slate-200 hover:border-[#c01515]/40 hover:shadow-md'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-[#c01515]' : ts.bg}`}>
-                        <MapPin className={`w-4 h-4 ${isActive ? 'text-white' : ts.text}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                          <p className="font-bold text-slate-800 text-sm">{t.city}</p>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isActive ? 'bg-[#c01515] text-white' : `${ts.bg} ${ts.text}`}`}>
-                            {ts.label}
-                          </span>
+                      {/* Icon + badge */}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                          isActive ? 'bg-[#c01515]' : ts.icon
+                        }`}>
+                          <Building2 className="w-4 h-4 text-white" />
                         </div>
-                        <p className="text-slate-500 text-xs leading-relaxed">{t.address}</p>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                          isActive ? 'bg-[#c01515] text-white' : `${ts.bg} ${ts.text}`
+                        }`}>
+                          {t.label}
+                        </span>
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0">
+                        <p className="font-black text-[#0f2c5c] text-sm leading-tight mb-1">{t.city}</p>
+                        <p className="text-slate-400 text-xs leading-relaxed">{t.address}</p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-col gap-1 mt-auto">
                         {t.type !== 'stop' && (
-                          <p className="text-[#c01515] text-xs font-semibold mt-1">{t.phone}</p>
+                          <a
+                            href={`tel:${t.tel}`}
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 text-[#c01515] text-xs font-semibold hover:underline"
+                          >
+                            <Phone className="w-3 h-3 shrink-0" /> {t.phone}
+                          </a>
                         )}
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${t.mapQ}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="flex items-center gap-1 text-slate-400 text-xs hover:text-[#0f2c5c] transition-colors"
+                        >
+                          <Navigation className="w-3 h-3 shrink-0" /> Cómo llegar
+                        </a>
                       </div>
                     </button>
                   )
