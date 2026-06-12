@@ -28,7 +28,7 @@ export function Hero() {
   const [destination, setDestination] = useState('OTY')
   const [date, setDate]               = useState(format(new Date(), 'yyyy-MM-dd'))
   const [passengers, setPassengers]   = useState(1)
-  const [tripType, setTripType]       = useState<'one_way' | 'round_trip'>('one_way')
+  const [tripType, setTripType]       = useState<'one_way' | 'round_trip'>('round_trip')
   const [bgIndex, setBgIndex]         = useState(0)
 
   useEffect(() => {
@@ -86,9 +86,12 @@ export function Hero() {
           </Link>
         </div>
 
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight mb-2 animate-fade-up-1">
+        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight mb-1 animate-fade-up-1">
           Transporte Los Angeles ↔ Tijuana
         </h1>
+        <p className="font-display text-lg sm:text-xl font-bold text-[#c8a951] mb-2 animate-fade-up-1">
+          y Tijuana ↔ Los Angeles
+        </p>
         <p className="text-white/60 text-base max-w-xl mx-auto mb-3 animate-fade-up-2">
           12 salidas diarias · Todos los días del año
         </p>
@@ -111,7 +114,7 @@ export function Hero() {
 
         {/* Trip type toggle */}
         <div className="inline-flex items-center bg-white/8 border border-white/15 rounded-xl p-1 mb-5 animate-fade-up-3">
-          {(['one_way', 'round_trip'] as const).map(type => (
+          {(['round_trip', 'one_way'] as const).map(type => (
             <button
               key={type}
               onClick={() => setTripType(type)}
