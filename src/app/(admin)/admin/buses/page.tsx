@@ -691,12 +691,15 @@ function RutasTab() {
 // ─── HORARIOS ────────────────────────────────────────────────────────────────
 
 function HorariosTab() {
-  const [routes, setRoutes]         = useState<RouteRow[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [open, setOpen]             = useState(false)
-  const [saving, setSaving]         = useState(false)
+  const [routes, setRoutes]               = useState<RouteRow[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [addOpen, setAddOpen]             = useState(false)
+  const [editOpen, setEditOpen]           = useState(false)
+  const [saving, setSaving]               = useState(false)
   const [selectedRouteId, setSelectedRouteId] = useState('')
-  const [form, setForm] = useState({ route_id: '', departure_time: '08:00', days_of_week: [1, 2, 3, 4, 5] as number[] })
+  const [addForm, setAddForm]             = useState({ route_id: '', departure_time: '08:00', days_of_week: [0, 1, 2, 3, 4, 5, 6] as number[] })
+  const [editTarget, setEditTarget]       = useState<{ id: string; routeId: string } | null>(null)
+  const [editForm, setEditForm]           = useState({ departure_time: '08:00', days_of_week: [] as number[] })
 
   const load = useCallback(() => {
     setLoading(true)
@@ -708,8 +711,16 @@ function HorariosTab() {
 
   useEffect(() => { load() }, [load])
 
-  const toggleDay = (day: number) =>
-    setForm(p => ({
+  const toggleAddDay = (day: number) =>
+    setAddForm(p => ({
+      ...p,
+      days_of_week: p.days_of_week.includes(day)
+        ? p.days_of_week.filter(d => d !== day)
+        : [...p.days_of_week, day].sort(),
+    }))
+
+  const toggleEditDay = (day: number) =>
+    setEditForm(p => ({
       ...p,
       days_of_week: p.days_of_week.includes(day)
         ? p.days_of_week.filter(d => d !== day)
@@ -717,20 +728,47 @@ function HorariosTab() {
     }))
 
   const openAdd = () => {
-    setForm({ route_id: routes[0]?.id ?? '', departure_time: '08:00', days_of_week: [1, 2, 3, 4, 5] })
-    setOpen(true)
+    setAddForm({ route_id: selectedRouteId || routes[0]?.id || '', departure_time: '08:00', days_of_week: [0, 1, 2, 3, 4, 5, 6] })
+    setAddOpen(true)
   }
 
-  const save = async () => {
+  const openEdit = (sch: ScheduleRow, routeId: string) => {
+    setEditTarget({ id: sch.id, routeId })
+    setEditForm({ departure_time: sch.departure_time.slice(0, 5), days_of_week: [...sch.days_of_week] })
+    setEditOpen(true)
+  }
+
+  const saveAdd = async () => {
+    if (!addForm.route_id || addForm.days_of_week.length === 0) return
     setSaving(true)
     await fetch('/api/admin/schedules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ route_id: form.route_id, departure_time: form.departure_time, days_of_week: form.days_of_week }),
+      body: JSON.stringify({ route_id: addForm.route_id, departure_time: addForm.departure_time, days_of_week: addForm.days_of_week }),
     })
     setSaving(false)
-    setOpen(false)
+    setAddOpen(false)
     load()
+  }
+
+  const saveEdit = async () => {
+    if (!editTarget || editForm.days_of_week.length === 0) return
+    setSaving(true)
+    const res = await fetch('/api/admin/schedules', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editTarget.id, departure_time: editForm.departure_time, days_of_week: editForm.days_of_week }),
+    })
+    const { schedule } = await res.json()
+    if (schedule) {
+      setRoutes(prev => prev.map(r => r.id === editTarget.routeId
+        ? { ...r, schedules: r.schedules.map(s => s.id === editTarget.id ? { ...s, ...schedule } : s) }
+        : r
+      ))
+    }
+    setSaving(false)
+    setEditOpen(false)
+    setEditTarget(null)
   }
 
   const deleteSchedule = async (scheduleId: string) => {
@@ -739,26 +777,37 @@ function HorariosTab() {
     setRoutes(prev => prev.map(r => ({ ...r, schedules: r.schedules.filter(s => s.id !== scheduleId) })))
   }
 
-  const toggleScheduleActive = async (scheduleId: string, current: boolean) => {
+  const toggleScheduleActive = async (scheduleId: string, current: boolean, routeId: string) => {
     await fetch('/api/admin/schedules', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scheduleId, is_active: !current }) })
-    setRoutes(prev => prev.map(r => ({
-      ...r,
-      schedules: r.schedules.map(s => s.id === scheduleId ? { ...s, is_active: !current } : s),
-    })))
+    setRoutes(prev => prev.map(r => r.id === routeId
+      ? { ...r, schedules: r.schedules.map(s => s.id === scheduleId ? { ...s, is_active: !current } : s) }
+      : r
+    ))
   }
 
   const filteredRoutes = selectedRouteId ? routes.filter(r => r.id === selectedRouteId) : routes
 
+  const DayPicker = ({ days, onToggle }: { days: number[]; onToggle: (d: number) => void }) => (
+    <div className="flex gap-2 flex-wrap">
+      {DAYS_LABELS.map((label, idx) => (
+        <button key={idx} type="button" onClick={() => onToggle(idx)}
+          className={`w-12 h-10 rounded-xl text-xs font-bold border transition-all ${
+            days.includes(idx)
+              ? 'bg-[#0f2c5c] text-white border-[#0f2c5c]'
+              : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-[#0f2c5c]/40 hover:text-[#0f2c5c]'
+          }`}>{label}</button>
+      ))}
+    </div>
+  )
+
   return (
     <>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <select value={selectedRouteId} onChange={e => setSelectedRouteId(e.target.value)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#c01515]/30">
-            <option value="">Todas las rutas</option>
-            {routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-        </div>
+        <select value={selectedRouteId} onChange={e => setSelectedRouteId(e.target.value)}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#c01515]/30">
+          <option value="">Todas las rutas</option>
+          {routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
         <Button onClick={openAdd} className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl">
           <Plus className="w-4 h-4 mr-2" /> Agregar horario
         </Button>
@@ -772,7 +821,7 @@ function HorariosTab() {
             <div className="bg-[#0f2c5c] px-5 py-3 flex items-center justify-between">
               <div>
                 <p className="text-white font-bold text-sm">{r.name}</p>
-                <p className="text-white/50 text-xs">{r.origin_stop?.name} → {r.destination_stop?.name}</p>
+                <p className="text-white/50 text-xs">{r.origin_stop?.name} → {r.destination_stop?.name} / {r.code}</p>
               </div>
               <span className="text-[#c8a951] font-bold text-xs">{r.schedules?.length ?? 0} horarios</span>
             </div>
@@ -781,22 +830,25 @@ function HorariosTab() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {r.schedules.map(sch => (
-                  <div key={sch.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono font-black text-[#0f2c5c] text-lg">{sch.departure_time.slice(0, 5)}</span>
-                      <div className="flex gap-1">
+                  <div key={sch.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <span className="font-mono font-black text-[#0f2c5c] text-lg shrink-0">{sch.departure_time.slice(0, 5)}</span>
+                      <div className="flex gap-1 flex-wrap">
                         {DAYS_LABELS.map((label, idx) => (
                           <span key={idx} className={`text-[10px] font-bold w-7 h-7 rounded-lg flex items-center justify-center ${
                             sch.days_of_week.includes(idx)
                               ? 'bg-[#0f2c5c] text-white'
-                              : 'bg-slate-100 text-slate-400'
+                              : 'bg-slate-100 text-slate-300'
                           }`}>{label}</span>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => toggleScheduleActive(sch.id, sch.is_active)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => toggleScheduleActive(sch.id, sch.is_active, r.id)} className="text-slate-400 hover:text-slate-700 transition-colors">
                         {sch.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5" />}
+                      </button>
+                      <button onClick={() => openEdit(sch, r.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-[#0f2c5c] transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => deleteSchedule(sch.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
@@ -810,7 +862,8 @@ function HorariosTab() {
         ))}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* Dialog: Agregar */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="rounded-2xl max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display font-black text-[#0f2c5c]">Agregar horario</DialogTitle>
@@ -818,30 +871,60 @@ function HorariosTab() {
           <div className="space-y-4 pt-2">
             <div>
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ruta</Label>
-              <select value={form.route_id} onChange={e => setForm(p => ({ ...p, route_id: e.target.value }))}
+              <select value={addForm.route_id} onChange={e => setAddForm(p => ({ ...p, route_id: e.target.value }))}
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#c01515]/30">
                 {routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
             <div>
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hora de salida</Label>
-              <Input type="time" value={form.departure_time} onChange={e => setForm(p => ({ ...p, departure_time: e.target.value }))}
+              <Input type="time" value={addForm.departure_time} onChange={e => setAddForm(p => ({ ...p, departure_time: e.target.value }))}
                 className="mt-1.5 rounded-xl border-slate-200 font-mono" />
             </div>
             <div>
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Días de operación</Label>
-              <div className="flex gap-2 flex-wrap">
-                {DAYS_LABELS.map((label, idx) => (
-                  <button key={idx} onClick={() => toggleDay(idx)}
-                    className={`w-12 h-10 rounded-xl text-xs font-bold border transition-all ${
-                      form.days_of_week.includes(idx) ? 'bg-[#0f2c5c] text-white border-[#0f2c5c]' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
-                    }`}>{label}</button>
-                ))}
-              </div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                Días de operación <span className="text-slate-400 font-normal normal-case tracking-normal">(selecciona los activos)</span>
+              </Label>
+              <DayPicker days={addForm.days_of_week} onToggle={toggleAddDay} />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setOpen(false)} className="rounded-xl">Cancelar</Button>
-              <Button onClick={save} disabled={saving} className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl">Agregar</Button>
+              <Button variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl">Cancelar</Button>
+              <Button onClick={saveAdd} disabled={saving || addForm.days_of_week.length === 0}
+                className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl">
+                {saving ? 'Guardando...' : 'Agregar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Editar */}
+      <Dialog open={editOpen} onOpenChange={v => { setEditOpen(v); if (!v) setEditTarget(null) }}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display font-black text-[#0f2c5c]">Editar horario</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hora de salida</Label>
+              <Input type="time" value={editForm.departure_time} onChange={e => setEditForm(p => ({ ...p, departure_time: e.target.value }))}
+                className="mt-1.5 rounded-xl border-slate-200 font-mono text-lg" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                Días de operación <span className="text-slate-400 font-normal normal-case tracking-normal">(clic para activar/desactivar)</span>
+              </Label>
+              <DayPicker days={editForm.days_of_week} onToggle={toggleEditDay} />
+              {editForm.days_of_week.length === 0 && (
+                <p className="text-red-500 text-xs mt-2 font-semibold">Selecciona al menos un día.</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditTarget(null) }} className="rounded-xl">Cancelar</Button>
+              <Button onClick={saveEdit} disabled={saving || editForm.days_of_week.length === 0}
+                className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl">
+                {saving ? 'Guardando...' : <><Save className="w-4 h-4 mr-1.5" />Guardar cambios</>}
+              </Button>
             </div>
           </div>
         </DialogContent>
