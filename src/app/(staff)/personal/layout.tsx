@@ -3,19 +3,21 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, Users, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart } from 'lucide-react'
+import { ScanLine, Users, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_CAJERO = [
   { href: '/personal/validar',       label: 'Validar boleto',    icon: ScanLine },
   { href: '/personal/venta',         label: 'Nueva venta',       icon: ShoppingCart },
-  { href: '/personal/reservaciones', label: 'Reservaciones',     icon: ClipboardList },
+  { href: '/personal/reservaciones', label: 'Pasajeros de hoy',  icon: ClipboardList },
+  { href: '/personal/salidas',       label: 'Salidas',           icon: Navigation },
 ]
 
 const NAV_BUSERO = [
   { href: '/personal/validar',   label: 'Validar boleto', icon: ScanLine },
   { href: '/personal/pasajeros', label: 'Pasajeros',      icon: Users },
+  { href: '/personal/salidas',   label: 'Salidas',        icon: Navigation },
 ]
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {

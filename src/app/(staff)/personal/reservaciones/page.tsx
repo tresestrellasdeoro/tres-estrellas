@@ -1,5 +1,5 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { ClipboardList, CheckCircle2, Clock, Banknote, CreditCard, ArrowRight, ArrowLeftRight } from 'lucide-react'
+import { ClipboardList, CheckCircle2, Clock, Banknote, CreditCard, ArrowRight, ArrowLeftRight, Bus } from 'lucide-react'
 
 export const revalidate = 30
 
@@ -22,9 +22,9 @@ export default async function ReservacionesPage() {
 
   const { data: bookings } = await service
     .from('bookings')
-    .select('id, booking_number, status, total_amount, payment_method, guest_email, ticket_type, created_at, passengers(full_name, checked_in, return_checked_in)')
-    .gte('created_at', `${today}T00:00:00`)
-    .order('created_at', { ascending: false })
+    .select('id, booking_number, status, total_amount, payment_method, guest_email, ticket_type, created_at, departure_time, passengers(full_name, checked_in, return_checked_in)')
+    .eq('date', today)
+    .order('departure_time', { ascending: true })
 
   const total   = bookings?.length ?? 0
   const revenue = bookings?.reduce((s, b) => s + (b.total_amount || 0), 0) ?? 0
@@ -41,9 +41,12 @@ export default async function ReservacionesPage() {
       <div className="mb-8">
         <h1 className="font-black text-2xl text-[#0a1628] flex items-center gap-2">
           <ClipboardList className="w-6 h-6 text-[#c01515]" />
-          Reservaciones de hoy
+          Pasajeros de hoy
         </h1>
-        <p className="text-slate-500 text-sm mt-1">{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        <p className="text-slate-500 text-sm mt-1">
+          {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {' · '}Boletos con fecha de viaje hoy
+        </p>
       </div>
 
       {/* Stats */}
@@ -100,7 +103,7 @@ export default async function ReservacionesPage() {
                     {statusIcon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-slate-800 text-sm truncate">
                         {passengers[0]?.full_name || b.guest_email || '—'}
                         {passengers.length > 1 && <span className="text-slate-400 ml-1 font-normal">+{passengers.length - 1}</span>}
@@ -111,7 +114,15 @@ export default async function ReservacionesPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-400 text-xs font-mono">{b.booking_number}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-slate-400 text-xs font-mono">{b.booking_number}</p>
+                      {(b as { departure_time?: string }).departure_time && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-slate-400 font-semibold">
+                          <Bus className="w-2.5 h-2.5" />
+                          {((b as { departure_time?: string }).departure_time ?? '').slice(0, 5)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-slate-800 text-sm">${b.total_amount}</p>
