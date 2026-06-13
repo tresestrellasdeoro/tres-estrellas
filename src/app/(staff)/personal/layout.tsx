@@ -1,41 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, Users, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
-const NAV_CAJERO = [
-  { href: '/personal/validar',       label: 'Validar boleto',    icon: ScanLine },
-  { href: '/personal/venta',         label: 'Nueva venta',       icon: ShoppingCart },
-  { href: '/personal/reservaciones', label: 'Pasajeros de hoy',  icon: ClipboardList },
-  { href: '/personal/salidas',       label: 'Salidas',           icon: Navigation },
-]
-
-const NAV_BUSERO = [
-  { href: '/personal/validar',   label: 'Validar boleto', icon: ScanLine },
-  { href: '/personal/pasajeros', label: 'Pasajeros',      icon: Users },
-  { href: '/personal/salidas',   label: 'Salidas',        icon: Navigation },
+const NAV_ITEMS = [
+  { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine },
+  { href: '/personal/venta',         label: 'Nueva venta',      icon: ShoppingCart },
+  { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList },
+  { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation },
 ]
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen]         = useState(false)
-  const [navItems, setNavItems] = useState(NAV_CAJERO)
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(supabase.from('profiles') as any).select('role').eq('id', user.id).maybeSingle().then(({ data }: { data: { role: string } | null }) => {
-        if (data?.role === 'driver') setNavItems(NAV_BUSERO)
-      })
-    })
-  }, [])
+  const [open, setOpen] = useState(false)
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -56,7 +38,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map(item => {
+          {NAV_ITEMS.map(item => {
             const active = pathname === item.href
             return (
               <Link key={item.href} href={item.href}
@@ -94,7 +76,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       {open && (
         <div className="md:hidden fixed inset-0 z-40 bg-[#0a1e42] pt-14">
           <nav className="p-4 space-y-1">
-            {navItems.map(item => (
+            {NAV_ITEMS.map(item => (
               <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                   pathname === item.href ? 'bg-[#c01515] text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
