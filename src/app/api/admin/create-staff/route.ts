@@ -7,7 +7,7 @@ const Schema = z.object({
   name:     z.string().min(2),
   email:    z.string().email(),
   password: z.string().min(8),
-  role:     z.enum(['cajero', 'driver']),
+  role:     z.enum(['cajero']),
 })
 
 export async function POST(req: NextRequest) {
@@ -46,12 +46,13 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Create auth user
+  // Create auth user — do NOT pass role in metadata; the DB trigger may
+  // cast it to user_role enum and 'cajero' won't exist until the ALTER TYPE runs.
   const { data: authData, error: authError } = await service.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: name, role },
+    user_metadata: { full_name: name },
   })
 
   if (authError || !authData.user) {
