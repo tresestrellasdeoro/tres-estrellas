@@ -16,20 +16,25 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const adminCookie = req.cookies.get('admin_session')
-  if (!adminCookie?.value && !user) {
+
+  // If env-var admin cookie is present, allow — no Supabase profile check needed
+  const hasAdminCookie = !!adminCookie?.value
+
+  if (!hasAdminCookie && !user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  if (user) {
-    const service = createServiceClient(
+  // If logged in via Supabase (no admin cookie), verify profile role
+  if (!hasAdminCookie && user) {
+    const svc = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
-    const { data: profile } = await service
+    const { data: profile } = await svc
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle() as { data: { role: string } | null }
     if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
