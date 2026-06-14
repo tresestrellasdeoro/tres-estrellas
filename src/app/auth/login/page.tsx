@@ -70,7 +70,7 @@ function LoginForm() {
         </div>
 
         <h1 className="text-center font-black text-2xl text-white mb-1">Iniciar sesión</h1>
-        <p className="text-center text-white/45 text-sm mb-6">Acceso para personal y administración</p>
+        <p className="text-center text-white/45 text-sm mb-6">Viajeros, personal y administración</p>
 
         <div className="bg-white/8 border border-white/12 backdrop-blur-sm rounded-2xl p-6">
 
@@ -138,11 +138,17 @@ function LoginForm() {
           </form>
         </div>
 
-        <p className="text-center mt-6">
+        <div className="mt-6 text-center space-y-2">
+          <p className="text-white/45 text-sm">
+            ¿No tienes cuenta?{' '}
+            <Link href="/auth/registro" className="text-[#c8a951] font-bold hover:text-[#e0b95c] transition-colors">
+              Crear cuenta
+            </Link>
+          </p>
           <Link href="/" className="text-white/25 text-xs hover:text-white/50 transition-colors">
             ← Volver al inicio
           </Link>
-        </p>
+        </div>
       </div>
 
       {/* Hidden native form for admin cookie login fallback */}
