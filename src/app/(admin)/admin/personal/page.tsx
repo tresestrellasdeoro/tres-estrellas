@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Users, UserPlus } from 'lucide-react'
 import { CreateStaffForm } from './create-staff-form'
+import { DeleteStaffButton } from './delete-staff-button'
 
 export const metadata = { title: 'Personal — Admin' }
 
@@ -73,6 +74,7 @@ export default async function PersonalPage() {
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-500'}`}>
                     {ROLE_LABELS[u.role] || u.role}
                   </span>
+                  <DeleteStaffButton userId={u.id} name={u.full_name ?? u.email} />
                 </div>
               ))}
             </div>
