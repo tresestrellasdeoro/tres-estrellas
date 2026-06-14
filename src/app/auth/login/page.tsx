@@ -31,14 +31,10 @@ function LoginForm() {
     const { data, error: sbError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (data?.user) {
-      // Get role from profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .maybeSingle() as { data: { role: string } | null }
+      // Get role via server API (bypasses RLS, guaranteed to read correct role)
+      const res = await fetch('/api/auth/me')
+      const { role } = await res.json()
 
-      const role = profile?.role
       if (role === 'cajero' || role === 'driver') {
         router.push('/personal/validar')
       } else if (role === 'admin' || role === 'super_admin') {
