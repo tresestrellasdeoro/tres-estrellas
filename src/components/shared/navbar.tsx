@@ -1,15 +1,39 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useRef } from 'react'
-import { Menu, X, Star, LogIn, Phone, ChevronDown, Info, ShieldAlert, ShieldCheck, Package, Home } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Menu, X, Star, LogIn, Phone, ChevronDown, Info, ShieldAlert, ShieldCheck, Package, Home, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LogoNavbar } from './logo'
+import { createClient } from '@/lib/supabase/client'
 
 export function Navbar() {
   const [open, setOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const infoRef = useRef<HTMLDivElement>(null)
+  const [accountHref, setAccountHref] = useState('/auth/login')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle()
+      const role = profile?.role
+      setIsLoggedIn(true)
+      if (role === 'admin' || role === 'super_admin') {
+        setAccountHref('/admin/dashboard')
+      } else if (role === 'cajero' || role === 'driver') {
+        setAccountHref('/personal/validar')
+      } else {
+        setAccountHref('/dashboard')
+      }
+    })
+  }, [])
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0f2c5c]/97 backdrop-blur-md border-b border-white/10">
@@ -102,10 +126,12 @@ export function Navbar() {
               <Star className="w-3.5 h-3.5 text-[#c8a951]" />
               Puntos
             </Link>
-            <Link href="/auth/login">
+            <Link href={accountHref}>
               <Button variant="outline" size="sm" className="border-white/25 text-white hover:bg-white/10 hover:text-white bg-transparent text-xs font-semibold">
-                <LogIn className="w-3.5 h-3.5 mr-1.5" />
-                Mi cuenta
+                {isLoggedIn
+                  ? <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
+                  : <LogIn className="w-3.5 h-3.5 mr-1.5" />}
+                {isLoggedIn ? 'Mi panel' : 'Mi cuenta'}
               </Button>
             </Link>
             <Link href="/buscar">
@@ -159,8 +185,10 @@ export function Navbar() {
             </a>
           </div>
           <div className="flex gap-2 pt-2">
-            <Link href="/auth/login" className="flex-1" onClick={() => setOpen(false)}>
-              <Button variant="outline" className="w-full border-white/25 text-white bg-transparent text-sm">Mi cuenta</Button>
+            <Link href={accountHref} className="flex-1" onClick={() => setOpen(false)}>
+              <Button variant="outline" className="w-full border-white/25 text-white bg-transparent text-sm">
+                {isLoggedIn ? 'Mi panel' : 'Mi cuenta'}
+              </Button>
             </Link>
             <Link href="/buscar" className="flex-1" onClick={() => setOpen(false)}>
               <Button className="w-full bg-[#c01515] hover:bg-[#a01010] text-white font-bold text-sm">Comprar</Button>
