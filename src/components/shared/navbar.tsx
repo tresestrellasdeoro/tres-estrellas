@@ -22,7 +22,7 @@ export function Navbar() {
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
-        .maybeSingle()
+        .maybeSingle() as { data: { role: string } | null }
       const role = profile?.role
       setIsLoggedIn(true)
       if (role === 'admin' || role === 'super_admin') {
