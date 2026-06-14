@@ -58,22 +58,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: authError?.message || 'Error al crear usuario' }, { status: 500 })
   }
 
-  // Upsert profile
-  const { error: profileError } = await service.from('profiles').upsert({
-    id:         authData.user.id,
-    email,
-    full_name:  name,
-    role,
-    phone:      null,
-    loyalty_tier:   'none',
-    loyalty_points: 0,
-    total_trips:    0,
-  })
+  const userId = authData.user.id
 
-  if (profileError) {
-    await service.auth.admin.deleteUser(authData.user.id)
-    return NextResponse.json({ error: 'Error al crear perfil' }, { status: 500 })
+  // Try to update existing profile first (may have been created by a DB trigger)
+  const { error: updateError } = await service
+    .from('profiles')
+    .update({ full_name: name, role, email })
+    .eq('id', userId)
+
+  if (updateError) {
+    // No existing profile — insert minimal record
+    const { error: insertError } = await service
+      .from('profiles')
+      .insert({ id: userId, email, full_name: name, role })
+
+    if (insertError) {
+      // Roll back auth user and return actual DB error
+      await service.auth.admin.deleteUser(userId)
+      return NextResponse.json({ error: `Error al crear perfil: ${insertError.message}` }, { status: 500 })
+    }
   }
 
-  return NextResponse.json({ ok: true, user_id: authData.user.id }, { status: 201 })
+  return NextResponse.json({ ok: true, user_id: userId }, { status: 201 })
 }
