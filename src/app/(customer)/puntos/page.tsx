@@ -25,7 +25,7 @@ export default async function PuntosPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single() as { data: Profile | null }
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() as { data: Profile | null }
 
   let transactions: LoyaltyTx[] = []
   try {

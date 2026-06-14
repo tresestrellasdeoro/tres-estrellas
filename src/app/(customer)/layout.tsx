@@ -12,7 +12,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   return (
     <div className="min-h-screen bg-slate-50 flex">

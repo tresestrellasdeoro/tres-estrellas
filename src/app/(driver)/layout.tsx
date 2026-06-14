@@ -8,7 +8,7 @@ export default async function DriverLayout({ children }: { children: React.React
 
   if (!user) redirect('/auth/login?next=/conductor/scanner')
 
-  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single() as { data: { role: string; full_name: string } | null }
+  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle() as { data: { role: string; full_name: string } | null }
 
   if (!profile || !['driver', 'admin', 'super_admin'].includes(profile.role)) {
     redirect('/dashboard')

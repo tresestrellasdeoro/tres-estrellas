@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { requireAuth } from '@/lib/api-auth'
 
 function service() {
   return createServiceClient(
@@ -9,7 +10,8 @@ function service() {
 }
 
 // Returns today's scheduled trips (schedules running today) + their log status
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const deny = await requireAuth(); if (deny) return deny
   const db   = service()
   const today = new Date().toISOString().slice(0, 10)
 
@@ -55,6 +57,7 @@ export async function GET() {
 
 // Upsert trip status
 export async function POST(req: NextRequest) {
+  const deny = await requireAuth(); if (deny) return deny
   const body = await req.json()
   const { schedule_id, status, delay_minutes = 0, notes = null } = body
 

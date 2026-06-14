@@ -15,7 +15,7 @@ export default async function PerfilPage() {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single() as { data: Profile | null }
+    .maybeSingle() as { data: Profile | null }
 
   return (
     <div className="p-6 sm:p-8 max-w-2xl">

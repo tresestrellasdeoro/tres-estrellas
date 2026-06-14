@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { requireAdmin } from '@/lib/api-auth'
 
 function service() {
   return createServiceClient(
@@ -8,7 +9,8 @@ function service() {
   )
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const deny = await requireAdmin(req); if (deny) return deny
   const { data, error } = await service()
     .from('pricing')
     .select(`
@@ -23,6 +25,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const deny = await requireAdmin(req); if (deny) return deny
   const body = await req.json()
   const { route_id, terminal_id, passenger_type, ticket_type, price } = body
 
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const deny = await requireAdmin(req); if (deny) return deny
   const body = await req.json()
   const { id, price } = body
 
@@ -69,6 +73,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const deny = await requireAdmin(req); if (deny) return deny
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
 

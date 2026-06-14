@@ -11,7 +11,7 @@ export async function GET() {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   return NextResponse.json({ user, profile })
 }
