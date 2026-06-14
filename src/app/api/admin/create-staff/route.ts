@@ -61,23 +61,18 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
-  // Try to update existing profile first (may have been created by a DB trigger)
-  const { error: updateError } = await service
+  // Upsert the profile — handles both the case where the DB trigger already
+  // created a row (update) and where it didn't (insert).
+  const { error: profileError } = await service
     .from('profiles')
-    .update({ full_name: name, role, email })
-    .eq('id', userId)
+    .upsert(
+      { id: userId, email, full_name: name, role },
+      { onConflict: 'id' }
+    )
 
-  if (updateError) {
-    // No existing profile — insert minimal record
-    const { error: insertError } = await service
-      .from('profiles')
-      .insert({ id: userId, email, full_name: name, role })
-
-    if (insertError) {
-      // Roll back auth user and return actual DB error
-      await service.auth.admin.deleteUser(userId)
-      return NextResponse.json({ error: `Error al crear perfil: ${insertError.message}` }, { status: 500 })
-    }
+  if (profileError) {
+    await service.auth.admin.deleteUser(userId)
+    return NextResponse.json({ error: `Error al crear perfil: ${profileError.message}` }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, user_id: userId }, { status: 201 })
