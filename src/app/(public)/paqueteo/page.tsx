@@ -5,19 +5,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { PaqueteoInteractive } from '@/components/public/paqueteo-interactive'
 
 export const metadata: Metadata = {
   title: 'Paqueteo | Tres Estrellas de Oro',
   description: 'Envío de paquetes y encomiendas entre Los Angeles y Tijuana. Servicio confiable por más de 30 años.',
 }
-
-const SIZES = [
-  { dim: '24×24', price: 45, label: 'Grande', desc: 'Cajas grandes y artículos voluminosos', popular: false },
-  { dim: '20×20', price: 35, label: 'Mediano grande', desc: 'Ropa, zapatos, electrónicos', popular: true },
-  { dim: '14×14', price: 25, label: 'Mediano', desc: 'Documentos, artículos del hogar', popular: false },
-  { dim: '8×8',   price: 15, label: 'Pequeño plus', desc: 'Regalos, accesorios, libros', popular: false },
-  { dim: 'Extra pequeño', price: 10, label: 'Pequeño', desc: 'Sobres, cartas, artículos ligeros', popular: false },
-]
 
 const SERVICES = [
   {
@@ -133,61 +126,14 @@ export default function PaqueteoPage() {
           </div>
         </div>
 
-        {/* Pricing table */}
-        <div id="tarifas">
-          <div className="text-center mb-8">
-            <h2 className="font-black text-[#0f2c5c] text-3xl tracking-tight mb-2">Tarifas de envío</h2>
-            <p className="text-slate-500 text-sm">Precios según el tamaño del paquete · Aplica para LA ↔ Tijuana</p>
-          </div>
-          <div className="space-y-3">
-            {SIZES.map(size => (
-              <div
-                key={size.dim}
-                className={`relative bg-white border rounded-2xl p-5 flex items-center gap-5 transition-all hover:shadow-md ${
-                  size.popular
-                    ? 'border-[#c01515] shadow-sm ring-1 ring-[#c01515]/20'
-                    : 'border-slate-200 hover:border-[#c01515]/30'
-                }`}
-              >
-                {size.popular && (
-                  <span className="absolute -top-3 left-5 bg-[#c01515] text-white text-[10px] font-black px-3 py-0.5 rounded-full tracking-wider">
-                    MÁS POPULAR
-                  </span>
-                )}
+        {/* Interactive: tracking + price calculator */}
+        <PaqueteoInteractive />
 
-                {/* Box visual */}
-                <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                  <Package className={`${
-                    size.price >= 45 ? 'w-9 h-9' :
-                    size.price >= 35 ? 'w-8 h-8' :
-                    size.price >= 25 ? 'w-6 h-6' :
-                    size.price >= 15 ? 'w-5 h-5' :
-                                        'w-4 h-4'
-                  } text-[#0f2c5c]`} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-black text-[#0f2c5c] text-base">{size.label}</p>
-                    <span className="text-slate-400 font-mono text-xs bg-slate-100 px-2 py-0.5 rounded-lg">{size.dim} in</span>
-                  </div>
-                  <p className="text-slate-500 text-sm">{size.desc}</p>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <p className="font-black text-[#c01515] text-3xl leading-none">${size.price}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">por envío</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
-            <Package className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-amber-700 text-sm leading-relaxed">
-              <strong>¿Paquete fuera de medida?</strong> Contáctanos para una cotización personalizada. Manejamos artículos especiales, electrodomésticos y envíos de alto volumen.
-            </p>
-          </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+          <Package className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-amber-700 text-sm leading-relaxed">
+            <strong>¿Paquete fuera de medida?</strong> Contáctanos para una cotización personalizada. Manejamos artículos especiales, electrodomésticos y envíos de alto volumen.
+          </p>
         </div>
 
         {/* How it works */}

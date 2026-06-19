@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Ticket, Star, User, LogOut, ChevronRight, Menu, X } from 'lucide-react'
+import { Bus, LayoutDashboard, Ticket, Star, User, LogOut, ChevronRight, Menu, X, Package } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types/database'
@@ -11,6 +11,7 @@ const NAV = [
   { href: '/dashboard',    icon: LayoutDashboard, label: 'Inicio' },
   { href: '/mis-tickets',  icon: Ticket,           label: 'Mis boletos' },
   { href: '/puntos',       icon: Star,             label: 'Mis puntos' },
+  { href: '/mis-paquetes', icon: Package,          label: 'Mis paquetes' },
   { href: '/perfil',       icon: User,             label: 'Mi perfil' },
 ]
 
