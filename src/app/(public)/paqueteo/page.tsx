@@ -6,6 +6,7 @@ import {
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PaqueteoInteractive } from '@/components/public/paqueteo-interactive'
+import { HeroTracker } from '@/components/public/hero-tracker'
 
 export const metadata: Metadata = {
   title: 'Paqueteo | Tres Estrellas de Oro',
@@ -72,19 +73,19 @@ export default function PaqueteoPage() {
           <p className="text-white/65 text-lg max-w-xl mx-auto leading-relaxed mb-8">
             Más de <strong className="text-white">30 años</strong> conectando familias, comunidades y oportunidades entre Los Angeles y Tijuana.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-2">
             <a href="#cotizar">
               <Button className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold px-6">
                 <ArrowRight className="w-4 h-4 mr-2" />
                 Cotizar ahora
               </Button>
             </a>
-            <a href="#rastrear">
-              <Button variant="outline" className="border-white/25 text-white hover:bg-white/10 hover:text-white bg-transparent font-semibold px-6">
-                Rastrear paquete
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </a>
+          </div>
+
+          {/* Tracking search embedded in hero */}
+          <div className="mt-2">
+            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-3">Rastrear mi paquete</p>
+            <HeroTracker />
           </div>
         </div>
       </div>
