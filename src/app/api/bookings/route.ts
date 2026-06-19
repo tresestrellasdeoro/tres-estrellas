@@ -20,7 +20,7 @@ const squareClient = squareConfigured
 const BookingSchema = z.object({
   ticket_type:        z.enum(['one_way', 'round_trip']),
   total_amount:       z.number().positive(),
-  guest_email:        z.string().email(),
+  guest_email:        z.string().email().or(z.literal('')).optional(),
   payment_method:     z.enum(['card', 'cash']).default('card'),
   source_id:          z.string().optional(),
   origin_name:        z.string(),
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     total_amount,
     payment_method,
     points_earned: Math.floor(total_amount),
-    guest_email,
+    guest_email:   guest_email || null,
   }
   if (return_date) bookingInsert.return_date = return_date
   if (customerId) bookingInsert.customer_id = customerId
@@ -192,10 +192,10 @@ export async function POST(req: NextRequest) {
     color: { dark: '#0a1e42', light: '#ffffff' },
   })
 
-  // Send email
-  let emailStatus = 'sent'
+  // Send email (skip if no email provided — e.g. cash sales at counter)
+  let emailStatus = guest_email ? 'sent' : 'skipped'
   let emailError  = ''
-  try {
+  if (guest_email) try {
     const emailResult = await resend.emails.send({
       from:    'Tres Estrellas de Oro <boletos@tresestrellasdeoroinc.com>',
       to:      guest_email,
@@ -227,6 +227,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
+    qr_data_url:    qrDataUrl,
     booking_id:     booking.id,
     booking_number: booking.booking_number,
     email_status:   emailStatus,

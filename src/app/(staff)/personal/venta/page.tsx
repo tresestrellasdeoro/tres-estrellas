@@ -1,101 +1,116 @@
 'use client'
 
-import { useState } from 'react'
-import { ShoppingCart, Plus, Minus, User, CheckCircle2, AlertCircle, Loader2, RotateCcw, Ticket, Clock } from 'lucide-react'
+import { useState, useRef } from 'react'
+import {
+  ShoppingCart, Plus, Minus, CheckCircle2, AlertCircle,
+  Loader2, RotateCcw, Ticket, Clock, CreditCard, Banknote,
+  ArrowRight, Printer,
+} from 'lucide-react'
+import { SquareCard, type SquareCardHandle } from '@/components/public/square-card'
+import {
+  ALL_STOPS, getPrice,
+  type StopCode,
+} from '@/lib/data/bus-config'
 
-// LA → Tijuana (OTY/TIJ) — must match bus-config ROUTE_PRICES
-const ROUTE_PRICES = {
-  adult:  55,
-  senior: 50,
-  child:  50,
-}
+// Stops available as origin (boarding)
+const ORIGINS: StopCode[]      = ['LA', 'HP', 'SYS', 'OTY', 'TIJ']
+const DESTINATIONS: StopCode[] = ['LA', 'HP', 'SYS', 'OTY', 'TIJ']
 
 const DEPARTURE_TIMES = [
-  '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-  '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
-  '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM', '11:00 PM',
+  '3:20 AM','4:30 AM','5:00 AM','6:00 AM','7:00 AM','7:30 AM','8:00 AM',
+  '9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM',
+  '4:00 PM','5:00 PM','6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM','11:00 PM',
 ]
 
 type PassengerType = 'adult' | 'senior' | 'child'
+const PASS_LABELS: Record<PassengerType, string> = { adult: 'Adulto', senior: 'Senior', child: 'Menor' }
 
-interface PassengerRow {
-  id: number
-  full_name: string
-  passenger_type: PassengerType
-}
+interface PassengerRow { id: number; full_name: string; passenger_type: PassengerType }
 
-function today() {
-  return new Date().toISOString().split('T')[0]
-}
+function today() { return new Date().toISOString().split('T')[0] }
 
 export default function VentaPage() {
-  const [ticketType, setTicketType]     = useState<'one_way' | 'round_trip'>('one_way')
-  const [date, setDate]                 = useState(today())
+  const [origin, setOrigin]           = useState<StopCode>('LA')
+  const [destination, setDestination] = useState<StopCode>('OTY')
+  const [ticketType, setTicketType]   = useState<'one_way' | 'round_trip'>('one_way')
+  const [date, setDate]               = useState(today())
   const [departureTime, setDepartureTime] = useState('8:00 AM')
-  const [returnDate, setReturnDate]     = useState('')
-  const [email, setEmail]               = useState('')
-  const [passengers, setPassengers]     = useState<PassengerRow[]>([
+  const [returnDate, setReturnDate]   = useState('')
+  const [email, setEmail]             = useState('')
+  const [passengers, setPassengers]   = useState<PassengerRow[]>([
     { id: 1, full_name: '', passenger_type: 'adult' },
   ])
-  const [loading, setLoading]           = useState(false)
-  const [success, setSuccess]           = useState<{ booking_number: string } | null>(null)
-  const [error, setError]               = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
+  const [squareReady, setSquareReady] = useState(false)
+  const squareRef = useRef<SquareCardHandle>(null)
 
-  const nextId = () => Math.max(...passengers.map(p => p.id)) + 1
+  const [loading, setLoading]         = useState(false)
+  const [success, setSuccess]         = useState<{ booking_number: string; qr: string; total: number } | null>(null)
+  const [error, setError]             = useState('')
+
+  const pricing   = getPrice(origin, destination)
+  const unitPrice = (type: PassengerType) =>
+    type === 'child' ? pricing.child : pricing.adult  // senior = adult price
+
+  const passTotal = passengers.reduce((sum, p) => sum + unitPrice(p.passenger_type), 0)
+  const total     = Math.round(passTotal * (ticketType === 'round_trip' ? 1.5 : 1))
 
   const addPassenger = () => {
     if (passengers.length >= 8) return
-    setPassengers(prev => [...prev, { id: nextId(), full_name: '', passenger_type: 'adult' }])
+    const nextId = Math.max(...passengers.map(p => p.id)) + 1
+    setPassengers(prev => [...prev, { id: nextId, full_name: '', passenger_type: 'adult' }])
   }
-
-  const removePassenger = (id: number) => {
-    if (passengers.length <= 1) return
-    setPassengers(prev => prev.filter(p => p.id !== id))
-  }
-
-  const updatePassenger = (id: number, field: keyof PassengerRow, value: string) => {
+  const removePassenger  = (id: number) => passengers.length > 1 && setPassengers(p => p.filter(x => x.id !== id))
+  const updatePassenger  = (id: number, field: keyof PassengerRow, value: string) =>
     setPassengers(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
-  }
 
-  // Round-trip: 25% de descuento = precio_ida × 1.5 (igual que en la tienda online)
-  const total = Math.round(
-    passengers.reduce((sum, p) => sum + ROUTE_PRICES[p.passenger_type], 0)
-    * (ticketType === 'round_trip' ? 1.5 : 1)
-  )
-
-  const canSubmit = email.includes('@') && passengers.every(p => p.full_name.trim().length >= 2) && date
+  const canSubmit = passengers.every(p => p.full_name.trim().length >= 2) && date
+    && origin !== destination
     && (ticketType !== 'round_trip' || returnDate !== '')
 
   const handleSubmit = async () => {
     if (!canSubmit) return
     setLoading(true)
     setError('')
+
+    let source_id: string | undefined
+    if (paymentMethod === 'card') {
+      try {
+        source_id = await squareRef.current?.tokenize()
+      } catch (err: any) {
+        setError(err.message ?? 'Error al procesar la tarjeta')
+        setLoading(false)
+        return
+      }
+    }
+
     try {
       const res = await fetch('/api/bookings', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticket_type:        ticketType,
           total_amount:       total,
-          guest_email:        email,
-          payment_method:     'cash',
-          origin_name:        'Los Angeles',
-          destination_name:   'Tijuana',
-          boarding_stop_code: 'LA',
-          boarding_stop_name: 'Los Angeles',
+          guest_email:        email || undefined,
+          payment_method:     paymentMethod,
+          source_id,
+          origin_name:        ALL_STOPS[origin].name,
+          destination_name:   ALL_STOPS[destination].name,
+          boarding_stop_code: origin,
+          boarding_stop_name: ALL_STOPS[origin].name,
           date,
           departure_time:     departureTime,
           return_date:        ticketType === 'round_trip' ? returnDate : undefined,
           passengers: passengers.map(p => ({
             full_name:      p.full_name.trim(),
             passenger_type: p.passenger_type,
-            price:          Math.round(ROUTE_PRICES[p.passenger_type] * (ticketType === 'round_trip' ? 1.5 : 1)),
+            price:          Math.round(unitPrice(p.passenger_type) * (ticketType === 'round_trip' ? 1.5 : 1)),
           })),
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Error al crear la venta'); return }
-      setSuccess({ booking_number: data.booking_number })
+      if (!res.ok) { setError(data.error || 'Error al registrar la venta'); return }
+      setSuccess({ booking_number: data.booking_number, qr: data.qr_data_url, total })
     } catch {
       setError('Error de conexión')
     } finally {
@@ -112,61 +127,140 @@ export default function VentaPage() {
     setTicketType('one_way')
     setPassengers([{ id: 1, full_name: '', passenger_type: 'adult' }])
     setError('')
+    setPaymentMethod('cash')
+    setSquareReady(false)
   }
 
+  /* ── SUCCESS SCREEN ── */
   if (success) {
     return (
       <div className="p-4 sm:p-8 max-w-xl mx-auto">
-        <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="bg-emerald-600 px-6 py-5 text-center">
+            <CheckCircle2 className="w-10 h-10 text-white mx-auto mb-2" />
+            <h2 className="font-black text-xl text-white">¡Venta registrada!</h2>
+            <p className="text-emerald-100 text-sm mt-1">
+              {paymentMethod === 'card' ? 'Pago con tarjeta procesado' : 'Cobrar en efectivo al cliente'}
+            </p>
           </div>
-          <h2 className="font-black text-xl text-slate-800 mb-1">¡Venta registrada!</h2>
-          <p className="text-slate-500 text-sm mb-4">El boleto fue creado exitosamente.</p>
-          <div className="bg-slate-50 rounded-xl p-4 mb-6">
+
+          {/* Booking number */}
+          <div className="px-6 py-5 text-center border-b border-slate-100">
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Número de reservación</p>
-            <p className="font-mono font-black text-xl text-[#0a1628]">{success.booking_number}</p>
-            <p className="text-slate-400 text-xs mt-2">El boleto fue enviado al correo del cliente · Cobrar en efectivo</p>
+            <p className="font-mono font-black text-3xl text-[#0a1628] tracking-widest">{success.booking_number}</p>
+            {paymentMethod === 'cash' && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                <Banknote className="w-4 h-4 text-amber-600" />
+                <p className="text-amber-700 text-sm font-bold">Cobrar ${success.total} en efectivo</p>
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-2 mx-auto px-6 py-3 rounded-xl bg-[#0f2c5c] hover:bg-[#0a1e42] text-white font-bold text-sm transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Nueva venta
-          </button>
+
+          {/* QR code */}
+          {success.qr && (
+            <div className="px-6 py-5 text-center border-b border-slate-100">
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">QR del boleto — mostrar al cliente</p>
+              <div className="bg-slate-50 rounded-2xl p-4 inline-block border border-slate-200">
+                <img src={success.qr} alt="QR" className="w-40 h-40 mx-auto" />
+              </div>
+              <p className="text-slate-400 text-xs mt-2">El cliente lo presenta al abordar</p>
+            </div>
+          )}
+
+          {/* Email note */}
+          {email ? (
+            <div className="px-6 py-4 flex items-center gap-2 bg-blue-50 border-b border-slate-100">
+              <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+              <p className="text-blue-700 text-sm">Boleto enviado a <strong>{email}</strong></p>
+            </div>
+          ) : (
+            <div className="px-6 py-4 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+              <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
+              <p className="text-slate-500 text-sm">Sin correo — mostrar el QR de arriba al cliente</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="p-6 flex gap-3">
+            <button onClick={() => window.print()}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-sm transition-colors">
+              <Printer className="w-4 h-4" />
+              Imprimir
+            </button>
+            <button onClick={handleReset}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0f2c5c] hover:bg-[#0a1e42] text-white font-bold text-sm transition-colors">
+              <RotateCcw className="w-4 h-4" />
+              Nueva venta
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
+  /* ── FORM ── */
   return (
     <div className="p-4 sm:p-8 max-w-xl mx-auto">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-black text-2xl text-[#0a1628] flex items-center gap-2">
           <ShoppingCart className="w-6 h-6 text-[#c01515]" />
-          Nueva venta en caja
+          Nueva venta
         </h1>
-        <p className="text-slate-500 text-sm mt-1">Registro manual de boleto · Pago en efectivo</p>
+        <p className="text-slate-500 text-sm mt-1">Registro de boleto en caja</p>
       </div>
 
-      <div className="space-y-5">
+      <div className="space-y-4">
+
+        {/* Route */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Ruta</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Origen</label>
+              <select value={origin} onChange={e => setOrigin(e.target.value as StopCode)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50">
+                {ORIGINS.map(c => (
+                  <option key={c} value={c}>{ALL_STOPS[c].name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Destino</label>
+              <select value={destination} onChange={e => setDestination(e.target.value as StopCode)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50">
+                {DESTINATIONS.filter(c => c !== origin).map(c => (
+                  <option key={c} value={c}>{ALL_STOPS[c].name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {origin !== destination && (
+            <div className="mt-3 flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+              <span className="text-xs text-slate-500 font-semibold">{ALL_STOPS[origin].name}</span>
+              <ArrowRight className="w-3.5 h-3.5 text-[#c01515]" />
+              <span className="text-xs text-slate-500 font-semibold">{ALL_STOPS[destination].name}</span>
+              <span className="ml-auto text-xs font-black text-[#0a1628]">
+                Adulto: ${pricing.adult} · Menor: ${pricing.child}
+              </span>
+            </div>
+          )}
+          {origin === destination && (
+            <p className="mt-2 text-xs text-red-500 font-semibold">El origen y destino no pueden ser iguales</p>
+          )}
+        </div>
 
         {/* Ticket type */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Tipo de boleto</p>
           <div className="grid grid-cols-2 gap-3">
             {([['one_way', 'Sólo ida'], ['round_trip', 'Ida y vuelta']] as const).map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setTicketType(val)}
+              <button key={val} onClick={() => setTicketType(val)}
                 className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                  ticketType === val
-                    ? 'border-[#c01515] bg-[#c01515]/5 text-[#c01515]'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                }`}
-              >
+                  ticketType === val ? 'border-[#c01515] bg-[#c01515]/5 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}>
                 {label}
+                {val === 'round_trip' && <span className="block text-[10px] font-normal opacity-60">25% desc. en regreso</span>}
               </button>
             ))}
           </div>
@@ -178,58 +272,41 @@ export default function VentaPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-400 font-semibold block mb-1">Fecha</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50"
-              />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50" />
             </div>
             <div>
               <label className="text-xs text-slate-400 font-semibold block mb-1">Hora</label>
-              <select
-                value={departureTime}
-                onChange={e => setDepartureTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50"
-              >
-                {DEPARTURE_TIMES.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
+              <select value={departureTime} onChange={e => setDepartureTime(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50">
+                {DEPARTURE_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
-        </div>
 
-        {/* Return date (round-trip only) */}
-        {ticketType === 'round_trip' && (
-          <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm">
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Fecha de regreso</p>
-            <p className="text-slate-400 text-xs mb-3">La hora queda abierta — el cliente puede abordar cualquier bus disponible ese día</p>
-            <input
-              type="date"
-              value={returnDate}
-              min={date ? (() => { const d = new Date(date + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })() : ''}
-              onChange={e => setReturnDate(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50"
-            />
-            {returnDate && (
-              <div className="mt-3 flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-                <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                <span className="text-blue-700 text-xs font-semibold">Regreso: {returnDate} · Hora abierta</span>
-              </div>
-            )}
-          </div>
-        )}
+          {ticketType === 'round_trip' && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <label className="text-xs text-blue-600 font-bold uppercase tracking-wider block mb-1">Fecha de regreso</label>
+              <input type="date" value={returnDate}
+                min={date ? (() => { const d = new Date(date + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })() : ''}
+                onChange={e => setReturnDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50" />
+              {returnDate && (
+                <div className="mt-2 flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+                  <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="text-blue-700 text-xs font-semibold">Regreso: {returnDate} · Hora abierta</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Passengers */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pasajeros</p>
-            <button
-              onClick={addPassenger}
-              disabled={passengers.length >= 8}
-              className="flex items-center gap-1 text-xs font-bold text-[#c01515] hover:text-[#a01010] disabled:opacity-40 transition-colors"
-            >
+            <button onClick={addPassenger} disabled={passengers.length >= 8}
+              className="flex items-center gap-1 text-xs font-bold text-[#c01515] hover:text-[#a01010] disabled:opacity-40 transition-colors">
               <Plus className="w-3.5 h-3.5" /> Agregar
             </button>
           </div>
@@ -239,9 +316,7 @@ export default function VentaPage() {
               <div key={p.id} className="bg-slate-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-[#0f2c5c] text-white rounded-full flex items-center justify-center text-xs font-black">
-                      {idx + 1}
-                    </div>
+                    <div className="w-6 h-6 bg-[#0f2c5c] text-white rounded-full flex items-center justify-center text-xs font-black">{idx + 1}</div>
                     <span className="text-sm font-bold text-slate-600">Pasajero {idx + 1}</span>
                   </div>
                   {passengers.length > 1 && (
@@ -251,25 +326,17 @@ export default function VentaPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <input
-                    value={p.full_name}
-                    onChange={e => updatePassenger(p.id, 'full_name', e.target.value)}
+                  <input value={p.full_name} onChange={e => updatePassenger(p.id, 'full_name', e.target.value)}
                     placeholder="Nombre completo"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-white"
-                  />
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-white" />
                   <div className="grid grid-cols-3 gap-2">
-                    {(['adult', 'senior', 'child'] as const).map(type => (
-                      <button
-                        key={type}
-                        onClick={() => updatePassenger(p.id, 'passenger_type', type)}
+                    {(['adult', 'senior', 'child'] as PassengerType[]).map(type => (
+                      <button key={type} onClick={() => updatePassenger(p.id, 'passenger_type', type)}
                         className={`py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          p.passenger_type === type
-                            ? 'border-[#c01515] bg-[#c01515]/10 text-[#c01515]'
-                            : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                        }`}
-                      >
-                        {type === 'adult' ? 'Adulto' : type === 'senior' ? 'Senior' : 'Menor'}
-                        <span className="block font-black text-[10px]">${ROUTE_PRICES[type]}</span>
+                          p.passenger_type === type ? 'border-[#c01515] bg-[#c01515]/10 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                        }`}>
+                        {PASS_LABELS[type]}
+                        <span className="block font-black text-[10px]">${unitPrice(type)}</span>
                       </button>
                     ))}
                   </div>
@@ -279,19 +346,53 @@ export default function VentaPage() {
           </div>
         </div>
 
-        {/* Email */}
+        {/* Email (optional) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-            Correo del cliente
+            Correo del cliente <span className="font-normal normal-case text-slate-400">(opcional)</span>
           </label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="cliente@correo.com"
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50"
-          />
-          <p className="text-slate-400 text-xs mt-2">El boleto con QR se enviará a este correo</p>
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50" />
+          <p className="text-slate-400 text-xs mt-2">
+            {email ? 'El boleto con QR se enviará a este correo' : 'Sin correo — muestra el QR en pantalla al finalizar'}
+          </p>
+        </div>
+
+        {/* Payment method */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Forma de pago</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setPaymentMethod('cash')}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === 'cash' ? 'border-[#c01515] bg-[#c01515]/5 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}>
+              <Banknote className="w-5 h-5 shrink-0" />
+              <div>
+                <p className="font-bold text-sm">Efectivo</p>
+                <p className="text-[10px] opacity-60">Cobrar al cliente</p>
+              </div>
+            </button>
+            <button onClick={() => { setPaymentMethod('card'); setSquareReady(false) }}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === 'card' ? 'border-[#c01515] bg-[#c01515]/5 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}>
+              <CreditCard className="w-5 h-5 shrink-0" />
+              <div>
+                <p className="font-bold text-sm">Tarjeta</p>
+                <p className="text-[10px] opacity-60">Square / terminal</p>
+              </div>
+            </button>
+          </div>
+
+          {paymentMethod === 'card' && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5" /> Datos de tarjeta
+              </p>
+              <SquareCard ref={squareRef} onReady={() => setSquareReady(true)} />
+            </div>
+          )}
         </div>
 
         {/* Total */}
@@ -300,7 +401,10 @@ export default function VentaPage() {
             <p className="text-white/60 text-xs font-bold uppercase tracking-wider">Total a cobrar</p>
             <p className="text-3xl font-black mt-0.5">${total} <span className="text-base font-semibold text-white/60">USD</span></p>
             <p className="text-white/50 text-xs mt-1">
-              {passengers.length} pasajero{passengers.length > 1 ? 's' : ''} · {ticketType === 'round_trip' ? 'Ida y vuelta' : 'Sólo ida'} · Efectivo
+              {passengers.length} pasajero{passengers.length > 1 ? 's' : ''} ·{' '}
+              {ticketType === 'round_trip' ? 'Ida y vuelta' : 'Solo ida'} ·{' '}
+              {ALL_STOPS[origin]?.name} → {ALL_STOPS[destination]?.name} ·{' '}
+              {paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
             </p>
           </div>
           <Ticket className="w-10 h-10 text-white/20" />
@@ -313,14 +417,15 @@ export default function VentaPage() {
           </div>
         )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit || loading}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#c01515] hover:bg-[#a01010] text-white font-black text-base transition-colors disabled:opacity-40"
-        >
+        <button onClick={handleSubmit} disabled={!canSubmit || loading || (paymentMethod === 'card' && !squareReady)}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#c01515] hover:bg-[#a01010] text-white font-black text-base transition-colors disabled:opacity-40">
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShoppingCart className="w-5 h-5" />}
-          Registrar venta · ${total} efectivo
+          {loading
+            ? (paymentMethod === 'card' ? 'Procesando pago...' : 'Registrando...')
+            : `Registrar venta · $${total} ${paymentMethod === 'card' ? 'tarjeta' : 'efectivo'}`
+          }
         </button>
+
       </div>
     </div>
   )
