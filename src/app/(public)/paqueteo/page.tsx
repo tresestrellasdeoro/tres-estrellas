@@ -73,15 +73,15 @@ export default function PaqueteoPage() {
             Más de <strong className="text-white">30 años</strong> conectando familias, comunidades y oportunidades entre Los Angeles y Tijuana.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="tel:+12136245524">
+            <a href="#cotizar">
               <Button className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold px-6">
-                <Phone className="w-4 h-4 mr-2" />
+                <ArrowRight className="w-4 h-4 mr-2" />
                 Cotizar ahora
               </Button>
             </a>
-            <a href="#tarifas">
+            <a href="#rastrear">
               <Button variant="outline" className="border-white/25 text-white hover:bg-white/10 hover:text-white bg-transparent font-semibold px-6">
-                Ver tarifas
+                Rastrear paquete
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </a>
