@@ -1,7 +1,8 @@
 import { Metadata } from 'next'
 import {
   Package, Zap, MessageCircle, MapPin, Phone, CheckCircle2,
-  ArrowRight, Star, Truck, Clock, Shield,
+  ArrowRight, Star, Truck, Clock, Shield, Printer, QrCode,
+  ScanLine, UserPlus, CreditCard, PackageCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -141,22 +142,122 @@ export default function PaqueteoPage() {
         <div>
           <div className="text-center mb-8">
             <h2 className="font-black text-[#0f2c5c] text-3xl tracking-tight mb-2">¿Cómo funciona?</h2>
-            <p className="text-slate-500 text-sm">Proceso sencillo en tres pasos</p>
+            <p className="text-slate-500 text-sm">De tu puerta a su destino — todo en el mismo día</p>
           </div>
-          <div className="grid sm:grid-cols-3 gap-4">
+
+          {/* Main steps */}
+          <div className="space-y-3 mb-8">
             {[
-              { n: '1', title: 'Lleva tu paquete', desc: 'Llega a cualquiera de nuestras terminales con tu paquete bien empacado y etiquetado con nombre y teléfono del destinatario.' },
-              { n: '2', title: 'Paga la tarifa', desc: 'Elige el tamaño correspondiente y paga en caja. Recibirás un comprobante de envío con número de seguimiento.' },
-              { n: '3', title: 'Tu paquete viaja ese día', desc: 'El paquete viaja en el mismo autobús del día. El destinatario lo recoge en la terminal de destino presentando ID.' },
-            ].map(step => (
-              <div key={step.n} className="bg-white border border-slate-200 rounded-2xl p-5 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#0f2c5c] text-white font-black text-xl flex items-center justify-center mx-auto mb-3">
-                  {step.n}
+              {
+                n: '1', icon: <UserPlus className="w-5 h-5" />, color: 'bg-blue-600',
+                title: 'Crea tu cuenta y registra el envío',
+                desc: 'Ingresa a tu cuenta en tresestrellasdeoroinc.com, ve a "Mis paquetes" y llena los datos del remitente y destinatario (nombre, teléfono). Selecciona el tamaño de tu paquete y elige la terminal de origen y destino.',
+                tag: 'En línea o en caja',
+              },
+              {
+                n: '2', icon: <Printer className="w-5 h-5" />, color: 'bg-violet-600',
+                title: 'Imprime tu etiqueta con código QR',
+                desc: 'Una vez registrado el envío, el sistema genera automáticamente una etiqueta con código QR único. Imprímela, recórtala y pégala firmemente en el paquete. La etiqueta incluye: número de rastreo, datos de remitente y destinatario, origen, destino y precio.',
+                tag: 'Desde casa o en la terminal',
+              },
+              {
+                n: '3', icon: <Package className="w-5 h-5" />, color: 'bg-amber-600',
+                title: 'Lleva tu paquete a la terminal',
+                desc: 'Presenta tu paquete con la etiqueta pegada en la terminal de origen. El personal escanea el código QR para confirmarlo en el sistema. En ese momento el estado cambia a "Recibido en terminal" y puedes rastrear su avance desde tu cuenta.',
+                tag: 'Cualquier día del año',
+              },
+              {
+                n: '4', icon: <CreditCard className="w-5 h-5" />, color: 'bg-emerald-600',
+                title: 'Paga en caja (si no pagaste en línea)',
+                desc: 'Si no completaste el pago al crear la etiqueta, el personal te cobra en caja según el tamaño. El precio es fijo: Sobre $10 · Pequeño $15 · Mediano $25 · Grande $35 · Extra grande $45. Sin cargos ocultos.',
+                tag: 'Precio fijo, sin sorpresas',
+              },
+              {
+                n: '5', icon: <Truck className="w-5 h-5" />, color: 'bg-[#c01515]',
+                title: 'Tu paquete viaja ese mismo día',
+                desc: 'El paquete viaja en el autobús de ese día. Puedes seguir su estado en tiempo real desde "Mis paquetes" o en la sección de rastreo: Etiqueta creada → Recibido → En tránsito → Llegó a destino → Entregado.',
+                tag: 'Entrega en el día',
+              },
+              {
+                n: '6', icon: <PackageCheck className="w-5 h-5" />, color: 'bg-slate-700',
+                title: 'El destinatario recoge con su ID',
+                desc: 'En la terminal de destino, el destinatario presenta una identificación oficial para recoger el paquete. El personal actualiza el estado a "Entregado" y tanto remitente como destinatario reciben la confirmación.',
+                tag: 'Identificación requerida',
+              },
+            ].map((step, i, arr) => (
+              <div key={step.n} className="relative">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 flex gap-4 hover:shadow-sm transition-shadow">
+                  {/* Number + icon */}
+                  <div className="shrink-0 flex flex-col items-center gap-2">
+                    <div className={`w-10 h-10 rounded-xl ${step.color} text-white flex items-center justify-center`}>
+                      {step.icon}
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="w-px flex-1 bg-slate-200 min-h-[16px]" />
+                    )}
+                  </div>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 pb-1">
+                    <div className="flex items-start justify-between gap-3 flex-wrap mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-300">PASO {step.n}</span>
+                        <h3 className="font-black text-[#0f2c5c] text-base">{step.title}</h3>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wide">
+                        {step.tag}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
+                  </div>
                 </div>
-                <h3 className="font-bold text-[#0f2c5c] text-base mb-2">{step.title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Label printing detail card */}
+          <div className="bg-gradient-to-br from-[#0f2c5c] to-[#0a1e42] rounded-2xl p-6 text-white">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+                <QrCode className="w-5 h-5 text-[#c8a951]" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg">¿Cómo funciona la etiqueta con QR?</h3>
+                <p className="text-white/50 text-xs">Sistema de rastreo digital — como FedEx o UPS</p>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4 mb-5">
+              {[
+                {
+                  icon: <Printer className="w-5 h-5 text-[#c8a951]" />,
+                  title: 'Imprimes desde casa',
+                  desc: 'Después de registrar tu envío en línea, descarga e imprime la etiqueta en cualquier impresora. También puedes imprimirla gratis en la terminal.',
+                },
+                {
+                  icon: <ScanLine className="w-5 h-5 text-[#c8a951]" />,
+                  title: 'El personal escanea el QR',
+                  desc: 'En la terminal, el cajero escanea el código QR con su dispositivo. Esto registra automáticamente el paquete y cambia su estado a "Recibido".',
+                },
+                {
+                  icon: <PackageCheck className="w-5 h-5 text-[#c8a951]" />,
+                  title: 'Rastreo en tiempo real',
+                  desc: 'Tú y el destinatario pueden ver el estado del paquete en todo momento desde tresestrellasdeoroinc.com usando el número de rastreo TEO...',
+                },
+              ].map(item => (
+                <div key={item.title} className="bg-white/8 border border-white/10 rounded-xl p-4">
+                  <div className="mb-2">{item.icon}</div>
+                  <p className="font-bold text-sm mb-1.5">{item.title}</p>
+                  <p className="text-white/55 text-xs leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white/8 border border-white/10 rounded-xl px-4 py-3 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <p className="text-white/70 text-xs leading-relaxed">
+                <strong className="text-white">Sin impresora en casa.</strong> No hay problema — llega a la terminal con los datos del destinatario y el cajero registra el paquete y te imprime la etiqueta en el momento. Solo cuesta el precio del tamaño seleccionado.
+              </p>
+            </div>
           </div>
         </div>
 
