@@ -1,3 +1,4 @@
+import { SquareClient, SquareEnvironment } from 'square'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -10,6 +11,11 @@ function svc() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
+
+const squareConfigured = !!(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID)
+const squareClient = squareConfigured
+  ? new SquareClient({ token: process.env.SQUARE_ACCESS_TOKEN!, environment: SquareEnvironment.Production })
+  : null
 
 // GET — list packages (customer: own; admin/staff: all + search)
 export async function GET(req: NextRequest) {
@@ -31,7 +37,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, tracking_number, sender_name, sender_phone,
       recipient_name, recipient_phone,
-      size, weight_lbs, price, status, created_at, notes,
+      size, weight_lbs, price, status, payment_status, payment_method, paid_at, created_at, notes,
       origin:stops!packages_origin_stop_id_fkey(name, city),
       destination:stops!packages_destination_stop_id_fkey(name, city)
     `)
@@ -49,7 +55,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ packages: data ?? [] })
 }
 
-// POST — create new package
+// POST — create new package (optionally charge card with Square)
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -60,6 +66,7 @@ export async function POST(req: NextRequest) {
     recipient_name, recipient_phone, recipient_email,
     origin_stop_id, destination_stop_id,
     size, weight_lbs, declared_value, notes,
+    payment_method, source_id,
   } = body
 
   if (!sender_name || !sender_phone || !recipient_name || !recipient_phone || !origin_stop_id || !destination_stop_id || !size) {
@@ -69,15 +76,44 @@ export async function POST(req: NextRequest) {
   const sizeInfo = PACKAGE_SIZES[size as PackageSize]
   if (!sizeInfo) return NextResponse.json({ error: 'Tamaño inválido' }, { status: 422 })
 
-  const db    = svc()
-  let tracking = generateTrackingNumber()
+  const method: 'card' | 'cash' | 'terminal' = payment_method ?? 'cash'
 
-  // Ensure unique tracking number
+  // ── Square charge (if card) ────────────────────────────────────────────────
+  let squarePaymentId: string | undefined
+
+  if (method === 'card') {
+    if (!source_id) return NextResponse.json({ error: 'Token de tarjeta requerido' }, { status: 400 })
+    if (!squareConfigured || !squareClient) return NextResponse.json({ error: 'Pagos con tarjeta no configurados' }, { status: 503 })
+    try {
+      const paymentResponse = await squareClient.payments.create({
+        sourceId:       source_id,
+        amountMoney:    { amount: BigInt(Math.round(sizeInfo.price * 100)), currency: 'USD' },
+        locationId:     process.env.SQUARE_LOCATION_ID!,
+        idempotencyKey: crypto.randomUUID(),
+        note:           `Paqueteo TEO — ${size} — ${sender_name} → ${recipient_name}`,
+      })
+      const payment = paymentResponse.payment
+      if (!payment || payment.status !== 'COMPLETED') {
+        return NextResponse.json({ error: 'Pago rechazado por el banco' }, { status: 402 })
+      }
+      squarePaymentId = payment.id
+    } catch (e: any) {
+      const detail = e?.errors?.[0]?.detail || e?.message || 'Pago rechazado'
+      return NextResponse.json({ error: detail }, { status: 402 })
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const db      = svc()
+  let tracking  = generateTrackingNumber()
   for (let i = 0; i < 5; i++) {
     const { data: existing } = await db.from('packages').select('id').eq('tracking_number', tracking).maybeSingle()
     if (!existing) break
     tracking = generateTrackingNumber()
   }
+
+  const now = new Date().toISOString()
+  const isPaid = method === 'card' && !!squarePaymentId
 
   const { data: pkg, error } = await db
     .from('packages')
@@ -96,20 +132,35 @@ export async function POST(req: NextRequest) {
       declared_value:      Number(declared_value ?? 0),
       price:               sizeInfo.price,
       status:              'label_created',
+      payment_status:      isPaid ? 'paid' : 'pending',
+      payment_method:      isPaid ? 'card' : null,
+      square_payment_id:   squarePaymentId ?? null,
+      paid_at:             isPaid ? now : null,
+      paid_by:             isPaid ? (user?.id ?? null) : null,
       customer_id:         user?.id ?? null,
       notes:               notes ?? null,
     })
     .select('*, origin:stops!packages_origin_stop_id_fkey(name,city), destination:stops!packages_destination_stop_id_fkey(name,city)')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Reembolsar Square si el insert falló
+    if (squarePaymentId && squareClient) {
+      await squareClient.refunds.refundPayment({
+        paymentId:      squarePaymentId,
+        amountMoney:    { amount: BigInt(Math.round(sizeInfo.price * 100)), currency: 'USD' },
+        idempotencyKey: crypto.randomUUID(),
+        reason:         'Package creation failed — automatic refund',
+      }).catch(() => {})
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  // Create first event
   await db.from('package_events').insert({
     package_id: pkg.id,
     status:     'label_created',
     location:   null,
-    notes:      'Etiqueta creada',
+    notes:      isPaid ? `Etiqueta creada · Pagado con tarjeta $${sizeInfo.price}` : 'Etiqueta creada · Pago pendiente en terminal',
     created_by: user?.id ?? null,
   })
 
