@@ -47,7 +47,11 @@ export async function GET(req: NextRequest) {
   if (!isAdmin) {
     query = query.eq('customer_id', user.id)
   } else if (search) {
-    query = query.or(`tracking_number.ilike.%${search}%,sender_name.ilike.%${search}%,recipient_name.ilike.%${search}%`)
+    query = query.or(
+      `tracking_number.ilike.%${search}%,` +
+      `sender_name.ilike.%${search}%,sender_phone.ilike.%${search}%,sender_email.ilike.%${search}%,` +
+      `recipient_name.ilike.%${search}%,recipient_phone.ilike.%${search}%,recipient_email.ilike.%${search}%`
+    )
   }
 
   const { data, error } = await query

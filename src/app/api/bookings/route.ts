@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
   // ── Square payment charge ──────────────────────────────────────────────────
   let squarePaymentId: string | undefined
 
+  if (payment_method === 'card' && !squareConfigured) {
+    return NextResponse.json({ error: 'Pagos con tarjeta no están configurados en el servidor' }, { status: 503 })
+  }
+
   if (payment_method === 'card' && squareConfigured && squareClient) {
     if (!source_id) {
       return NextResponse.json({ error: 'Token de pago requerido' }, { status: 400 })

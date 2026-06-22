@@ -101,11 +101,14 @@ export default function VentaPage() {
           date,
           departure_time:     departureTime,
           return_date:        ticketType === 'round_trip' ? returnDate : undefined,
-          passengers: passengers.map(p => ({
-            full_name:      p.full_name.trim(),
-            passenger_type: p.passenger_type,
-            price:          Math.round(unitPrice(p.passenger_type) * (ticketType === 'round_trip' ? 1.5 : 1)),
-          })),
+          passengers: (() => {
+            const mult   = ticketType === 'round_trip' ? 1.5 : 1
+            const mapped = passengers.map(p => ({ full_name: p.full_name.trim(), passenger_type: p.passenger_type, price: Math.round(unitPrice(p.passenger_type) * mult) }))
+            // Adjust last passenger so sum of prices equals total_amount exactly
+            const sumSoFar = mapped.slice(0, -1).reduce((s, p) => s + p.price, 0)
+            mapped[mapped.length - 1].price = total - sumSoFar
+            return mapped
+          })(),
         }),
       })
       const data = await res.json()
@@ -183,7 +186,26 @@ export default function VentaPage() {
 
           {/* Actions */}
           <div className="p-6 flex gap-3">
-            <button onClick={() => window.print()}
+            <button onClick={() => {
+              const win = window.open('', '_blank', 'width=380,height=560')
+              if (!win) return
+              win.document.write(`<!DOCTYPE html><html><head><title>Boleto ${success.booking_number}</title>
+<style>body{font-family:monospace;text-align:center;padding:24px;margin:0}h1{font-size:14px;margin:0 0 4px}p{margin:4px 0;font-size:12px}strong{font-size:18px}img{width:180px;height:180px;margin:12px auto;display:block}hr{margin:12px 0;border:none;border-top:1px dashed #ccc}.big{font-size:28px;font-weight:900;letter-spacing:4px}</style>
+</head><body>
+<h1>Tres Estrellas de Oro Inc.</h1>
+<hr/>
+<p>Reservación</p>
+<p class="big">${success.booking_number}</p>
+<hr/>
+${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
+<p>Total cobrado: <strong>$${success.total} USD</strong></p>
+<hr/>
+<p style="font-size:10px">Presenta este código al abordar</p>
+</body></html>`)
+              win.document.close()
+              win.focus()
+              win.print()
+            }}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-sm transition-colors">
               <Printer className="w-4 h-4" />
               Imprimir
