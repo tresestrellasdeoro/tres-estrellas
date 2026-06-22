@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Package, ScanLine, CheckCircle2, AlertCircle, Plus, Printer,
-  CreditCard, Banknote, Loader2, Search, Clock, ChevronRight, X,
+  CreditCard, Banknote, Loader2, Search, Clock, ChevronRight, X, Wifi,
 } from 'lucide-react'
 import { STATUS_META, PACKAGE_SIZES, type PackageStatus, type PackageSize } from '@/lib/packages'
 import { NewPackageModal } from '@/components/packages/new-package-modal'
@@ -39,6 +39,12 @@ interface Pkg {
 }
 
 export default function StaffPaquetesPage() {
+  // Scanner input
+  const [scanValue, setScanValue]   = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
+  const [scanError, setScanError]   = useState('')
+  const scanRef                     = useRef<HTMLInputElement>(null)
+
   // List + search
   const [packages, setPackages]   = useState<Pkg[]>([])
   const [listLoading, setListLoading] = useState(true)
@@ -77,6 +83,35 @@ export default function StaffPaquetesPage() {
   }, [])
 
   useEffect(() => { fetchPackages() }, [fetchPackages])
+
+  // Auto-focus scanner on load
+  useEffect(() => { scanRef.current?.focus() }, [])
+
+  // ── Scanner lookup (exact tracking number, fires on Enter) ────────────
+  const handleScan = useCallback(async () => {
+    const tracking = scanValue.trim().toUpperCase()
+    if (!tracking) return
+    setScanLoading(true)
+    setScanError('')
+    try {
+      const res  = await fetch(`/api/packages/track?n=${encodeURIComponent(tracking)}`)
+      const data = await res.json()
+      if (!res.ok || !data.package) {
+        setScanError(`No se encontró el paquete "${tracking}"`)
+        setScanValue('')
+        setTimeout(() => scanRef.current?.focus(), 50)
+        return
+      }
+      selectPkg(data.package as Pkg)
+      setScanValue('')
+      setScanError('')
+      setTimeout(() => scanRef.current?.focus(), 50)
+    } catch {
+      setScanError('Error de conexión')
+    } finally {
+      setScanLoading(false)
+    }
+  }, [scanValue]) // selectPkg defined below, safe via closure
 
   // Debounced search
   useEffect(() => {
@@ -189,12 +224,56 @@ export default function StaffPaquetesPage() {
             <ScanLine className="w-6 h-6 text-[#c01515]" />
             Paquetes
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">Busca por nombre, teléfono, correo o número de rastreo</p>
+          <p className="text-slate-500 text-sm mt-0.5">Escanea la etiqueta QR o busca por nombre, teléfono o correo</p>
         </div>
-        <button onClick={() => setShowNew(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#c01515] hover:bg-[#a01010] text-white text-sm font-bold transition-colors">
-          <Plus className="w-4 h-4" /> Nuevo envío
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+            <Wifi className="w-3.5 h-3.5" />
+            Escáner listo
+          </div>
+          <button onClick={() => setShowNew(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#c01515] hover:bg-[#a01010] text-white text-sm font-bold transition-colors">
+            <Plus className="w-4 h-4" /> Nuevo envío
+          </button>
+        </div>
+      </div>
+
+      {/* ── SCANNER SECTION ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border-2 border-[#c01515]/20 focus-within:border-[#c01515] p-4 shadow-sm mb-4 transition-colors">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <ScanLine className="w-3.5 h-3.5 text-[#c01515]" />
+          Escanear etiqueta de paquete
+        </p>
+        <div className="flex gap-2">
+          <input
+            ref={scanRef}
+            value={scanValue}
+            onChange={e => setScanValue(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && handleScan()}
+            placeholder="TEO12345678 · Apunta el escáner QR aquí"
+            className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-slate-50"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <button onClick={handleScan} disabled={scanLoading || !scanValue.trim()}
+            className="px-5 py-3 bg-[#c01515] hover:bg-[#a01010] text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-colors flex items-center gap-2">
+            {scanLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Buscar
+          </button>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-slate-400 text-xs flex items-center gap-1">
+            <ScanLine className="w-3 h-3" />
+            El escáner enviará Enter automáticamente — solo apunta y dispara
+          </p>
+          <p className="text-slate-300 text-xs">o escribe el # manualmente</p>
+        </div>
+        {scanError && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {scanError}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4">
