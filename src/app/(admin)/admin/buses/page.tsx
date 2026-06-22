@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Bus, Plus, Search, Wifi, Wind, Bath, Usb, Tv2, Pencil,
   ToggleLeft, ToggleRight, Trash2, MapPin, DollarSign, Luggage,
-  Clock, Save, X, ChevronDown, Route,
+  Clock, Save, X, ChevronDown, Route, ArrowUp, ArrowDown, CheckCircle2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -506,15 +506,28 @@ function ParadasTab() {
 
 // ─── RUTAS ───────────────────────────────────────────────────────────────────
 
+interface RouteStopEntry {
+  id: string
+  stop_id: string
+  stop_order: number
+  stops: { id: string; code: string; name: string; city: string } | null
+}
+
 function RutasTab() {
-  const [routes, setRoutes]   = useState<RouteRow[]>([])
-  const [stops, setStops]     = useState<StopRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [open, setOpen]       = useState(false)
-  const [editing, setEditing] = useState<RouteRow | null>(null)
-  const [saving, setSaving]   = useState(false)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [form, setForm] = useState({ code: '', name: '', origin_stop_id: '', destination_stop_id: '', duration_minutes: 120 })
+  const [routes, setRoutes]         = useState<RouteRow[]>([])
+  const [stops, setStops]           = useState<StopRow[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [open, setOpen]             = useState(false)
+  const [editing, setEditing]       = useState<RouteRow | null>(null)
+  const [saving, setSaving]         = useState(false)
+  const [expanded, setExpanded]     = useState<string | null>(null)
+  const [form, setForm]             = useState({ code: '', name: '', origin_stop_id: '', destination_stop_id: '', duration_minutes: 120 })
+
+  // per-route stops state: routeId → ordered stop IDs being edited
+  const [routeStops, setRouteStops]       = useState<Record<string, RouteStopEntry[]>>({})
+  const [stopsLoading, setStopsLoading]   = useState<Record<string, boolean>>({})
+  const [stopsSaving, setStopsSaving]     = useState<Record<string, boolean>>({})
+  const [addStopId, setAddStopId]         = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -528,6 +541,28 @@ function RutasTab() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const loadRouteStops = async (routeId: string) => {
+    setStopsLoading(p => ({ ...p, [routeId]: true }))
+    try {
+      const res  = await fetch(`/api/admin/route-stops?route_id=${routeId}`)
+      const data = await res.json()
+      if (Array.isArray(data.route_stops)) {
+        setRouteStops(p => ({ ...p, [routeId]: data.route_stops }))
+      }
+    } finally {
+      setStopsLoading(p => ({ ...p, [routeId]: false }))
+    }
+  }
+
+  const toggleExpand = (routeId: string) => {
+    if (expanded === routeId) {
+      setExpanded(null)
+    } else {
+      setExpanded(routeId)
+      if (!routeStops[routeId]) loadRouteStops(routeId)
+    }
+  }
 
   const openAdd = () => {
     setEditing(null)
@@ -546,7 +581,16 @@ function RutasTab() {
     if (editing) {
       await fetch('/api/admin/routes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, ...form }) })
     } else {
-      await fetch('/api/admin/routes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const res  = await fetch('/api/admin/routes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const data = await res.json()
+      // Auto-seed route_stops with origin + destination for new routes
+      if (data.route?.id) {
+        await fetch('/api/admin/route-stops', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ route_id: data.route.id, stops: [form.origin_stop_id, form.destination_stop_id] }),
+        })
+      }
     }
     setSaving(false)
     setOpen(false)
@@ -569,6 +613,57 @@ function RutasTab() {
     return h > 0 ? `${h}h ${m > 0 ? m + 'min' : ''}`.trim() : `${m}min`
   }
 
+  // Move stop up/down in the local list
+  const moveStop = (routeId: string, idx: number, dir: -1 | 1) => {
+    setRouteStops(prev => {
+      const list  = [...(prev[routeId] ?? [])]
+      const other = idx + dir
+      if (other < 0 || other >= list.length) return prev
+      ;[list[idx], list[other]] = [list[other], list[idx]]
+      return { ...prev, [routeId]: list }
+    })
+  }
+
+  const removeStop = (routeId: string, idx: number) => {
+    setRouteStops(prev => {
+      const list = [...(prev[routeId] ?? [])]
+      list.splice(idx, 1)
+      return { ...prev, [routeId]: list }
+    })
+  }
+
+  const addStop = (routeId: string) => {
+    const stopId = addStopId[routeId]
+    if (!stopId) return
+    const stopInfo = stops.find(s => s.id === stopId)
+    if (!stopInfo) return
+    setRouteStops(prev => {
+      const list = [...(prev[routeId] ?? [])]
+      if (list.some(rs => rs.stop_id === stopId)) return prev
+      list.push({ id: '', stop_id: stopId, stop_order: list.length, stops: { id: stopId, code: stopInfo.code, name: stopInfo.name, city: stopInfo.city } })
+      return { ...prev, [routeId]: list }
+    })
+    setAddStopId(p => ({ ...p, [routeId]: '' }))
+  }
+
+  const saveRouteStops = async (routeId: string) => {
+    setStopsSaving(p => ({ ...p, [routeId]: true }))
+    try {
+      const orderedIds = (routeStops[routeId] ?? []).map(rs => rs.stop_id)
+      const res  = await fetch('/api/admin/route-stops', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ route_id: routeId, stops: orderedIds }),
+      })
+      const data = await res.json()
+      if (Array.isArray(data.route_stops)) {
+        setRouteStops(p => ({ ...p, [routeId]: data.route_stops }))
+      }
+    } finally {
+      setStopsSaving(p => ({ ...p, [routeId]: false }))
+    }
+  }
+
   return (
     <>
       <div className="flex items-center justify-between mb-5">
@@ -582,58 +677,142 @@ function RutasTab() {
       {!loading && routes.length === 0 && <div className="text-center py-16 text-slate-400 text-sm">No hay rutas registradas.</div>}
 
       <div className="space-y-3">
-        {routes.map(r => (
-          <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-5 py-4 gap-4">
-              <button className="flex items-center gap-4 min-w-0 flex-1 text-left" onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
-                <div className="w-10 h-10 rounded-xl bg-[#0f2c5c] flex items-center justify-center shrink-0">
-                  <Route className="w-5 h-5 text-[#c8a951]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-slate-800">{r.name}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">
-                    {r.origin_stop?.name} → {r.destination_stop?.name} · {formatDuration(r.duration_minutes)}
-                  </p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${expanded === r.id ? 'rotate-180' : ''}`} />
-              </button>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                  {r.is_active ? 'Activa' : 'Inactiva'}
-                </span>
-                <button onClick={() => toggleActive(r)} className="text-slate-400 hover:text-slate-700 transition-colors">
-                  {r.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5" />}
-                </button>
-                <button onClick={() => openEdit(r)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => deleteRoute(r.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-            {expanded === r.id && (
-              <div className="border-t border-slate-100 px-5 py-4 bg-slate-50">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Horarios ({r.schedules?.length ?? 0})</p>
-                {(r.schedules ?? []).length === 0 ? (
-                  <p className="text-slate-400 text-xs">Sin horarios. Agrégalos en la pestaña Horarios.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {r.schedules.map(sch => (
-                      <div key={sch.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5 border border-slate-200">
-                        <span className="font-mono font-bold text-sm text-[#0f2c5c]">{sch.departure_time.slice(0, 5)}</span>
-                        <span className="text-slate-400 text-xs">{sch.days_of_week.map(d => DAYS_LABELS[d]).join(', ')}</span>
-                        <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${sch.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                          {sch.is_active ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </div>
-                    ))}
+        {routes.map(r => {
+          const rStops   = routeStops[r.id] ?? []
+          const isLoading = stopsLoading[r.id]
+          const isSavingS = stopsSaving[r.id]
+
+          // Stops available to add (not already in the list)
+          const availableStops = stops.filter(s => !rStops.some(rs => rs.stop_id === s.id))
+
+          return (
+            <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between px-5 py-4 gap-4">
+                <button className="flex items-center gap-4 min-w-0 flex-1 text-left" onClick={() => toggleExpand(r.id)}>
+                  <div className="w-10 h-10 rounded-xl bg-[#0f2c5c] flex items-center justify-center shrink-0">
+                    <Route className="w-5 h-5 text-[#c8a951]" />
                   </div>
-                )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800">{r.name}</p>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      {r.origin_stop?.name} → {r.destination_stop?.name} · {formatDuration(r.duration_minutes)}
+                    </p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${expanded === r.id ? 'rotate-180' : ''}`} />
+                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                    {r.is_active ? 'Activa' : 'Inactiva'}
+                  </span>
+                  <button onClick={() => toggleActive(r)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                    {r.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5" />}
+                  </button>
+                  <button onClick={() => openEdit(r)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => deleteRoute(r.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              {expanded === r.id && (
+                <div className="border-t border-slate-100 bg-slate-50 divide-y divide-slate-100">
+
+                  {/* ── Paradas del recorrido ── */}
+                  <div className="px-5 py-4">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Paradas del recorrido
+                    </p>
+
+                    {isLoading ? (
+                      <p className="text-slate-400 text-xs">Cargando paradas...</p>
+                    ) : rStops.length === 0 ? (
+                      <p className="text-slate-400 text-xs mb-3">Sin paradas configuradas. Agrega las paradas en orden (origen → destino).</p>
+                    ) : (
+                      <div className="space-y-1.5 mb-3">
+                        {rStops.map((rs, idx) => (
+                          <div key={rs.stop_id} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-slate-200">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black flex items-center justify-center shrink-0">
+                              {idx}
+                            </span>
+                            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{rs.stops?.name ?? rs.stop_id}</span>
+                            {idx === 0 && <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full">Origen</span>}
+                            {idx === rStops.length - 1 && rStops.length > 1 && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Destino</span>}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => moveStop(r.id, idx, -1)} disabled={idx === 0}
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 disabled:opacity-30 transition-colors">
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => moveStop(r.id, idx, 1)} disabled={idx === rStops.length - 1}
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 disabled:opacity-30 transition-colors">
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => removeStop(r.id, idx)}
+                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add stop row */}
+                    <div className="flex gap-2">
+                      <select
+                        value={addStopId[r.id] ?? ''}
+                        onChange={e => setAddStopId(p => ({ ...p, [r.id]: e.target.value }))}
+                        className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#c01515]/30"
+                      >
+                        <option value="">+ Agregar parada...</option>
+                        {availableStops.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => addStop(r.id)}
+                        disabled={!addStopId[r.id]}
+                        className="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold disabled:opacity-40 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => saveRouteStops(r.id)}
+                        disabled={isSavingS || rStops.length < 2}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f2c5c] hover:bg-[#0a1e42] text-white text-sm font-bold disabled:opacity-40 transition-colors"
+                      >
+                        {isSavingS ? '…' : <><CheckCircle2 className="w-3.5 h-3.5" /> Guardar</>}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Horarios ── */}
+                  <div className="px-5 py-4">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Horarios ({r.schedules?.length ?? 0})</p>
+                    {(r.schedules ?? []).length === 0 ? (
+                      <p className="text-slate-400 text-xs">Sin horarios. Agrégalos en la pestaña Horarios.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {r.schedules.map(sch => (
+                          <div key={sch.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5 border border-slate-200">
+                            <span className="font-mono font-bold text-sm text-[#0f2c5c]">{sch.departure_time.slice(0, 5)}</span>
+                            <span className="text-slate-400 text-xs">{sch.days_of_week.map((d: number) => DAYS_LABELS[d]).join(', ')}</span>
+                            <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${sch.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                              {sch.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -675,6 +854,11 @@ function RutasTab() {
                 {stops.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
               </select>
             </div>
+            {!editing && (
+              <p className="text-slate-400 text-xs bg-slate-50 rounded-xl p-3">
+                Después de crear la ruta, expándela para agregar paradas intermedias en orden.
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)} className="rounded-xl">Cancelar</Button>
               <Button onClick={save} disabled={saving} className="bg-[#c01515] hover:bg-[#a01010] text-white font-bold rounded-xl">
