@@ -34,6 +34,7 @@ const BookingSchema = z.object({
     full_name:      z.string().min(2),
     passenger_type: z.enum(['adult', 'child', 'senior']),
     price:          z.number().positive(),
+    seat_number:    z.string().optional(),
   })).min(1),
 })
 
@@ -92,12 +93,24 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const customerId: string | null = user?.id ?? null
 
-  // Get any real trip to satisfy FK constraint (demo mode)
-  const { data: tripData } = await service
+  // Find a trip matching the booking date; fall back to any trip if none scheduled for that day
+  let { data: tripData } = await service
     .from('trips')
     .select('id')
+    .eq('departure_date', date)
+    .eq('status', 'scheduled')
+    .order('departure_time', { ascending: true })
     .limit(1)
     .maybeSingle()
+
+  if (!tripData?.id) {
+    const { data: anyTrip } = await service
+      .from('trips')
+      .select('id')
+      .limit(1)
+      .maybeSingle()
+    tripData = anyTrip
+  }
 
   if (!tripData?.id) {
     return NextResponse.json({ error: 'No hay viajes en el sistema. Ejecuta el seed SQL.' }, { status: 404 })
@@ -119,7 +132,7 @@ export async function POST(req: NextRequest) {
   const { data: booking, error: bookingError } = await service
     .from('bookings')
     .insert(bookingInsert)
-    .select('id, booking_number')
+    .select('id, booking_number, points_earned')
     .single()
 
   if (bookingError || !booking) {
@@ -139,6 +152,20 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json({ error: 'Error al crear la reservación' }, { status: 500 })
+  }
+
+  // Save Square payment record for audit trail and future refunds
+  if (squarePaymentId) {
+    const { error: payErr } = await service.from('payments').insert({
+      booking_id:          booking.id,
+      amount:              total_amount,
+      provider:            'square',
+      provider_payment_id: squarePaymentId,
+      status:              'completed',
+      payment_method:      'card',
+      metadata:            {},
+    })
+    if (payErr) console.error('Failed to save payment record:', payErr.message)
   }
 
   // Get terminal_id for the boarding stop (fallback to first available stop)
@@ -167,6 +194,7 @@ export async function POST(req: NextRequest) {
       passenger_type: p.passenger_type,
       terminal_id:    terminalId,
       price:          p.price,
+      seat_number:    p.seat_number ?? null,
     }))
   )
 
@@ -187,6 +215,45 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json({ error: 'Error al registrar los pasajeros' }, { status: 500 })
+  }
+
+  // Credit loyalty points to authenticated users
+  const pointsEarned = (booking as any).points_earned ?? Math.floor(total_amount)
+  if (customerId && pointsEarned > 0) {
+    const { data: profile } = await service
+      .from('profiles')
+      .select('loyalty_points')
+      .eq('id', customerId)
+      .maybeSingle()
+    const currentPoints = (profile as any)?.loyalty_points ?? 0
+    await service
+      .from('profiles')
+      .update({ loyalty_points: currentPoints + pointsEarned })
+      .eq('id', customerId)
+    const { error: loyaltyErr } = await service.from('loyalty_transactions').insert({
+      customer_id: customerId,
+      booking_id:  booking.id,
+      points:      pointsEarned,
+      type:        'earned',
+      description: `Boleto ${booking.booking_number} — ${origin_name} → ${destination_name}`,
+    })
+    if (loyaltyErr) console.error('Failed to insert loyalty transaction:', loyaltyErr.message)
+  }
+
+  // Sync to QuickBooks (non-blocking — a QB failure never fails the booking)
+  try {
+    const { createSalesReceipt } = await import('@/lib/quickbooks/client')
+    await createSalesReceipt({
+      bookingNumber:   booking.booking_number,
+      originName:      origin_name,
+      destinationName: destination_name,
+      totalAmount:     total_amount,
+      passengerNames:  passengers.map(p => p.full_name),
+      date,
+      paymentMethod:   payment_method,
+    })
+  } catch (qbErr: any) {
+    console.error('QuickBooks sync skipped:', qbErr.message)
   }
 
   // Generate QR code

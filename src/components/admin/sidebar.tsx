@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package } from 'lucide-react'
+import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -14,7 +14,8 @@ const NAV = [
   { href: '/admin/clientes',   icon: Users,           label: 'Clientes' },
   { href: '/admin/reportes',   icon: BarChart3,       label: 'Reportes' },
   { href: '/admin/personal',   icon: UserCog,         label: 'Personal' },
-  { href: '/admin/paquetes',   icon: Package,         label: 'Paquetes' },
+  { href: '/admin/paquetes',        icon: Package,         label: 'Paquetes' },
+  { href: '/admin/configuracion',  icon: Settings,        label: 'Configuración' },
 ]
 
 export function AdminSidebar() {
@@ -60,11 +61,7 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-3 border-t border-white/8 space-y-1">
-        <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/40 hover:text-white/70 hover:bg-white/5 transition-all">
-          <Settings className="w-4 h-4" />
-          Configuración
-        </Link>
+      <div className="p-3 border-t border-white/8">
         <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-sm font-semibold text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all">
           <LogOut className="w-4 h-4" />
           Cerrar sesión

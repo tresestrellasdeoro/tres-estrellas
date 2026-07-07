@@ -108,10 +108,11 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           date,
           departure_time:     bus?.departs || '',
           return_date:        tripType === 'round_trip' ? returnDate : undefined,
-          passengers: passengers.map(p => ({
+          passengers: passengers.map((p, i) => ({
             full_name:      p.name,
             passenger_type: p.type,
             price:          p.type === 'adult' ? adultPrice : childPrice,
+            seat_number:    selectedSeats[i] ?? undefined,
           })),
         }),
       })
@@ -290,6 +291,9 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 placeholder="tucorreo@ejemplo.com"
                 className="mt-1.5 rounded-xl border-slate-200 focus:border-[#c01515] focus:ring-[#c01515]/20"
               />
+              {email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && (
+                <p className="text-red-500 text-xs mt-1.5">Ingresa un correo electrónico válido</p>
+              )}
             </div>
           </div>
 
