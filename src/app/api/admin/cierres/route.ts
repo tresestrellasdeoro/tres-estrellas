@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
     .gte('created_at', fechaStart)
     .lte('created_at', fechaEnd)
     .eq('sucursal_id', sucursal_id)
-    .catch(() => ({ data: [] })) as any
+    .throwOnError()
+    .then(r => r, () => ({ data: [] as any[] })) as any
 
   const total_boletos  = bookings?.length ?? 0
   const total_efectivo = bookings?.filter((b: any) => b.payment_method === 'cash').reduce((s: number, b: any) => s + (b.total_amount || 0), 0) ?? 0
