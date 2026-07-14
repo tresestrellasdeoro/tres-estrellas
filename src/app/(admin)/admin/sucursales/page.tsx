@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { Plus, Pencil, Trash2, Store, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,8 +152,8 @@ export default function SucursalesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sucursales.map(s => (
-                <>
-                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                <Fragment key={s.id}>
+                  <tr className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-slate-800 flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-[#0a1e42]/8 flex items-center justify-center shrink-0">
                         <Store className="w-3.5 h-3.5 text-[#0a1e42]" />
@@ -200,7 +200,7 @@ export default function SucursalesPage() {
                     </td>
                   </tr>
                   {expandedQB === s.id && (
-                    <tr key={`${s.id}-qb`} className="bg-slate-50">
+                    <tr className="bg-slate-50">
                       <td colSpan={6} className="px-4 py-3">
                         <div className="text-xs space-y-1 text-slate-500">
                           <div><span className="font-semibold text-slate-600">QB Cash Account ID:</span> {s.qb_cash_account_id || <span className="text-amber-600 italic">No configurado</span>}</div>
@@ -212,7 +212,7 @@ export default function SucursalesPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
