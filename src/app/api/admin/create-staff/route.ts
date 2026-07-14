@@ -3,56 +3,64 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
+const DEPARTAMENTOS = [
+  'Contabilidad', 'Coordinación', 'Equipaje', 'Flota',
+  'Gerencia', 'Sistemas', 'Ventas', 'Webmaster',
+] as const
+
+const PERMISOS_VALIDOS = [
+  'ventas', 'checkin', 'reportes', 'paquetes', 'clientes', 'personal', 'all',
+] as const
+
 const Schema = z.object({
-  name:     z.string().min(2),
-  email:    z.string().email(),
-  password: z.string().min(8),
-  role:     z.enum(['cajero']),
+  name:         z.string().min(2),
+  email:        z.string().email(),
+  password:     z.string().min(8),
+  role:         z.enum(['cajero', 'admin', 'super_admin']).default('cajero'),
+  sucursal_id:  z.string().uuid().optional().nullable(),
+  departamento: z.enum(DEPARTAMENTOS).optional().nullable(),
+  permisos:     z.array(z.enum(PERMISOS_VALIDOS)).default([]),
 })
 
-export async function POST(req: NextRequest) {
-  // Verify caller is admin
+async function verifyAdmin(req: NextRequest) {
+  const adminCookie = req.cookies.get('admin_session')
+  if (adminCookie?.value) return true
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
 
-  const adminCookie = req.cookies.get('admin_session')
+  const svc = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: profile } = await svc
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle() as { data: { role: string } | null }
 
-  // If env-var admin cookie is present, allow — no Supabase profile check needed
-  const hasAdminCookie = !!adminCookie?.value
+  return profile?.role === 'admin' || profile?.role === 'super_admin'
+}
 
-  if (!hasAdminCookie && !user) {
+export async function POST(req: NextRequest) {
+  if (!await verifyAdmin(req)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
-
-  // If logged in via Supabase (no admin cookie), verify profile role
-  if (!hasAdminCookie && user) {
-    const svc = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    const { data: profile } = await svc
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle() as { data: { role: string } | null }
-    if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
   }
 
   const body = await req.json()
   const parsed = Schema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'Datos inválidos' }, { status: 422 })
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 422 })
+  }
 
-  const { name, email, password, role } = parsed.data
+  const { name, email, password, role, sucursal_id, departamento, permisos } = parsed.data
 
   const service = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Create auth user — do NOT pass role in metadata; the DB trigger may
-  // cast it to user_role enum and 'cajero' won't exist until the ALTER TYPE runs.
   const { data: authData, error: authError } = await service.auth.admin.createUser({
     email,
     password,
@@ -66,14 +74,17 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
-  // Upsert the profile — handles both the case where the DB trigger already
-  // created a row (update) and where it didn't (insert).
   const { error: profileError } = await service
     .from('profiles')
-    .upsert(
-      { id: userId, email, full_name: name, role },
-      { onConflict: 'id' }
-    )
+    .upsert({
+      id:           userId,
+      email,
+      full_name:    name,
+      role,
+      sucursal_id:  sucursal_id  ?? null,
+      departamento: departamento ?? null,
+      permisos:     permisos,
+    }, { onConflict: 'id' })
 
   if (profileError) {
     await service.auth.admin.deleteUser(userId)
