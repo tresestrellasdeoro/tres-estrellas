@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, Fragment } from 'react'
-import { Plus, Pencil, Trash2, Store, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Pencil, Trash2, Store, CheckCircle2, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -30,6 +30,9 @@ export default function SucursalesPage() {
   const [saving, setSaving]         = useState(false)
   const [expandedQB, setExpandedQB] = useState<string | null>(null)
   const [toast, setToast]           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [qbAccounts, setQbAccounts] = useState<{ id: string; name: string }[]>([])
+  const [qbItems,    setQbItems]    = useState<{ id: string; name: string }[]>([])
+  const [loadingQB,  setLoadingQB]  = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -47,10 +50,24 @@ export default function SucursalesPage() {
     return () => clearTimeout(t)
   }, [toast])
 
+  const fetchQBAccounts = async () => {
+    setLoadingQB(true)
+    try {
+      const res = await fetch('/api/admin/quickbooks/accounts')
+      if (res.ok) {
+        const data = await res.json()
+        setQbAccounts(data.accounts ?? [])
+        setQbItems(data.items ?? [])
+      }
+    } catch {}
+    setLoadingQB(false)
+  }
+
   const openCreate = () => {
     setEditing(null)
     setForm(EMPTY)
     setModalOpen(true)
+    if (qbAccounts.length === 0) fetchQBAccounts()
   }
 
   const openEdit = (s: Sucursal) => {
@@ -59,6 +76,7 @@ export default function SucursalesPage() {
               active: s.active, qb_cash_account_id: s.qb_cash_account_id ?? '',
               qb_item_id: s.qb_item_id ?? '' })
     setModalOpen(true)
+    if (qbAccounts.length === 0) fetchQBAccounts()
   }
 
   const handleSave = async () => {
@@ -254,17 +272,56 @@ export default function SucursalesPage() {
               </div>
 
               <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">QuickBooks IDs</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">QuickBooks</p>
+                  <button type="button" onClick={fetchQBAccounts} disabled={loadingQB}
+                    className="flex items-center gap-1 text-xs text-[#0a1e42] hover:underline disabled:opacity-50">
+                    <RefreshCw className={`w-3 h-3 ${loadingQB ? 'animate-spin' : ''}`} />
+                    {loadingQB ? 'Cargando...' : 'Recargar cuentas'}
+                  </button>
+                </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">Cash Account ID <span className="font-normal text-slate-400">(cuenta "Cash on hand" en QB)</span></label>
-                    <Input value={form.qb_cash_account_id ?? ''} onChange={e => setForm(f => ({ ...f, qb_cash_account_id: e.target.value }))}
-                      placeholder="Ej: 123" className="rounded-xl font-mono text-sm" />
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">
+                      Cuenta de efectivo <span className="font-normal text-slate-400">("Cash on hand" de esta sucursal)</span>
+                    </label>
+                    {qbAccounts.length > 0 ? (
+                      <select
+                        value={form.qb_cash_account_id ?? ''}
+                        onChange={e => setForm(f => ({ ...f, qb_cash_account_id: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0a1e42]/20"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {qbAccounts.map(a => (
+                          <option key={a.id} value={a.id}>{a.name} (ID: {a.id})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input value={form.qb_cash_account_id ?? ''} onChange={e => setForm(f => ({ ...f, qb_cash_account_id: e.target.value }))}
+                        placeholder={loadingQB ? 'Cargando cuentas QB...' : 'Conecta QB para ver opciones o ingresa el ID manualmente'}
+                        className="rounded-xl font-mono text-sm" disabled={loadingQB} />
+                    )}
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">Item ID <span className="font-normal text-slate-400">(ítem de ventas de boletos en QB)</span></label>
-                    <Input value={form.qb_item_id ?? ''} onChange={e => setForm(f => ({ ...f, qb_item_id: e.target.value }))}
-                      placeholder="Ej: 456" className="rounded-xl font-mono text-sm" />
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">
+                      Ítem de ventas <span className="font-normal text-slate-400">(producto/servicio de boletos en QB)</span>
+                    </label>
+                    {qbItems.length > 0 ? (
+                      <select
+                        value={form.qb_item_id ?? ''}
+                        onChange={e => setForm(f => ({ ...f, qb_item_id: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0a1e42]/20"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {qbItems.map(i => (
+                          <option key={i.id} value={i.id}>{i.name} (ID: {i.id})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input value={form.qb_item_id ?? ''} onChange={e => setForm(f => ({ ...f, qb_item_id: e.target.value }))}
+                        placeholder={loadingQB ? 'Cargando ítems QB...' : 'Conecta QB para ver opciones o ingresa el ID manualmente'}
+                        className="rounded-xl font-mono text-sm" disabled={loadingQB} />
+                    )}
                   </div>
                 </div>
               </div>
