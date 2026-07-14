@@ -27,6 +27,7 @@ const BookingSchema = z.object({
   destination_name:   z.string(),
   boarding_stop_code: z.string().optional(),
   boarding_stop_name: z.string(),
+  sucursal_id:        z.string().uuid().optional(),
   date:               z.string(),
   departure_time:     z.string(),
   return_date:        z.string().optional(),
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
   const {
     ticket_type, total_amount, guest_email, payment_method, source_id,
     origin_name, destination_name, boarding_stop_code, boarding_stop_name,
-    date, departure_time, return_date, passengers,
+    date, departure_time, return_date, passengers, sucursal_id,
   } = parsed.data
 
   // ── Square payment charge ──────────────────────────────────────────────────
@@ -126,8 +127,9 @@ export async function POST(req: NextRequest) {
     points_earned: Math.floor(total_amount),
     guest_email:   guest_email || null,
   }
-  if (return_date) bookingInsert.return_date = return_date
-  if (customerId) bookingInsert.customer_id = customerId
+  if (return_date)  bookingInsert.return_date  = return_date
+  if (customerId)   bookingInsert.customer_id  = customerId
+  if (sucursal_id)  bookingInsert.sucursal_id  = sucursal_id
 
   const { data: booking, error: bookingError } = await service
     .from('bookings')
@@ -243,6 +245,20 @@ export async function POST(req: NextRequest) {
   // Sync to QuickBooks (non-blocking — a QB failure never fails the booking)
   try {
     const { createSalesReceipt } = await import('@/lib/quickbooks/client')
+
+    // Fetch sucursal QB account IDs if sucursal_id was provided
+    let qbCashAccountId: string | null = null
+    let qbItemId: string | null = null
+    if (sucursal_id) {
+      const { data: suc } = await service
+        .from('sucursales')
+        .select('qb_cash_account_id, qb_item_id')
+        .eq('id', sucursal_id)
+        .maybeSingle()
+      qbCashAccountId = (suc as any)?.qb_cash_account_id ?? null
+      qbItemId        = (suc as any)?.qb_item_id ?? null
+    }
+
     await createSalesReceipt({
       bookingNumber:   booking.booking_number,
       originName:      origin_name,
@@ -251,6 +267,8 @@ export async function POST(req: NextRequest) {
       passengerNames:  passengers.map(p => p.full_name),
       date,
       paymentMethod:   payment_method,
+      qbCashAccountId,
+      qbItemId,
     })
   } catch (qbErr: any) {
     console.error('QuickBooks sync skipped:', qbErr.message)

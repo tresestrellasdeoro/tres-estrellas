@@ -103,13 +103,16 @@ export async function isConnected() {
 }
 
 export interface SalesReceiptParams {
-  bookingNumber:   string
-  originName:      string
-  destinationName: string
-  totalAmount:     number
-  passengerNames:  string[]
-  date:            string
-  paymentMethod:   'card' | 'cash'
+  bookingNumber:      string
+  originName:         string
+  destinationName:    string
+  totalAmount:        number
+  passengerNames:     string[]
+  date:               string
+  paymentMethod:      'card' | 'cash'
+  // Sucursal QB account IDs (optional — falls back to generic if not set)
+  qbCashAccountId?:   string | null
+  qbItemId?:          string | null
 }
 
 export async function createSalesReceipt(params: SalesReceiptParams) {
@@ -122,20 +125,29 @@ export async function createSalesReceipt(params: SalesReceiptParams) {
     params.date,
   ].join(' — ')
 
-  const body = {
-    DocNumber: params.bookingNumber,
-    TxnDate:   params.date,
+  const itemRef = params.qbItemId
+    ? { value: params.qbItemId }
+    : { value: '1', name: 'Services' }
+
+  const body: Record<string, unknown> = {
+    DocNumber:   params.bookingNumber,
+    TxnDate:     params.date,
     Line: [{
-      Amount:     params.totalAmount,
-      DetailType: 'SalesItemLineDetail',
+      Amount:      params.totalAmount,
+      DetailType:  'SalesItemLineDetail',
       Description: description,
       SalesItemLineDetail: {
-        ItemRef:   { value: '1', name: 'Services' },
+        ItemRef:   itemRef,
         Qty:       1,
         UnitPrice: params.totalAmount,
       },
     }],
     PrivateNote: `Boleto ${params.bookingNumber} — Pago: ${params.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}`,
+  }
+
+  // Cash payments deposit to the branch cash account; card goes to Undeposited Funds
+  if (params.paymentMethod === 'cash' && params.qbCashAccountId) {
+    body.DepositToAccountRef = { value: params.qbCashAccountId }
   }
 
   const res = await fetch(`${QB_API_BASE}/${tokens.realm_id}/salesreceipt`, {
