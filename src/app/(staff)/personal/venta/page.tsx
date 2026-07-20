@@ -25,7 +25,16 @@ const DEPARTURE_TIMES = [
 type PassengerType = 'adult' | 'senior' | 'child'
 const PASS_LABELS: Record<PassengerType, string> = { adult: 'Adulto', senior: 'Senior', child: 'Menor' }
 
-interface PassengerRow { id: number; full_name: string; passenger_type: PassengerType }
+const PROMO_LABELS = ['Promoción', 'Maestro', 'Estudiante', '3ra Edad', 'Cortesía']
+
+interface PassengerRow {
+  id:           number
+  full_name:    string
+  passenger_type: PassengerType
+  is_promo:     boolean
+  promo_label:  string
+  promo_price:  string  // string for input control; empty = not set
+}
 
 function today() {
   const d = new Date()
@@ -41,7 +50,7 @@ export default function VentaPage() {
   const [returnDate, setReturnDate]   = useState('')
   const [email, setEmail]             = useState('')
   const [passengers, setPassengers]   = useState<PassengerRow[]>([
-    { id: 1, full_name: '', passenger_type: 'adult' },
+    { id: 1, full_name: '', passenger_type: 'adult', is_promo: false, promo_label: 'Promoción', promo_price: '' },
   ])
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
   const [squareReady, setSquareReady] = useState(false)
@@ -61,24 +70,33 @@ export default function VentaPage() {
   const [error, setError]             = useState('')
 
   const pricing   = getPrice(origin, destination)
-  const unitPrice = (type: PassengerType) =>
-    type === 'child' ? pricing.child : pricing.adult  // senior = adult price
+  const mult      = ticketType === 'round_trip' ? 1.5 : 1
+  const basePrice = (type: PassengerType) =>
+    Math.round((type === 'child' ? pricing.child : pricing.adult) * mult)
 
-  const passTotal = passengers.reduce((sum, p) => sum + unitPrice(p.passenger_type), 0)
-  const total     = Math.round(passTotal * (ticketType === 'round_trip' ? 1.5 : 1))
+  const passengerPrice = (p: PassengerRow): number => {
+    if (p.is_promo && p.promo_price !== '') {
+      const v = parseFloat(p.promo_price)
+      return isNaN(v) || v <= 0 ? 0 : v
+    }
+    return basePrice(p.passenger_type)
+  }
+
+  const total = passengers.reduce((sum, p) => sum + passengerPrice(p), 0)
 
   const addPassenger = () => {
     if (passengers.length >= 8) return
     const nextId = Math.max(...passengers.map(p => p.id)) + 1
-    setPassengers(prev => [...prev, { id: nextId, full_name: '', passenger_type: 'adult' }])
+    setPassengers(prev => [...prev, { id: nextId, full_name: '', passenger_type: 'adult', is_promo: false, promo_label: 'Promoción', promo_price: '' }])
   }
   const removePassenger  = (id: number) => passengers.length > 1 && setPassengers(p => p.filter(x => x.id !== id))
   const updatePassenger  = (id: number, field: keyof PassengerRow, value: string) =>
     setPassengers(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
 
-  const canSubmit = passengers.every(p => p.full_name.trim().length >= 2) && date
-    && origin !== destination
-    && (ticketType !== 'round_trip' || returnDate !== '')
+  const canSubmit = passengers.every(p =>
+    p.full_name.trim().length >= 2 &&
+    (!p.is_promo || (p.promo_price !== '' && parseFloat(p.promo_price) > 0))
+  ) && date && origin !== destination && (ticketType !== 'round_trip' || returnDate !== '')
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -115,9 +133,14 @@ export default function VentaPage() {
           departure_time:     departureTime,
           return_date:        ticketType === 'round_trip' ? returnDate : undefined,
           passengers: (() => {
-            const mult   = ticketType === 'round_trip' ? 1.5 : 1
-            const mapped = passengers.map(p => ({ full_name: p.full_name.trim(), passenger_type: p.passenger_type, price: Math.round(unitPrice(p.passenger_type) * mult) }))
-            // Adjust last passenger so sum of prices equals total_amount exactly
+            const mapped = passengers.map(p => ({
+              full_name:      p.full_name.trim(),
+              passenger_type: p.passenger_type,
+              price:          passengerPrice(p),
+              is_promo:       p.is_promo,
+              promo_label:    p.is_promo ? p.promo_label : undefined,
+            }))
+            // Adjust last passenger so sum equals total_amount exactly
             const sumSoFar = mapped.slice(0, -1).reduce((s, p) => s + p.price, 0)
             mapped[mapped.length - 1].price = total - sumSoFar
             return mapped
@@ -141,7 +164,7 @@ export default function VentaPage() {
     setDepartureTime('8:00 AM')
     setReturnDate('')
     setTicketType('one_way')
-    setPassengers([{ id: 1, full_name: '', passenger_type: 'adult' }])
+    setPassengers([{ id: 1, full_name: '', passenger_type: 'adult', is_promo: false, promo_label: 'Promoción', promo_price: '' }])
     setError('')
     setPaymentMethod('cash')
     setSquareReady(false)
@@ -276,7 +299,7 @@ ${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
               <ArrowRight className="w-3.5 h-3.5 text-[#c01515]" />
               <span className="text-xs text-slate-500 font-semibold">{ALL_STOPS[destination].name}</span>
               <span className="ml-auto text-xs font-black text-[#0a1628]">
-                Adulto: ${pricing.adult} · Menor: ${pricing.child}
+                Adulto: ${basePrice('adult')} · Menor: ${basePrice('child')}
               </span>
             </div>
           )}
@@ -348,32 +371,93 @@ ${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
 
           <div className="space-y-3">
             {passengers.map((p, idx) => (
-              <div key={p.id} className="bg-slate-50 rounded-xl p-4">
+              <div key={p.id} className={`rounded-xl p-4 border-2 transition-colors ${p.is_promo ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-transparent'}`}>
+                {/* Row header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-[#0f2c5c] text-white rounded-full flex items-center justify-center text-xs font-black">{idx + 1}</div>
                     <span className="text-sm font-bold text-slate-600">Pasajero {idx + 1}</span>
+                    {p.is_promo && (
+                      <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full">P</span>
+                    )}
                   </div>
-                  {passengers.length > 1 && (
-                    <button onClick={() => removePassenger(p.id)} className="text-slate-400 hover:text-red-500 transition-colors">
-                      <Minus className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    {/* Promo toggle */}
+                    <button
+                      onClick={() => setPassengers(prev => prev.map(x => x.id === p.id ? { ...x, is_promo: !x.is_promo, promo_price: '' } : x))}
+                      className={`text-xs font-black px-2.5 py-1 rounded-lg border-2 transition-all ${
+                        p.is_promo ? 'border-amber-400 bg-amber-400 text-white' : 'border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-600'
+                      }`}>
+                      P
                     </button>
-                  )}
+                    {passengers.length > 1 && (
+                      <button onClick={() => removePassenger(p.id)} className="text-slate-400 hover:text-red-500 transition-colors">
+                        <Minus className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
                 <div className="space-y-2">
+                  {/* Name */}
                   <input value={p.full_name} onChange={e => updatePassenger(p.id, 'full_name', e.target.value)}
                     placeholder="Nombre completo"
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] bg-white" />
+
+                  {/* Passenger type buttons */}
                   <div className="grid grid-cols-3 gap-2">
                     {(['adult', 'senior', 'child'] as PassengerType[]).map(type => (
                       <button key={type} onClick={() => updatePassenger(p.id, 'passenger_type', type)}
+                        disabled={p.is_promo}
                         className={`py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          p.passenger_type === type ? 'border-[#c01515] bg-[#c01515]/10 text-[#c01515]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                          p.is_promo
+                            ? 'border-slate-100 text-slate-300 bg-white cursor-not-allowed'
+                            : p.passenger_type === type
+                              ? 'border-[#c01515] bg-[#c01515]/10 text-[#c01515]'
+                              : 'border-slate-200 text-slate-500 hover:border-slate-300'
                         }`}>
                         {PASS_LABELS[type]}
-                        <span className="block font-black text-[10px]">${unitPrice(type)}</span>
+                        <span className="block font-black text-[10px]">${basePrice(type)}</span>
                       </button>
                     ))}
+                  </div>
+
+                  {/* Promo section */}
+                  {p.is_promo && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Tipo de promo</label>
+                        <select
+                          value={p.promo_label}
+                          onChange={e => setPassengers(prev => prev.map(x => x.id === p.id ? { ...x, promo_label: e.target.value } : x))}
+                          className="w-full px-2 py-2 rounded-lg border border-amber-300 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400/30">
+                          {PROMO_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Precio especial *</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-600 font-bold text-xs">$</span>
+                          <input
+                            type="number" min="0.01" step="0.01"
+                            value={p.promo_price}
+                            onChange={e => setPassengers(prev => prev.map(x => x.id === p.id ? { ...x, promo_price: e.target.value } : x))}
+                            placeholder="0.00"
+                            className="w-full pl-6 pr-2 py-2 rounded-lg border border-amber-300 bg-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Price summary per passenger */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-slate-400">
+                      {p.is_promo ? `${p.promo_label} · precio especial` : `${PASS_LABELS[p.passenger_type]} · ${ticketType === 'round_trip' ? 'I+V' : 'Ida'}`}
+                    </span>
+                    <span className={`text-sm font-black ${p.is_promo ? 'text-amber-600' : 'text-[#0a1628]'}`}>
+                      ${passengerPrice(p) > 0 ? passengerPrice(p).toFixed(2) : '—'}
+                    </span>
                   </div>
                 </div>
               </div>

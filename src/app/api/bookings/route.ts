@@ -36,6 +36,8 @@ const BookingSchema = z.object({
     passenger_type: z.enum(['adult', 'child', 'senior']),
     price:          z.number().positive(),
     seat_number:    z.string().optional(),
+    is_promo:       z.boolean().optional(),
+    promo_label:    z.string().optional(),
   })).min(1),
 })
 
@@ -208,6 +210,8 @@ export async function POST(req: NextRequest) {
       terminal_id:    terminalId,
       price:          p.price,
       seat_number:    p.seat_number ?? null,
+      is_promo:       p.is_promo    ?? false,
+      promo_label:    p.promo_label ?? null,
     }))
   )
 
@@ -258,8 +262,8 @@ export async function POST(req: NextRequest) {
   // - Online sales (no sucursal_id) → synced immediately since there is no cashier cierre
   if (!sucursal_id) {
     try {
-      const { createSalesReceipt } = await import('@/lib/quickbooks/client')
-      await createSalesReceipt({
+      const { createSalesReceipt, logQBTransaction } = await import('@/lib/quickbooks/client')
+      const qbResult = await createSalesReceipt({
         bookingNumber:   booking.booking_number,
         originName:      origin_name,
         destinationName: destination_name,
@@ -271,6 +275,16 @@ export async function POST(req: NextRequest) {
         sucursalCode:    'WEB',
         qbCashAccountId: null,
         qbItemId:        null,
+      })
+      await logQBTransaction({
+        type:          'sales_receipt',
+        docNumber:     booking.booking_number,
+        qbId:          qbResult?.SalesReceipt?.Id ?? null,
+        amount:        total_amount,
+        description:   `[WEB] ${origin_name} → ${destination_name} — ${date}`,
+        referenceType: 'booking_online',
+        referenceId:   booking.id,
+        payload:       { bookingNumber: booking.booking_number, route: `${origin_name} → ${destination_name}`, paymentMethod: payment_method, amount: total_amount },
       })
     } catch (qbErr: any) {
       console.error('QB online booking sync skipped:', qbErr.message)
