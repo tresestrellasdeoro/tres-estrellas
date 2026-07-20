@@ -12,7 +12,16 @@ export async function middleware(request: NextRequest) {
 
   // Allow admin with local session cookie (no Supabase required)
   const adminCookie = request.cookies.get('admin_session')
-  if (adminCookie?.value && protectedAdmin) {
+  const isValidAdminSession = (() => {
+    if (!adminCookie?.value) return false
+    try {
+      const decoded = atob(adminCookie.value)
+      return decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')
+    } catch {
+      return false
+    }
+  })()
+  if (isValidAdminSession && protectedAdmin) {
     return NextResponse.next({ request })
   }
 
@@ -45,7 +54,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user && !adminCookie?.value && (protectedCustomer || protectedAdmin || protectedDriver || protectedStaff)) {
+  if (!user && !isValidAdminSession && (protectedCustomer || protectedAdmin || protectedDriver || protectedStaff)) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('next', pathname)
