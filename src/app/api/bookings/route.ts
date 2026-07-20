@@ -242,43 +242,9 @@ export async function POST(req: NextRequest) {
     if (loyaltyErr) console.error('Failed to insert loyalty transaction:', loyaltyErr.message)
   }
 
-  // Sync to QuickBooks (non-blocking — a QB failure never fails the booking)
-  try {
-    const { createSalesReceipt } = await import('@/lib/quickbooks/client')
-
-    // Fetch sucursal info for QB tagging
-    let qbCashAccountId: string | null = null
-    let qbItemId: string | null = null
-    let sucursalName: string | null = null
-    let sucursalCode: string | null = null
-    if (sucursal_id) {
-      const { data: suc } = await service
-        .from('sucursales')
-        .select('qb_cash_account_id, qb_item_id, name, code')
-        .eq('id', sucursal_id)
-        .maybeSingle()
-      qbCashAccountId = (suc as any)?.qb_cash_account_id ?? null
-      qbItemId        = (suc as any)?.qb_item_id ?? null
-      sucursalName    = (suc as any)?.name ?? null
-      sucursalCode    = (suc as any)?.code ?? null
-    }
-
-    await createSalesReceipt({
-      bookingNumber:   booking.booking_number,
-      originName:      origin_name,
-      destinationName: destination_name,
-      totalAmount:     total_amount,
-      passengerNames:  passengers.map(p => p.full_name),
-      date,
-      paymentMethod:   payment_method,
-      sucursalName,
-      sucursalCode,
-      qbCashAccountId,
-      qbItemId,
-    })
-  } catch (qbErr: any) {
-    console.error('QuickBooks sync skipped:', qbErr.message)
-  }
+  // QB sync happens at cierre de caja (shift close), not per individual ticket.
+  // This avoids flooding QB with individual entries and matches how the
+  // accountant reconciles cash: one entry per branch per day.
 
   // Generate QR code
   const qrDataUrl = await QRCode.toDataURL(booking.booking_number, {

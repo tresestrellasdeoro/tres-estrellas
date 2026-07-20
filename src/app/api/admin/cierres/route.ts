@@ -106,9 +106,81 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // The cierre is a local cash-reconciliation report only.
-  // Each individual sale already creates a Sales Receipt in QuickBooks via /api/bookings.
-  // Sending the daily total here would double-count every sale.
+  // Sync cierre to QuickBooks — one entry per branch per day (cleaner than per-ticket)
+  try {
+    const { getValidTokens } = await import('@/lib/quickbooks/client')
+    const tokens = await getValidTokens()
+
+    if (tokens && total_general > 0) {
+      const sucData = (cierre as any).sucursales as { name: string; code: string } | null
+      const sucName = sucData?.name ?? 'Sin sucursal'
+      const sucCode = sucData?.code ?? ''
+
+      // Get QB account config for this sucursal
+      const { data: sucConfig } = await svc
+        .from('sucursales')
+        .select('qb_cash_account_id, qb_item_id')
+        .eq('id', sucursal_id)
+        .maybeSingle()
+      const cashAccountId = (sucConfig as any)?.qb_cash_account_id ?? null
+      const itemId        = (sucConfig as any)?.qb_item_id ?? null
+      const itemRef       = itemId ? { value: itemId } : { value: '1', name: 'Services' }
+
+      const privateNote = [
+        `Cierre de turno — ${sucName} [${sucCode}]`,
+        `Boletos: ${total_boletos}`,
+        `Efectivo: $${total_efectivo.toFixed(2)}`,
+        `Tarjeta: $${total_tarjeta.toFixed(2)}`,
+        `Paquetes: $${total_paquetes.toFixed(2)}`,
+        `Total: $${total_general.toFixed(2)}`,
+        notas ? `Notas: ${notas}` : '',
+      ].filter(Boolean).join('\n')
+
+      const qbHeaders = {
+        Authorization:  `Bearer ${tokens.access_token}`,
+        'Content-Type': 'application/json',
+        Accept:         'application/json',
+      }
+      const QB_URL = `https://quickbooks.api.intuit.com/v3/company/${tokens.realm_id}/salesreceipt`
+
+      // Send cash sales — deposit to the branch cash account
+      if (total_efectivo + total_paquetes > 0) {
+        const cashBody: Record<string, unknown> = {
+          DocNumber:   `CIERRE-${sucCode}-${fecha}-EF`,
+          TxnDate:     fecha,
+          PrivateNote: privateNote,
+          Line: [{
+            Amount:      total_efectivo + total_paquetes,
+            DetailType:  'SalesItemLineDetail',
+            Description: `[${sucCode}] Efectivo y paquetes — ${fecha}`,
+            SalesItemLineDetail: { ItemRef: itemRef, Qty: 1, UnitPrice: total_efectivo + total_paquetes },
+          }],
+          ...(cashAccountId ? { DepositToAccountRef: { value: cashAccountId } } : {}),
+        }
+        await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cashBody) })
+      }
+
+      // Send card sales — go to Undeposited Funds (bank reconciliation done separately)
+      if (total_tarjeta > 0) {
+        const cardBody: Record<string, unknown> = {
+          DocNumber:   `CIERRE-${sucCode}-${fecha}-TC`,
+          TxnDate:     fecha,
+          PrivateNote: privateNote,
+          Line: [{
+            Amount:      total_tarjeta,
+            DetailType:  'SalesItemLineDetail',
+            Description: `[${sucCode}] Tarjeta — ${fecha}`,
+            SalesItemLineDetail: { ItemRef: itemRef, Qty: 1, UnitPrice: total_tarjeta },
+          }],
+        }
+        await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cardBody) })
+      }
+
+      await svc.from('cierres_turno').update({ qb_synced: true }).eq('id', (cierre as any).id)
+    }
+  } catch (qbErr: any) {
+    console.error('QB cierre sync skipped:', qbErr.message)
+  }
 
   return NextResponse.json({ cierre }, { status: 201 })
 }

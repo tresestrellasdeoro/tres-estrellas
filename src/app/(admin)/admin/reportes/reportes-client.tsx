@@ -49,7 +49,7 @@ export default function ReportesClient({ data }: { data: ReportesData }) {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
-      setCierreToast({ type: 'success', msg: 'Cierre generado correctamente. Las ventas individuales ya están en QuickBooks.' })
+      setCierreToast({ type: 'success', msg: `Cierre generado${json.cierre?.qb_synced ? ' y enviado a QuickBooks ✓' : ' (QB no conectado — sin sincronizar)'}` })
       setCierres(prev => [json.cierre, ...prev])
       setCierreModal(false)
       setCiNotas('')
@@ -344,7 +344,10 @@ export default function ReportesClient({ data }: { data: ReportesData }) {
                       <td className="px-5 py-4 text-right text-blue-600 font-medium">${Number(c.total_tarjeta).toFixed(2)}</td>
                       <td className="px-5 py-4 text-right font-bold text-emerald-600">${Number(c.total_general).toFixed(2)}</td>
                       <td className="px-5 py-4 text-center">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" title="Cada venta ya fue enviada a QB individualmente" />
+                        {c.qb_synced
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" title="Enviado a QuickBooks" />
+                          : <XCircle className="w-4 h-4 text-slate-300 mx-auto" title="No enviado a QB" />
+                        }
                       </td>
                     </tr>
                   ))}
