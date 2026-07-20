@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/api-auth'
+import { getValidTokens } from '@/lib/quickbooks/client'
 
 function service() {
   return createServiceClient(
@@ -9,17 +10,25 @@ function service() {
   )
 }
 
-// GET — check if QuickBooks is connected
+// GET — check QB connection and proactively refresh token if needed
 export async function GET(req: NextRequest) {
   const deny = await requireAdmin(req); if (deny) return deny
 
-  const { data } = await (service() as any)
-    .from('quickbooks_settings')
-    .select('realm_id, expires_at, updated_at')
-    .limit(1)
-    .maybeSingle()
+  // getValidTokens auto-refreshes if expired — keeps token always alive
+  const tokens = await getValidTokens()
 
-  return NextResponse.json({ connected: !!data, settings: data ?? null })
+  if (!tokens) {
+    return NextResponse.json({ connected: false, settings: null })
+  }
+
+  return NextResponse.json({
+    connected: true,
+    settings: {
+      realm_id:   tokens.realm_id,
+      expires_at: tokens.expires_at,
+      updated_at: tokens.updated_at,
+    },
+  })
 }
 
 // DELETE — disconnect QuickBooks (removes all tokens)
