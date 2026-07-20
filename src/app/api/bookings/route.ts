@@ -89,10 +89,21 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Try to link to authenticated user (optional)
+  // Link booking to the authenticated customer — but NOT if the caller is staff/admin.
+  // When a cashier sells a ticket, they are authenticated as staff, so we must not
+  // set their user ID as the customer (it would give them loyalty points, etc.).
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const customerId: string | null = user?.id ?? null
+  let customerId: string | null = null
+  if (user) {
+    const { data: callerProfile } = await service
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle() as { data: { role: string } | null }
+    const isStaff = ['cajero', 'admin', 'super_admin'].includes(callerProfile?.role ?? '')
+    if (!isStaff) customerId = user.id
+  }
 
   // Find a trip matching the booking date; fall back to any trip if none scheduled for that day
   let { data: tripData } = await service
@@ -242,9 +253,29 @@ export async function POST(req: NextRequest) {
     if (loyaltyErr) console.error('Failed to insert loyalty transaction:', loyaltyErr.message)
   }
 
-  // QB sync happens at cierre de caja (shift close), not per individual ticket.
-  // This avoids flooding QB with individual entries and matches how the
-  // accountant reconciles cash: one entry per branch per day.
+  // QB sync strategy:
+  // - In-person sales (sucursal_id set) → synced at cierre de caja, not here
+  // - Online sales (no sucursal_id) → synced immediately since there is no cashier cierre
+  if (!sucursal_id) {
+    try {
+      const { createSalesReceipt } = await import('@/lib/quickbooks/client')
+      await createSalesReceipt({
+        bookingNumber:   booking.booking_number,
+        originName:      origin_name,
+        destinationName: destination_name,
+        totalAmount:     total_amount,
+        passengerNames:  passengers.map(p => p.full_name),
+        date,
+        paymentMethod:   payment_method,
+        sucursalName:    'Online',
+        sucursalCode:    'WEB',
+        qbCashAccountId: null,
+        qbItemId:        null,
+      })
+    } catch (qbErr: any) {
+      console.error('QB online booking sync skipped:', qbErr.message)
+    }
+  }
 
   // Generate QR code
   const qrDataUrl = await QRCode.toDataURL(booking.booking_number, {

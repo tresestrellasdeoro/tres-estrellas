@@ -57,9 +57,12 @@ export async function POST(req: NextRequest) {
 
   const svc = service()
 
-  // Get all bookings for this sucursal on this date
-  const fechaStart = `${fecha}T00:00:00.000Z`
-  const fechaEnd   = `${fecha}T23:59:59.999Z`
+  // Branches are in Pacific Time (UTC-7). Midnight local = 07:00 UTC.
+  // Filter created_at using UTC boundaries that correspond to the local calendar day.
+  const fechaStart = `${fecha}T07:00:00.000Z`
+  const nextDay = new Date(`${fecha}T12:00:00.000Z`)
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1)
+  const fechaEnd = nextDay.toISOString().split('T')[0] + 'T06:59:59.999Z'
 
   let bookingQuery = svc
     .from('bookings')
@@ -143,10 +146,14 @@ export async function POST(req: NextRequest) {
       }
       const QB_URL = `https://quickbooks.api.intuit.com/v3/company/${tokens.realm_id}/salesreceipt`
 
+      const { logQBTransaction } = await import('@/lib/quickbooks/client')
+      const cierreId = (cierre as any).id as string
+
       // Send cash sales — deposit to the branch cash account
       if (total_efectivo + total_paquetes > 0) {
+        const cashDocNumber = `CIERRE-${sucCode}-${fecha}-EF`
         const cashBody: Record<string, unknown> = {
-          DocNumber:   `CIERRE-${sucCode}-${fecha}-EF`,
+          DocNumber:   cashDocNumber,
           TxnDate:     fecha,
           PrivateNote: privateNote,
           Line: [{
@@ -157,13 +164,25 @@ export async function POST(req: NextRequest) {
           }],
           ...(cashAccountId ? { DepositToAccountRef: { value: cashAccountId } } : {}),
         }
-        await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cashBody) })
+        const cashRes  = await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cashBody) })
+        const cashData = cashRes.ok ? await cashRes.json() : null
+        await logQBTransaction({
+          type:          'sales_receipt',
+          docNumber:     cashDocNumber,
+          qbId:          cashData?.SalesReceipt?.Id ?? null,
+          amount:        total_efectivo + total_paquetes,
+          description:   `[${sucCode}] Efectivo y paquetes — ${fecha}`,
+          referenceType: 'cierre',
+          referenceId:   cierreId,
+          payload:       cashBody,
+        })
       }
 
       // Send card sales — go to Undeposited Funds (bank reconciliation done separately)
       if (total_tarjeta > 0) {
+        const cardDocNumber = `CIERRE-${sucCode}-${fecha}-TC`
         const cardBody: Record<string, unknown> = {
-          DocNumber:   `CIERRE-${sucCode}-${fecha}-TC`,
+          DocNumber:   cardDocNumber,
           TxnDate:     fecha,
           PrivateNote: privateNote,
           Line: [{
@@ -173,10 +192,21 @@ export async function POST(req: NextRequest) {
             SalesItemLineDetail: { ItemRef: itemRef, Qty: 1, UnitPrice: total_tarjeta },
           }],
         }
-        await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cardBody) })
+        const cardRes  = await fetch(QB_URL, { method: 'POST', headers: qbHeaders, body: JSON.stringify(cardBody) })
+        const cardData = cardRes.ok ? await cardRes.json() : null
+        await logQBTransaction({
+          type:          'sales_receipt',
+          docNumber:     cardDocNumber,
+          qbId:          cardData?.SalesReceipt?.Id ?? null,
+          amount:        total_tarjeta,
+          description:   `[${sucCode}] Tarjeta — ${fecha}`,
+          referenceType: 'cierre',
+          referenceId:   cierreId,
+          payload:       cardBody,
+        })
       }
 
-      await svc.from('cierres_turno').update({ qb_synced: true }).eq('id', (cierre as any).id)
+      await svc.from('cierres_turno').update({ qb_synced: true }).eq('id', cierreId)
     }
   } catch (qbErr: any) {
     console.error('QB cierre sync skipped:', qbErr.message)

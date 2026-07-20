@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   ShoppingCart, Plus, Minus, CheckCircle2, AlertCircle,
   Loader2, RotateCcw, Ticket, Clock, CreditCard, Banknote,
@@ -27,7 +27,10 @@ const PASS_LABELS: Record<PassengerType, string> = { adult: 'Adulto', senior: 'S
 
 interface PassengerRow { id: number; full_name: string; passenger_type: PassengerType }
 
-function today() { return new Date().toISOString().split('T')[0] }
+function today() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export default function VentaPage() {
   const [origin, setOrigin]           = useState<StopCode>('LA')
@@ -43,6 +46,15 @@ export default function VentaPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
   const [squareReady, setSquareReady] = useState(false)
   const squareRef = useRef<SquareCardHandle>(null)
+
+  const [sucursalId, setSucursalId]   = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => setSucursalId(d.sucursal_id ?? null))
+      .catch(() => {})
+  }, [])
 
   const [loading, setLoading]         = useState(false)
   const [success, setSuccess]         = useState<{ booking_number: string; qr: string; total: number } | null>(null)
@@ -98,6 +110,7 @@ export default function VentaPage() {
           destination_name:   ALL_STOPS[destination].name,
           boarding_stop_code: origin,
           boarding_stop_name: ALL_STOPS[origin].name,
+          sucursal_id:        sucursalId ?? undefined,
           date,
           departure_time:     departureTime,
           return_date:        ticketType === 'round_trip' ? returnDate : undefined,

@@ -7,16 +7,17 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
-  { href: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/rutas',      icon: Map,             label: 'Rutas' },
-  { href: '/admin/horarios',   icon: Clock,           label: 'Horarios' },
-  { href: '/admin/buses',      icon: Bus,             label: 'Autobuses' },
-  { href: '/admin/clientes',   icon: Users,           label: 'Clientes' },
-  { href: '/admin/reportes',   icon: BarChart3,       label: 'Reportes' },
-  { href: '/admin/personal',   icon: UserCog,         label: 'Personal' },
-  { href: '/admin/paquetes',        icon: Package,         label: 'Paquetes' },
-  { href: '/admin/sucursales',      icon: Store,           label: 'Sucursales' },
-  { href: '/admin/configuracion',  icon: Settings,        label: 'Configuración' },
+  { href: '/admin/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/admin/rutas',        icon: Map,             label: 'Rutas' },
+  { href: '/admin/horarios',     icon: Clock,           label: 'Horarios' },
+  { href: '/admin/buses',        icon: Bus,             label: 'Autobuses' },
+  { href: '/admin/clientes',     icon: Users,           label: 'Clientes' },
+  { href: '/admin/reportes',     icon: BarChart3,       label: 'Reportes' },
+  { href: '/admin/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
+  { href: '/admin/personal',     icon: UserCog,         label: 'Personal' },
+  { href: '/admin/paquetes',     icon: Package,         label: 'Paquetes' },
+  { href: '/admin/sucursales',   icon: Store,           label: 'Sucursales' },
+  { href: '/admin/configuracion',icon: Settings,        label: 'Configuración' },
 ]
 
 export function AdminSidebar() {

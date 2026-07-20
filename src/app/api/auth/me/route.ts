@@ -17,9 +17,12 @@ export async function GET() {
 
   const { data: profile } = await service
     .from('profiles')
-    .select('role')
+    .select('role, sucursal_id')
     .eq('id', user.id)
-    .maybeSingle() as { data: { role: string } | null }
+    .maybeSingle() as { data: { role: string; sucursal_id: string | null } | null }
 
-  return NextResponse.json({ role: profile?.role ?? null })
+  return NextResponse.json({
+    role:        profile?.role        ?? null,
+    sucursal_id: profile?.sucursal_id ?? null,
+  })
 }

@@ -345,8 +345,8 @@ export default function ReportesClient({ data }: { data: ReportesData }) {
                       <td className="px-5 py-4 text-right font-bold text-emerald-600">${Number(c.total_general).toFixed(2)}</td>
                       <td className="px-5 py-4 text-center">
                         {c.qb_synced
-                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" title="Enviado a QuickBooks" />
-                          : <XCircle className="w-4 h-4 text-slate-300 mx-auto" title="No enviado a QB" />
+                          ? <span title="Enviado a QuickBooks"><CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /></span>
+                          : <span title="No enviado a QB"><XCircle className="w-4 h-4 text-slate-300 mx-auto" /></span>
                         }
                       </td>
                     </tr>

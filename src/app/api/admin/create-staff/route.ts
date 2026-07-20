@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
 
   const { name, email, password, role, sucursal_id, departamento, permisos } = parsed.data
 
+  if (role === 'cajero' && !sucursal_id) {
+    return NextResponse.json({ error: 'Los cajeros deben tener una sucursal asignada.' }, { status: 422 })
+  }
+
   const service = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

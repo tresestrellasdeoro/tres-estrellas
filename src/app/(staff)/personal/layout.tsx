@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList },
   { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation },
   { href: '/personal/paquetes',      label: 'Paquetes',         icon: Package },
+  { href: '/personal/gastos',        label: 'Gastos',           icon: Receipt },
 ]
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {

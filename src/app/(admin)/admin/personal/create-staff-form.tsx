@@ -64,6 +64,10 @@ export function CreateStaffForm({ sucursales }: Props) {
       setError('Completa todos los campos. Contraseña mínimo 8 caracteres.')
       return
     }
+    if (role === 'cajero' && !sucursalId) {
+      setError('Los cajeros deben tener una sucursal asignada.')
+      return
+    }
     setLoading(true); setError(''); setSuccess('')
     try {
       const res = await fetch('/api/admin/create-staff', {
@@ -126,14 +130,21 @@ export function CreateStaffForm({ sucursales }: Props) {
 
       {/* Sucursal */}
       <div>
-        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sucursal</Label>
+        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          Sucursal {role === 'cajero' && <span className="text-[#c01515]">*</span>}
+        </Label>
         <select value={sucursalId} onChange={e => setSucursalId(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515]">
-          <option value="">— Sin sucursal asignada —</option>
+          className={`mt-1.5 w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#c01515]/20 focus:border-[#c01515] ${
+            role === 'cajero' && !sucursalId ? 'border-amber-300' : 'border-slate-200'
+          }`}>
+          <option value="">{role === 'cajero' ? '— Selecciona una sucursal —' : '— Sin sucursal (opcional) —'}</option>
           {sucursales.map(s => (
             <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
           ))}
         </select>
+        {role === 'cajero' && !sucursalId && (
+          <p className="text-amber-600 text-xs mt-1 font-semibold">Requerido para cajeros — define en qué sucursal trabaja</p>
+        )}
       </div>
 
       {/* Departamento */}
@@ -200,7 +211,8 @@ export function CreateStaffForm({ sucursales }: Props) {
         </div>
       )}
 
-      <Button type="submit" disabled={loading || !name || !email || password.length < 8}
+      <Button type="submit"
+        disabled={loading || !name || !email || password.length < 8 || (role === 'cajero' && !sucursalId)}
         className="w-full bg-[#c01515] hover:bg-[#a01010] text-white font-black rounded-xl">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Crear usuario'}
       </Button>

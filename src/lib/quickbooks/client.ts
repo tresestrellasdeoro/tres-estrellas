@@ -117,6 +117,96 @@ export interface SalesReceiptParams {
   qbItemId?:          string | null
 }
 
+export interface PurchaseParams {
+  amount:           number
+  category:         string
+  description:      string
+  date:             string
+  paymentMethod:    'cash' | 'card'
+  sucursalName?:    string | null
+  sucursalCode?:    string | null
+  docNumber?:       string
+  paymentAccountId?: string | null
+  expenseAccountId?: string | null
+}
+
+export async function createPurchase(params: PurchaseParams) {
+  const tokens = await getValidTokens()
+  if (!tokens) throw new Error('QuickBooks no está conectado')
+
+  const paymentAccountId = params.paymentAccountId || process.env.QB_DEFAULT_CASH_ACCOUNT_ID
+  const expenseAccountId = params.expenseAccountId || process.env.QB_DEFAULT_EXPENSE_ACCOUNT_ID
+
+  if (!paymentAccountId || !expenseAccountId) {
+    throw new Error('Configura QB_DEFAULT_CASH_ACCOUNT_ID y QB_DEFAULT_EXPENSE_ACCOUNT_ID en las variables de entorno')
+  }
+
+  const branchTag  = params.sucursalCode ? `[${params.sucursalCode}]` : ''
+  const lineDesc   = [branchTag, params.category, params.description].filter(Boolean).join(' — ')
+
+  const body = {
+    PaymentType:  params.paymentMethod === 'card' ? 'CreditCard' : 'Cash',
+    AccountRef:   { value: paymentAccountId },
+    TxnDate:      params.date,
+    DocNumber:    params.docNumber ?? undefined,
+    PrivateNote:  [
+      `Sucursal: ${params.sucursalName ?? 'Sin sucursal'}`,
+      `Categoría: ${params.category}`,
+      `Descripción: ${params.description || '—'}`,
+      `Pago: ${params.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}`,
+    ].join('\n'),
+    Line: [{
+      Amount:      params.amount,
+      DetailType:  'AccountBasedExpenseLineDetail',
+      Description: lineDesc,
+      AccountBasedExpenseLineDetail: {
+        AccountRef:    { value: expenseAccountId },
+        BillableStatus: 'NotBillable',
+      },
+    }],
+  }
+
+  const res = await fetch(`${QB_API_BASE}/${tokens.realm_id}/purchase`, {
+    method:  'POST',
+    headers: {
+      Authorization:  `Bearer ${tokens.access_token}`,
+      'Content-Type': 'application/json',
+      Accept:         'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(JSON.stringify(err?.Fault?.Error ?? err))
+  }
+
+  return (await res.json()) as { Purchase: { Id: string; DocNumber: string } }
+}
+
+export async function logQBTransaction(params: {
+  type:           'sales_receipt' | 'purchase'
+  docNumber?:     string
+  qbId?:          string
+  amount:         number
+  description?:   string
+  referenceType?: 'cierre' | 'gasto' | 'booking_online'
+  referenceId?:   string
+  payload?:       Record<string, unknown>
+}) {
+  const db = service()
+  await (db as any).from('qb_transactions').insert({
+    type:           params.type,
+    doc_number:     params.docNumber   ?? null,
+    qb_id:          params.qbId        ?? null,
+    amount:         params.amount,
+    description:    params.description ?? null,
+    reference_type: params.referenceType ?? null,
+    reference_id:   params.referenceId   ?? null,
+    payload:        params.payload       ?? {},
+  })
+}
+
 export async function createSalesReceipt(params: SalesReceiptParams) {
   const tokens = await getValidTokens()
   if (!tokens) throw new Error('QuickBooks no está conectado')
