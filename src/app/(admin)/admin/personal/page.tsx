@@ -4,6 +4,7 @@ import { CreateStaffForm } from './create-staff-form'
 import { DeleteStaffButton } from './delete-staff-button'
 
 export const metadata = { title: 'Personal — Admin' }
+export const dynamic = 'force-dynamic'
 
 function getService() {
   return createServiceClient(

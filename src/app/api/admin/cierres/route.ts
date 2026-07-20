@@ -73,20 +73,18 @@ export async function POST(req: NextRequest) {
 
   const { data: bookings } = await bookingQuery
 
-  // Get packages for this sucursal/date
+  // Get packages for this date (packages table has no sucursal_id yet)
   const { data: packages } = await svc
     .from('packages')
-    .select('total_price')
+    .select('price')
     .gte('created_at', fechaStart)
     .lte('created_at', fechaEnd)
-    .eq('sucursal_id', sucursal_id)
-    .throwOnError()
     .then(r => r, () => ({ data: [] as any[] })) as any
 
   const total_boletos  = bookings?.length ?? 0
   const total_efectivo = bookings?.filter((b: any) => b.payment_method === 'cash').reduce((s: number, b: any) => s + (b.total_amount || 0), 0) ?? 0
   const total_tarjeta  = bookings?.filter((b: any) => b.payment_method === 'card').reduce((s: number, b: any) => s + (b.total_amount || 0), 0) ?? 0
-  const total_paquetes = (packages ?? []).reduce((s: number, p: any) => s + (p.total_price || 0), 0)
+  const total_paquetes = (packages ?? []).reduce((s: number, p: any) => s + (p.price || 0), 0)
   const total_general  = total_efectivo + total_tarjeta + total_paquetes
 
   const { data: cierre, error } = await svc
