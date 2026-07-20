@@ -2,6 +2,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Users, UserPlus } from 'lucide-react'
 import { CreateStaffForm } from './create-staff-form'
 import { DeleteStaffButton } from './delete-staff-button'
+import { EditStaffButton } from './edit-staff-modal'
 
 export const metadata = { title: 'Personal — Admin' }
 export const dynamic = 'force-dynamic'
@@ -128,7 +129,13 @@ export default async function PersonalPage() {
                           </div>
                         )}
                       </div>
-                      <DeleteStaffButton userId={u.id} name={u.full_name ?? u.email} />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <EditStaffButton
+                          user={{ id: u.id, full_name: u.full_name ?? u.email, email: u.email, role: u.role, sucursal_id: u.sucursal_id, departamento: u.departamento, permisos: u.permisos ?? [] }}
+                          sucursales={sucursales ?? []}
+                        />
+                        <DeleteStaffButton userId={u.id} name={u.full_name ?? u.email} />
+                      </div>
                     </div>
                   </div>
                 )

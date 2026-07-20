@@ -1,25 +1,38 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
-const NAV_ITEMS = [
-  { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine },
-  { href: '/personal/venta',         label: 'Nueva venta',      icon: ShoppingCart },
-  { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList },
-  { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation },
-  { href: '/personal/paquetes',      label: 'Paquetes',         icon: Package },
-  { href: '/personal/gastos',        label: 'Gastos',           icon: Receipt },
+const ALL_NAV = [
+  { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine,      perm: 'checkin' },
+  { href: '/personal/venta',         label: 'Nueva venta',      icon: ShoppingCart,  perm: 'ventas' },
+  { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList, perm: 'checkin' },
+  { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation,    perm: 'checkin' },
+  { href: '/personal/paquetes',      label: 'Paquetes',         icon: Package,       perm: 'paquetes' },
+  { href: '/personal/gastos',        label: 'Gastos',           icon: Receipt,       perm: 'ventas' },
 ]
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open,     setOpen]     = useState(false)
+  const [permisos, setPermisos] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => setPermisos(d.permisos ?? []))
+      .catch(() => setPermisos([]))
+  }, [])
+
+  const hasAll  = permisos?.includes('all') ?? false
+  const navItems = permisos === null
+    ? []
+    : ALL_NAV.filter(item => hasAll || permisos.includes(item.perm))
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -27,31 +40,45 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     router.push('/auth/login')
   }
 
+  const NavLinks = ({ onClick }: { onClick?: () => void }) => (
+    <>
+      {permisos === null ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-4 h-4 animate-spin text-white/30" />
+        </div>
+      ) : navItems.length === 0 ? (
+        <div className="px-3 py-4 text-white/30 text-xs text-center">Sin accesos asignados</div>
+      ) : (
+        navItems.map(item => {
+          const active = pathname === item.href
+          return (
+            <Link key={item.href} href={item.href} onClick={onClick}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                active ? 'bg-[#c01515] text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'
+              }`}>
+              <item.icon className="w-4 h-4 shrink-0" />
+              {item.label}
+            </Link>
+          )
+        })
+      )}
+    </>
+  )
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
 
       {/* Sidebar desktop */}
       <aside className="hidden md:flex flex-col w-60 bg-[#0a1e42] min-h-screen shrink-0">
         <div className="p-5 border-b border-white/8">
-          <Link href="/personal/validar">
+          <Link href="/personal/venta">
             <Image src="/logo.png" alt="TEO" width={80} height={64} className="h-14 w-auto object-contain" />
           </Link>
           <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-2">Portal Personal</p>
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          {NAV_ITEMS.map(item => {
-            const active = pathname === item.href
-            return (
-              <Link key={item.href} href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  active ? 'bg-[#c01515] text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'
-                }`}>
-                <item.icon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </Link>
-            )
-          })}
+          <NavLinks />
         </nav>
 
         <div className="p-3 border-t border-white/8">
@@ -78,15 +105,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       {open && (
         <div className="md:hidden fixed inset-0 z-40 bg-[#0a1e42] pt-14">
           <nav className="p-4 space-y-1">
-            {NAV_ITEMS.map(item => (
-              <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                  pathname === item.href ? 'bg-[#c01515] text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
-                }`}>
-                <item.icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            ))}
+            <NavLinks onClick={() => setOpen(false)} />
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/40 hover:text-white text-sm font-semibold">
               <LogOut className="w-5 h-5" />

@@ -17,12 +17,14 @@ export async function GET() {
 
   const { data: profile } = await service
     .from('profiles')
-    .select('role, sucursal_id')
+    .select('role, sucursal_id, permisos, full_name')
     .eq('id', user.id)
-    .maybeSingle() as { data: { role: string; sucursal_id: string | null } | null }
+    .maybeSingle() as { data: { role: string; sucursal_id: string | null; permisos: string[] | null; full_name: string | null } | null }
 
   return NextResponse.json({
     role:        profile?.role        ?? null,
     sucursal_id: profile?.sucursal_id ?? null,
+    permisos:    profile?.permisos    ?? [],
+    full_name:   profile?.full_name   ?? null,
   })
 }
