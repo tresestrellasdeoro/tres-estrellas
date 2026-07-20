@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
+import { requireAdmin } from '@/lib/api-auth'
 import { z } from 'zod'
 
 const DEPARTAMENTOS = [
@@ -22,31 +22,8 @@ const Schema = z.object({
   permisos:     z.array(z.enum(PERMISOS_VALIDOS)).default([]),
 })
 
-async function verifyAdmin(req: NextRequest) {
-  const adminCookie = req.cookies.get('admin_session')
-  if (adminCookie?.value) return true
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-
-  const svc = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const { data: profile } = await svc
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle() as { data: { role: string } | null }
-
-  return profile?.role === 'admin' || profile?.role === 'super_admin'
-}
-
 export async function POST(req: NextRequest) {
-  if (!await verifyAdmin(req)) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
+  const deny = await requireAdmin(req); if (deny) return deny
 
   const body = await req.json()
   const parsed = Schema.safeParse(body)
