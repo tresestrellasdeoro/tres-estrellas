@@ -110,6 +110,8 @@ export interface SalesReceiptParams {
   passengerNames:     string[]
   date:               string
   paymentMethod:      'card' | 'cash'
+  sucursalName?:      string | null
+  sucursalCode?:      string | null
   // Sucursal QB account IDs (optional — falls back to generic if not set)
   qbCashAccountId?:   string | null
   qbItemId?:          string | null
@@ -119,11 +121,15 @@ export async function createSalesReceipt(params: SalesReceiptParams) {
   const tokens = await getValidTokens()
   if (!tokens) throw new Error('QuickBooks no está conectado')
 
+  const branchTag  = params.sucursalCode ? `[${params.sucursalCode}]` : ''
+  const branchName = params.sucursalName ?? 'Sin sucursal'
+
   const description = [
+    branchTag,
     `${params.originName} → ${params.destinationName}`,
     params.passengerNames.join(', '),
     params.date,
-  ].join(' — ')
+  ].filter(Boolean).join(' — ')
 
   const itemRef = params.qbItemId
     ? { value: params.qbItemId }
@@ -142,7 +148,11 @@ export async function createSalesReceipt(params: SalesReceiptParams) {
         UnitPrice: params.totalAmount,
       },
     }],
-    PrivateNote: `Boleto ${params.bookingNumber} — Pago: ${params.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}`,
+    PrivateNote: [
+      `Sucursal: ${branchName}`,
+      `Boleto: ${params.bookingNumber}`,
+      `Pago: ${params.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}`,
+    ].join('\n'),
   }
 
   // Cash payments deposit to the branch cash account; card goes to Undeposited Funds

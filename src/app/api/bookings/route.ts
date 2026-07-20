@@ -246,17 +246,21 @@ export async function POST(req: NextRequest) {
   try {
     const { createSalesReceipt } = await import('@/lib/quickbooks/client')
 
-    // Fetch sucursal QB account IDs if sucursal_id was provided
+    // Fetch sucursal info for QB tagging
     let qbCashAccountId: string | null = null
     let qbItemId: string | null = null
+    let sucursalName: string | null = null
+    let sucursalCode: string | null = null
     if (sucursal_id) {
       const { data: suc } = await service
         .from('sucursales')
-        .select('qb_cash_account_id, qb_item_id')
+        .select('qb_cash_account_id, qb_item_id, name, code')
         .eq('id', sucursal_id)
         .maybeSingle()
       qbCashAccountId = (suc as any)?.qb_cash_account_id ?? null
       qbItemId        = (suc as any)?.qb_item_id ?? null
+      sucursalName    = (suc as any)?.name ?? null
+      sucursalCode    = (suc as any)?.code ?? null
     }
 
     await createSalesReceipt({
@@ -267,6 +271,8 @@ export async function POST(req: NextRequest) {
       passengerNames:  passengers.map(p => p.full_name),
       date,
       paymentMethod:   payment_method,
+      sucursalName,
+      sucursalCode,
       qbCashAccountId,
       qbItemId,
     })
