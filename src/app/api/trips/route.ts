@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
       schedule:schedules(
         route:routes(
           id, code,
-          origin_stop:stops!routes_origin_stop_id_fkey(id, name, code),
-          destination_stop:stops!routes_destination_stop_id_fkey(id, name, code),
+          origin_stop:stops!origin_stop_id(id, name, code),
+          destination_stop:stops!destination_stop_id(id, name, code),
           pricing(passenger_type, ticket_type, price, terminal_id)
         )
       )
