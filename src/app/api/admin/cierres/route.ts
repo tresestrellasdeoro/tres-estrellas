@@ -73,12 +73,13 @@ export async function POST(req: NextRequest) {
 
   const { data: bookings } = await bookingQuery
 
-  // Get packages for this date (packages table has no sucursal_id yet)
+  // Get packages for this sucursal/date
   const { data: packages } = await svc
     .from('packages')
     .select('price')
     .gte('created_at', fechaStart)
     .lte('created_at', fechaEnd)
+    .eq('sucursal_id', sucursal_id)
     .then(r => r, () => ({ data: [] as any[] })) as any
 
   const total_boletos  = bookings?.length ?? 0
