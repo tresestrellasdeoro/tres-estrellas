@@ -77,20 +77,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ created: 0, skipped: 0, message: 'No hay horarios activos para ese rango' })
   }
 
-  // Batch insert — ON CONFLICT DO NOTHING handles duplicates (UNIQUE schedule_id+departure_date)
-  let inserted: any[] | null = null
-  let insErr: any = null
-  try {
-    const result = await db.from('trips').insert(inserts).select('id')
-    inserted = result.data
-    insErr   = result.error
-  } catch (e: any) {
-    insErr = e
-  }
+  // Upsert — ignoreDuplicates skips rows with same (schedule_id, departure_date)
+  const { data: upserted, error: insErr } = await db
+    .from('trips')
+    .upsert(inserts, { onConflict: 'schedule_id,departure_date', ignoreDuplicates: true })
+    .select('id') as any
 
   if (insErr) return NextResponse.json({ error: insErr.message ?? String(insErr) }, { status: 500 })
 
-  const created = inserted?.length ?? 0
+  const created = upserted?.length ?? 0
   const skipped = inserts.length - created
 
   return NextResponse.json({ created, skipped, total_attempted: inserts.length })
