@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
       id, departure_time, days_of_week, route_id,
       routes(
         id, name, code,
-        origin_stop:stops!routes_origin_stop_id_fkey(id, name, city),
-        destination_stop:stops!routes_destination_stop_id_fkey(id, name, city)
+        origin_stop:stops!origin_stop_id(id, name, city),
+        destination_stop:stops!destination_stop_id(id, name, city)
       )
     `)
     .eq('is_active', true)

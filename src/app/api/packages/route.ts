@@ -38,8 +38,8 @@ export async function GET(req: NextRequest) {
       id, tracking_number, sender_name, sender_phone,
       recipient_name, recipient_phone,
       size, weight_lbs, price, status, payment_status, payment_method, paid_at, created_at, notes,
-      origin:stops!packages_origin_stop_id_fkey(name, city),
-      destination:stops!packages_destination_stop_id_fkey(name, city)
+      origin:stops!origin_stop_id(name, city),
+      destination:stops!destination_stop_id(name, city)
     `)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
       customer_id:         user?.id ?? null,
       notes:               notes ?? null,
     })
-    .select('*, origin:stops!packages_origin_stop_id_fkey(name,city), destination:stops!packages_destination_stop_id_fkey(name,city)')
+    .select('*, origin:stops!origin_stop_id(name,city), destination:stops!destination_stop_id(name,city)')
     .single()
 
   if (error) {

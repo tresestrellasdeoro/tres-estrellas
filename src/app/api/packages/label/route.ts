@@ -20,8 +20,8 @@ export async function GET(req: NextRequest) {
     .select(`
       tracking_number, sender_name, sender_phone, recipient_name, recipient_phone, recipient_email,
       size, weight_lbs, declared_value, price, notes, created_at,
-      origin:stops!packages_origin_stop_id_fkey(name, city),
-      destination:stops!packages_destination_stop_id_fkey(name, city)
+      origin:stops!origin_stop_id(name, city),
+      destination:stops!destination_stop_id(name, city)
     `)
     .eq('tracking_number', tracking)
     .maybeSingle()

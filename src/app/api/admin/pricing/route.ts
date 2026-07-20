@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     .select(`
       *,
       route:routes(code, name),
-      stop:stops!pricing_terminal_id_fkey(code, name)
+      stop:stops!terminal_id(code, name)
     `)
     .order('route_id', { ascending: true })
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     .select(`
       *,
       route:routes(code, name),
-      stop:stops!pricing_terminal_id_fkey(code, name)
+      stop:stops!terminal_id(code, name)
     `)
     .single()
 
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest) {
     .select(`
       *,
       route:routes(code, name),
-      stop:stops!pricing_terminal_id_fkey(code, name)
+      stop:stops!terminal_id(code, name)
     `)
     .single()
 

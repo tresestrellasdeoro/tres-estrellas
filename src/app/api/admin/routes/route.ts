@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     .from('routes')
     .select(`
       *,
-      origin_stop:stops!routes_origin_stop_id_fkey(id, code, name),
-      destination_stop:stops!routes_destination_stop_id_fkey(id, code, name),
+      origin_stop:stops!origin_stop_id(id, code, name),
+      destination_stop:stops!destination_stop_id(id, code, name),
       schedules(id, departure_time, days_of_week, is_active)
     `)
     .order('code', { ascending: true })
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     .insert({ code: code.toUpperCase(), name, origin_stop_id, destination_stop_id, duration_minutes: Number(duration_minutes), is_active: true })
     .select(`
       *,
-      origin_stop:stops!routes_origin_stop_id_fkey(id, code, name),
-      destination_stop:stops!routes_destination_stop_id_fkey(id, code, name),
+      origin_stop:stops!origin_stop_id(id, code, name),
+      destination_stop:stops!destination_stop_id(id, code, name),
       schedules(id, departure_time, days_of_week, is_active)
     `)
     .single()
@@ -62,8 +62,8 @@ export async function PATCH(req: NextRequest) {
     .eq('id', id)
     .select(`
       *,
-      origin_stop:stops!routes_origin_stop_id_fkey(id, code, name),
-      destination_stop:stops!routes_destination_stop_id_fkey(id, code, name),
+      origin_stop:stops!origin_stop_id(id, code, name),
+      destination_stop:stops!destination_stop_id(id, code, name),
       schedules(id, departure_time, days_of_week, is_active)
     `)
     .single()
