@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Route, Loader2, RefreshCw, Bus, UserCheck, Users,
   TrendingUp, ChevronDown, ChevronUp, AlertCircle,
-  Calendar, Clock, Percent,
+  Calendar, Clock, Percent, Zap,
 } from 'lucide-react'
 
 interface Corrida {
@@ -47,6 +47,7 @@ export default function CorridasPage() {
   const [expanded,  setExpanded]  = useState<string | null>(null)
   const [assigning, setAssigning] = useState<string | null>(null)
   const [toast,     setToast]     = useState('')
+  const [generating,setGenerating]= useState(false)
 
   // Filters
   const today = new Date().toISOString().split('T')[0]
@@ -105,9 +106,32 @@ export default function CorridasPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Salidas programadas — asigna bus y chofer</p>
         </div>
-        <button onClick={fetchAll} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
-          <RefreshCw className="w-4 h-4" /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={async () => {
+            setGenerating(true)
+            const res  = await fetch('/api/admin/trips/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ from, to }),
+            })
+            const data = await res.json()
+            if (res.ok) {
+              setToast(`Corridas generadas: ${data.created} nuevas, ${data.skipped} ya existían`)
+              fetchAll()
+            } else {
+              setToast(`Error: ${data.error}`)
+            }
+            setGenerating(false)
+            setTimeout(() => setToast(''), 4000)
+          }} disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#c01515] hover:bg-[#a01010] text-white text-sm font-bold transition-colors disabled:opacity-50">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Generar corridas
+          </button>
+          <button onClick={fetchAll} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
+            <RefreshCw className="w-4 h-4" /> Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Toast */}

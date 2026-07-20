@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Ticket, CheckCircle2, QrCode, ArrowRight, ArrowLeft, Clock, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { CancelBookingButton } from './cancel-button'
 
 export const metadata = { title: 'Mis boletos' }
 
@@ -145,6 +146,12 @@ export default async function MisTicketsPage() {
                       <p className="font-semibold text-slate-600">correo electrónico</p>
                     </div>
                   </div>
+
+                  {booking.status === 'confirmed' && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <CancelBookingButton bookingId={booking.id} bookingNumber={booking.booking_number} />
+                    </div>
+                  )}
                 </div>
               </div>
             )
