@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   let customerId: string | null = null
+  let soldByUserId: string | null = null
   if (user) {
     const { data: callerProfile } = await service
       .from('profiles')
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle() as { data: { role: string } | null }
     const isStaff = ['cajero', 'admin', 'super_admin'].includes(callerProfile?.role ?? '')
     if (!isStaff) customerId = user.id
+    else soldByUserId = user.id
   }
 
   // Find a trip matching the booking date; fall back to any trip if none scheduled for that day
@@ -140,9 +142,10 @@ export async function POST(req: NextRequest) {
     points_earned: Math.floor(total_amount),
     guest_email:   guest_email || null,
   }
-  if (return_date)  bookingInsert.return_date  = return_date
-  if (customerId)   bookingInsert.customer_id  = customerId
-  if (sucursal_id)  bookingInsert.sucursal_id  = sucursal_id
+  if (return_date)    bookingInsert.return_date    = return_date
+  if (customerId)     bookingInsert.customer_id    = customerId
+  if (sucursal_id)    bookingInsert.sucursal_id    = sucursal_id
+  if (soldByUserId)   bookingInsert.sold_by_user_id = soldByUserId
 
   const { data: booking, error: bookingError } = await service
     .from('bookings')

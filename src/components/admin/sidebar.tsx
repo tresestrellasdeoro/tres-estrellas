@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store } from 'lucide-react'
+import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
   { href: '/admin/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/admin/corridas',     icon: Route,           label: 'Corridas' },
+  { href: '/admin/choferes',     icon: UserCheck,       label: 'Choferes' },
   { href: '/admin/rutas',        icon: Map,             label: 'Rutas' },
   { href: '/admin/horarios',     icon: Clock,           label: 'Horarios' },
   { href: '/admin/buses',        icon: Bus,             label: 'Autobuses' },
