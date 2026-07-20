@@ -11,7 +11,15 @@ function svc() {
 
 /** Returns a 401/403 NextResponse if caller is not an admin, or null if allowed. */
 export async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
-  if (req.cookies.get('admin_session')?.value) return null
+  const sessionValue = req.cookies.get('admin_session')?.value
+  if (sessionValue) {
+    try {
+      const decoded = Buffer.from(sessionValue, 'base64').toString('utf-8')
+      if (decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return null
+    } catch {
+      // Invalid base64 — fall through to Supabase auth
+    }
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
