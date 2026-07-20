@@ -106,69 +106,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Sync to QuickBooks (non-blocking)
-  try {
-    const { getValidTokens } = await import('@/lib/quickbooks/client')
-    const tokens = await getValidTokens()
-
-    if (tokens) {
-      // Get sucursal QB accounts
-      const { data: suc } = await svc
-        .from('sucursales')
-        .select('qb_cash_account_id, qb_item_id, name')
-        .eq('id', sucursal_id)
-        .maybeSingle()
-
-      const sucData = suc as any
-
-      // Build QB Journal Entry summary for the day
-      const qbBody = {
-        DocNumber:   `CIERRE-${(cierre as any).sucursales?.code}-${fecha}`,
-        TxnDate:     fecha,
-        PrivateNote: [
-          `Cierre de turno — ${(cierre as any).sucursales?.name}`,
-          `Boletos: ${total_boletos}`,
-          `Efectivo: $${total_efectivo.toFixed(2)}`,
-          `Tarjeta: $${total_tarjeta.toFixed(2)}`,
-          `Paquetes: $${total_paquetes.toFixed(2)}`,
-          `Total: $${total_general.toFixed(2)}`,
-          notas ? `Notas: ${notas}` : '',
-        ].filter(Boolean).join('\n'),
-        Line: [{
-          Amount:      total_general,
-          DetailType:  'SalesItemLineDetail',
-          Description: `Cierre de turno ${(cierre as any).sucursales?.name} — ${fecha}`,
-          SalesItemLineDetail: {
-            ItemRef:   sucData?.qb_item_id ? { value: sucData.qb_item_id } : { value: '1', name: 'Services' },
-            Qty:       1,
-            UnitPrice: total_general,
-          },
-        }],
-        ...(sucData?.qb_cash_account_id && total_efectivo > 0
-          ? { DepositToAccountRef: { value: sucData.qb_cash_account_id } }
-          : {}),
-      }
-
-      const res = await fetch(
-        `https://quickbooks.api.intuit.com/v3/company/${tokens.realm_id}/salesreceipt`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization:  `Bearer ${tokens.access_token}`,
-            'Content-Type': 'application/json',
-            Accept:         'application/json',
-          },
-          body: JSON.stringify(qbBody),
-        }
-      )
-
-      if (res.ok) {
-        await svc.from('cierres_turno').update({ qb_synced: true }).eq('id', (cierre as any).id)
-      }
-    }
-  } catch (qbErr: any) {
-    console.error('QB cierre sync skipped:', qbErr.message)
-  }
+  // The cierre is a local cash-reconciliation report only.
+  // Each individual sale already creates a Sales Receipt in QuickBooks via /api/bookings.
+  // Sending the daily total here would double-count every sale.
 
   return NextResponse.json({ cierre }, { status: 201 })
 }
