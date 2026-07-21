@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, X, Send, Plus, ChevronLeft, AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 
+// Exposed so other components can trigger a refresh
+export const supportWidgetBus = { refresh: () => {} }
+
 const CATEGORIES = [
   { value: 'ventas',        label: 'Ventas / Boletos' },
   { value: 'checkin',       label: 'Check-in / Validación' },
@@ -57,11 +60,24 @@ export function SupportWidget() {
   const [loading,  setLoading]  = useState(false)
   const [sending,  setSending]  = useState(false)
   const [reply,    setReply]    = useState('')
+  const [badge,    setBadge]    = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const [form, setForm] = useState({
     subject: '', category: 'sistema', priority: 'media', description: '',
   })
+
+  // Load badge count on mount and every 60s
+  useEffect(() => {
+    const loadBadge = () =>
+      fetch('/api/support/tickets')
+        .then(r => r.ok ? r.json() : [])
+        .then((ts: Ticket[]) => setBadge(ts.filter(t => t.status === 'en_revision').length))
+        .catch(() => {})
+    loadBadge()
+    const interval = setInterval(loadBadge, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     if (open && view === 'list') fetchTickets()
@@ -132,6 +148,11 @@ export function SupportWidget() {
         title="Soporte"
       >
         {open ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+        {!open && badge > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-[#0a1628] text-[10px] font-black flex items-center justify-center shadow">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
       </button>
 
       {/* Panel */}

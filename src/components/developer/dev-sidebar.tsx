@@ -7,7 +7,7 @@ import {
   Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
   MessageCircle, HeadphonesIcon, Terminal
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const ADMIN_NAV = [
@@ -32,7 +32,19 @@ const DEV_NAV = [
 export function DevSidebar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open,        setOpen]        = useState(false)
+  const [openTickets, setOpenTickets] = useState(0)
+
+  useEffect(() => {
+    const load = () =>
+      fetch('/api/developer/support?status=abierta')
+        .then(r => r.ok ? r.json() : [])
+        .then((ts: unknown[]) => setOpenTickets(ts.length))
+        .catch(() => {})
+    load()
+    const interval = setInterval(load, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -80,7 +92,25 @@ export function DevSidebar() {
         <p className="text-violet-400/70 text-[10px] font-bold uppercase tracking-widest px-3 mb-2 flex items-center gap-1.5">
           <MessageCircle className="w-3 h-3" /> Exclusivo Developer
         </p>
-        {DEV_NAV.map(item => <NavItem key={item.href} {...item} />)}
+        {DEV_NAV.map(item => {
+          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          return (
+            <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 text-sm font-semibold transition-all ${
+                active
+                  ? 'bg-[rgba(240,180,41,0.15)] text-[#f0b429] border border-[rgba(240,180,41,0.2)]'
+                  : 'text-white/50 hover:text-white/90 hover:bg-white/5'
+              }`}>
+              <item.icon className="w-4 h-4 shrink-0" />
+              <span className="flex-1">{item.label}</span>
+              {openTickets > 0 && item.href === '/developer/soporte' && (
+                <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                  {openTickets > 9 ? '9+' : openTickets}
+                </span>
+              )}
+            </Link>
+          )
+        })}
       </nav>
 
       <div className="p-3 border-t border-white/8 shrink-0">
