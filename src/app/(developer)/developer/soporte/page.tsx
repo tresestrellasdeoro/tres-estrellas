@@ -62,6 +62,7 @@ type Ticket = {
 export default function SoporteListPage() {
   const [tickets,  setTickets]  = useState<Ticket[]>([])
   const [loading,  setLoading]  = useState(true)
+  const [fetchErr, setFetchErr] = useState('')
   const [search,   setSearch]   = useState('')
   const [status,   setStatus]   = useState('')
   const [category, setCategory] = useState('')
@@ -69,6 +70,7 @@ export default function SoporteListPage() {
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
+    setFetchErr('')
     try {
       const params = new URLSearchParams()
       if (status)   params.set('status', status)
@@ -76,7 +78,14 @@ export default function SoporteListPage() {
       if (priority) params.set('priority', priority)
       if (search)   params.set('search', search)
       const r = await fetch(`/api/developer/support?${params}`)
-      if (r.ok) setTickets(await r.json())
+      if (r.ok) {
+        setTickets(await r.json())
+      } else {
+        const body = await r.json().catch(() => ({}))
+        setFetchErr(`Error ${r.status}: ${body.error ?? 'desconocido'}`)
+      }
+    } catch {
+      setFetchErr('Error de conexión')
     } finally { setLoading(false) }
   }, [status, category, priority, search])
 
@@ -101,6 +110,10 @@ export default function SoporteListPage() {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      {fetchErr && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{fetchErr}</div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">

@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireDeveloper } from '@/lib/api-auth'
+import { requireAdmin } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -11,7 +11,7 @@ function svc() {
 
 // GET — all tickets for developer dashboard, with filters
 export async function GET(req: NextRequest) {
-  const deny = await requireDeveloper(req); if (deny) return deny
+  const deny = await requireAdmin(req); if (deny) return deny
 
   const { searchParams } = new URL(req.url)
   const status   = searchParams.get('status')

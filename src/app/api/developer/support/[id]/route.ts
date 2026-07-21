@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireDeveloper } from '@/lib/api-auth'
+import { requireAdmin } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -11,7 +11,7 @@ function svc() {
 
 // GET — full ticket detail with messages
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const deny = await requireDeveloper(req); if (deny) return deny
+  const deny = await requireAdmin(req); if (deny) return deny
   const { id } = await params
 
   const service = svc()
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // PATCH — update status, priority, or assigned_to
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const deny = await requireDeveloper(req); if (deny) return deny
+  const deny = await requireAdmin(req); if (deny) return deny
   const { id } = await params
 
   const body = await req.json()
