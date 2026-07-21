@@ -6,6 +6,7 @@ import { Bus, LayoutDashboard, Ticket, Star, User, LogOut, ChevronRight, Menu, X
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types/database'
+import { SupportWidget } from '@/components/support/support-widget'
 
 const NAV = [
   { href: '/dashboard',    icon: LayoutDashboard, label: 'Inicio' },
@@ -135,6 +136,8 @@ export function CustomerSidebar({ profile }: { profile: Profile | null }) {
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-[#0a1628] flex-col border-r border-white/5">
         <SidebarContent />
       </div>
+
+      <SupportWidget />
     </>
   )
 }

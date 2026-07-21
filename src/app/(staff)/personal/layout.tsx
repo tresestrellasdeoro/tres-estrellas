@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { SupportWidget } from '@/components/support/support-widget'
 
 const ALL_NAV = [
   { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine,      perm: 'checkin' },
@@ -119,6 +120,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       <main className="flex-1 md:pt-0 pt-14 overflow-auto">
         {children}
       </main>
+
+      <SupportWidget />
     </div>
   )
 }

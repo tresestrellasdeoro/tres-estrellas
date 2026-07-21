@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck } from 'lucide-react'
+import {
+  Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X,
+  Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
+  MessageCircle, HeadphonesIcon, Terminal
+} from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { SupportWidget } from '@/components/support/support-widget'
 
-const NAV = [
-  { href: '/admin/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+const ADMIN_NAV = [
   { href: '/admin/corridas',     icon: Route,           label: 'Corridas' },
   { href: '/admin/choferes',     icon: UserCheck,       label: 'Choferes' },
   { href: '/admin/rutas',        icon: Map,             label: 'Rutas' },
@@ -23,7 +25,11 @@ const NAV = [
   { href: '/admin/configuracion',icon: Settings,        label: 'Configuración' },
 ]
 
-export function AdminSidebar() {
+const DEV_NAV = [
+  { href: '/developer/soporte', icon: HeadphonesIcon, label: 'Soporte' },
+]
+
+export function DevSidebar() {
   const pathname = usePathname()
   const router   = useRouter()
   const [open, setOpen] = useState(false)
@@ -34,39 +40,50 @@ export function AdminSidebar() {
     router.push('/auth/login')
   }
 
+  const NavItem = ({ href, icon: Icon, label }: { href: string; icon: typeof Bus; label: string }) => {
+    const active = pathname === href || pathname.startsWith(href + '/')
+    return (
+      <Link href={href} onClick={() => setOpen(false)}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 text-sm font-semibold transition-all ${
+          active
+            ? 'bg-[rgba(240,180,41,0.15)] text-[#f0b429] border border-[rgba(240,180,41,0.2)]'
+            : 'text-white/50 hover:text-white/90 hover:bg-white/5'
+        }`}>
+        <Icon className="w-4 h-4 shrink-0" />
+        {label}
+      </Link>
+    )
+  }
+
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-5 border-b border-white/8">
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="p-5 border-b border-white/8 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#f0b429] to-[#d97706] flex items-center justify-center">
-            <Bus className="w-5 h-5 text-[#0a1628]" strokeWidth={2.5} />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
+            <Terminal className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <div>
-            <div className="text-white font-bold text-sm font-display">Admin Panel</div>
-            <div className="text-[#f0b429]/50 text-[10px] tracking-widest">Tres Estrellas de Oro</div>
+            <div className="text-white font-bold text-sm font-display">Developer</div>
+            <div className="text-violet-400/70 text-[10px] tracking-widest">Tres Estrellas de Oro</div>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 px-3 py-4">
-        <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">Gestión</p>
-        {NAV.map(item => {
-          const active = pathname.startsWith(item.href)
-          return (
-            <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 text-sm font-semibold transition-all ${
-                active
-                  ? 'bg-[rgba(240,180,41,0.15)] text-[#f0b429] border border-[rgba(240,180,41,0.2)]'
-                  : 'text-white/50 hover:text-white/90 hover:bg-white/5'
-              }`}>
-              <item.icon className="w-4 h-4 shrink-0" />
-              {item.label}
-            </Link>
-          )
-        })}
+        <NavItem href="/developer/dashboard" icon={LayoutDashboard} label="Dev Dashboard" />
+        <div className="my-2 border-t border-white/8" />
+        <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">Panel Admin</p>
+        {ADMIN_NAV.map(item => <NavItem key={item.href} {...item} />)}
+
+        <div className="my-3 border-t border-white/8" />
+
+        <p className="text-violet-400/70 text-[10px] font-bold uppercase tracking-widest px-3 mb-2 flex items-center gap-1.5">
+          <MessageCircle className="w-3 h-3" /> Exclusivo Developer
+        </p>
+        {DEV_NAV.map(item => <NavItem key={item.href} {...item} />)}
       </nav>
 
-      <div className="p-3 border-t border-white/8">
+      <div className="p-3 border-t border-white/8 shrink-0">
         <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-sm font-semibold text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all">
           <LogOut className="w-4 h-4" />
           Cerrar sesión
@@ -87,7 +104,6 @@ export function AdminSidebar() {
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-[#0a1628] flex-col border-r border-white/5">
         <SidebarContent />
       </div>
-      <SupportWidget />
     </>
   )
 }

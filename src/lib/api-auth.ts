@@ -31,8 +31,27 @@ export async function requireAdmin(req: NextRequest): Promise<NextResponse | nul
     .eq('id', user.id)
     .maybeSingle() as { data: { role: string } | null }
 
-  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
+  const adminRoles = ['admin', 'super_admin', 'developer']
+  if (!adminRoles.includes(profile?.role ?? '')) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+  return null
+}
+
+/** Returns a 401/403 NextResponse if caller is not a developer, or null if allowed. */
+export async function requireDeveloper(req: NextRequest): Promise<NextResponse | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { data: profile } = await svc()
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle() as { data: { role: string } | null }
+
+  if (profile?.role !== 'developer') {
+    return NextResponse.json({ error: 'Solo para developers' }, { status: 403 })
   }
   return null
 }
