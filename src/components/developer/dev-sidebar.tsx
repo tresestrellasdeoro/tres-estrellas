@@ -11,18 +11,18 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const ADMIN_NAV = [
-  { href: '/admin/corridas',     icon: Route,           label: 'Corridas' },
-  { href: '/admin/choferes',     icon: UserCheck,       label: 'Choferes' },
-  { href: '/admin/rutas',        icon: Map,             label: 'Rutas' },
-  { href: '/admin/horarios',     icon: Clock,           label: 'Horarios' },
-  { href: '/admin/buses',        icon: Bus,             label: 'Autobuses' },
-  { href: '/admin/clientes',     icon: Users,           label: 'Clientes' },
-  { href: '/admin/reportes',     icon: BarChart3,       label: 'Reportes' },
-  { href: '/admin/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
-  { href: '/admin/personal',     icon: UserCog,         label: 'Personal' },
-  { href: '/admin/paquetes',     icon: Package,         label: 'Paquetes' },
-  { href: '/admin/sucursales',   icon: Store,           label: 'Sucursales' },
-  { href: '/admin/configuracion',icon: Settings,        label: 'Configuración' },
+  { href: '/developer/corridas',     icon: Route,           label: 'Corridas' },
+  { href: '/developer/choferes',     icon: UserCheck,       label: 'Choferes' },
+  { href: '/developer/rutas',        icon: Map,             label: 'Rutas' },
+  { href: '/developer/horarios',     icon: Clock,           label: 'Horarios' },
+  { href: '/developer/buses',        icon: Bus,             label: 'Autobuses' },
+  { href: '/developer/clientes',     icon: Users,           label: 'Clientes' },
+  { href: '/developer/reportes',     icon: BarChart3,       label: 'Reportes' },
+  { href: '/developer/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
+  { href: '/developer/personal',     icon: UserCog,         label: 'Personal' },
+  { href: '/developer/paquetes',     icon: Package,         label: 'Paquetes' },
+  { href: '/developer/sucursales',   icon: Store,           label: 'Sucursales' },
+  { href: '/developer/configuracion',icon: Settings,        label: 'Configuración' },
 ]
 
 const DEV_NAV = [
