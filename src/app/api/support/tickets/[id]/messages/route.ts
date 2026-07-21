@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 
 function svc() {
   return createServiceClient(
@@ -9,11 +10,29 @@ function svc() {
   )
 }
 
-// GET — messages for a ticket the user owns
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+async function resolveUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (user) return { id: user.id, email: user.email ?? '' }
+
+  const cookieStore = await cookies()
+  const session = cookieStore.get('admin_session')?.value
+  if (session) {
+    try {
+      const decoded = Buffer.from(session, 'base64').toString('utf-8')
+      const adminEmail = process.env.ADMIN_EMAIL ?? ''
+      if (decoded.startsWith(adminEmail + ':')) {
+        const { data: profile } = await svc().from('profiles').select('id').eq('email', adminEmail).maybeSingle() as any
+        if (profile?.id) return { id: profile.id, email: adminEmail }
+      }
+    } catch { /* ignore */ }
+  }
+  return null
+}
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const service = svc()
@@ -30,11 +49,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(data ?? [])
 }
 
-// POST — user sends a reply on their own ticket
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const service = svc()
@@ -55,7 +72,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Reabrir si estaba solucionado (el usuario respondió)
   if (ticket.status === 'solucionada') {
     await service.from('support_tickets').update({ status: 'en_revision' }).eq('id', id)
   }

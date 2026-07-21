@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, Loader2 } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, Loader2, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
@@ -80,6 +80,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex-1 p-3 space-y-1">
           <NavLinks />
+          <div className="border-t border-white/8 my-2" />
+          <Link href="/personal/soporte"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith('/personal/soporte') ? 'bg-[#c01515] text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'
+            }`}>
+            <MessageCircle className="w-4 h-4 shrink-0" />
+            Mis incidencias
+          </Link>
         </nav>
 
         <div className="p-3 border-t border-white/8">
@@ -107,6 +115,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         <div className="md:hidden fixed inset-0 z-40 bg-[#0a1e42] pt-14">
           <nav className="p-4 space-y-1">
             <NavLinks onClick={() => setOpen(false)} />
+            <div className="border-t border-white/8 my-2" />
+            <Link href="/personal/soporte" onClick={() => setOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                pathname.startsWith('/personal/soporte') ? 'bg-[#c01515] text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'
+              }`}>
+              <MessageCircle className="w-4 h-4 shrink-0" />
+              Mis incidencias
+            </Link>
             <button onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/40 hover:text-white text-sm font-semibold">
               <LogOut className="w-5 h-5" />
