@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let query = svc()
     .from('support_tickets')
-    .select('id, ticket_number, subject, category, priority, status, creator_name, creator_role, sucursal_id, created_at, updated_at, resolved_at, sucursales(nombre)')
+    .select('id, ticket_number, subject, category, priority, status, creator_name, creator_role, sucursal_id, created_at, updated_at, resolved_at')
     .order('updated_at', { ascending: false })
 
   if (status)   query = query.eq('status', status)     as any

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const [{ data: ticket, error }, { data: messages }] = await Promise.all([
     service
       .from('support_tickets')
-      .select('*, sucursales(nombre)')
+      .select('*')
       .eq('id', id)
       .maybeSingle() as any,
     service
