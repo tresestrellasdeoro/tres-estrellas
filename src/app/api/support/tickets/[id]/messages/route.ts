@@ -13,7 +13,7 @@ function svc() {
 async function resolveUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) return { id: user.id, email: user.email ?? '' }
+  if (user) return { id: user.id as string | null, email: user.email ?? '' }
 
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
@@ -23,11 +23,21 @@ async function resolveUser() {
       const adminEmail = process.env.ADMIN_EMAIL ?? ''
       if (decoded.startsWith(adminEmail + ':')) {
         const { data: profile } = await svc().from('profiles').select('id').eq('email', adminEmail).maybeSingle() as any
-        if (profile?.id) return { id: profile.id, email: adminEmail }
+        return { id: (profile?.id ?? null) as string | null, email: adminEmail }
       }
     } catch { /* ignore */ }
   }
   return null
+}
+
+async function findTicketForUser(id: string, user: { id: string | null; email: string }) {
+  const service = svc()
+  if (user.id) {
+    const { data } = await service.from('support_tickets').select('id, status').eq('id', id).eq('created_by', user.id).maybeSingle()
+    return data
+  }
+  const { data } = await service.from('support_tickets').select('id, status').eq('id', id).eq('creator_name', user.email).maybeSingle()
+  return data
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,11 +45,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const service = svc()
-  const { data: ticket } = await service.from('support_tickets').select('id').eq('id', id).eq('created_by', user.id).maybeSingle()
+  const ticket = await findTicketForUser(id, user)
   if (!ticket) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const { data, error } = await service
+  const { data, error } = await svc()
     .from('support_messages')
     .select('id, sender_name, message, is_developer, created_at')
     .eq('ticket_id', id)
@@ -54,19 +63,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const service = svc()
-  const { data: ticket } = await service.from('support_tickets').select('id, status').eq('id', id).eq('created_by', user.id).maybeSingle() as any
+  const ticket = await findTicketForUser(id, user) as any
   if (!ticket) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
   if (ticket.status === 'cerrada') return NextResponse.json({ error: 'El ticket está cerrado' }, { status: 409 })
+
+  const service = svc()
 
   const { message } = await req.json()
   if (!message?.trim()) return NextResponse.json({ error: 'Mensaje vacío' }, { status: 422 })
 
-  const { data: profile } = await service.from('profiles').select('full_name').eq('id', user.id).maybeSingle() as any
+  let senderName = user.email
+  if (user.id) {
+    const { data: profile } = await service.from('profiles').select('full_name').eq('id', user.id).maybeSingle() as any
+    senderName = profile?.full_name ?? user.email
+  }
 
   const { data, error } = await service
     .from('support_messages')
-    .insert({ ticket_id: id, sender_id: user.id, sender_name: profile?.full_name ?? 'Usuario', message: message.trim(), is_developer: false })
+    .insert({ ticket_id: id, sender_id: user.id, sender_name: senderName, message: message.trim(), is_developer: false })
     .select('id, sender_name, message, is_developer, created_at')
     .single()
 

@@ -59,6 +59,7 @@ export function SupportWidget() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading,  setLoading]  = useState(false)
   const [sending,  setSending]  = useState(false)
+  const [error,    setError]    = useState('')
   const [reply,    setReply]    = useState('')
   const [badge,    setBadge]    = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -108,6 +109,7 @@ export function SupportWidget() {
   async function submitNew() {
     if (!form.subject.trim() || !form.description.trim()) return
     setSending(true)
+    setError('')
     try {
       const r = await fetch('/api/support/tickets', {
         method: 'POST',
@@ -118,7 +120,12 @@ export function SupportWidget() {
         setForm({ subject: '', category: 'sistema', priority: 'media', description: '' })
         setView('list')
         fetchTickets()
+      } else {
+        const body = await r.json().catch(() => ({}))
+        setError(body.error ?? `Error ${r.status}`)
       }
+    } catch (e) {
+      setError('Error de conexión')
     } finally { setSending(false) }
   }
 
@@ -259,6 +266,9 @@ export function SupportWidget() {
                     className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#c01515]/30 focus:border-[#c01515] resize-none"
                   />
                 </div>
+                {error && (
+                  <p className="text-red-500 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+                )}
                 <button
                   onClick={submitNew}
                   disabled={sending || !form.subject.trim() || !form.description.trim()}

@@ -10,14 +10,11 @@ function svc() {
   )
 }
 
-// Resolve authenticated user — supports Supabase auth OR admin_session cookie
 async function resolveUser() {
-  // 1. Try Supabase auth first
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) return { id: user.id, email: user.email ?? '' }
+  if (user) return { id: user.id as string | null, email: user.email ?? '' }
 
-  // 2. Fallback: admin_session cookie
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
   if (session) {
@@ -25,35 +22,37 @@ async function resolveUser() {
       const decoded = Buffer.from(session, 'base64').toString('utf-8')
       const adminEmail = process.env.ADMIN_EMAIL ?? ''
       if (decoded.startsWith(adminEmail + ':')) {
-        // Find profile by email
-        const { data: profile } = await svc()
-          .from('profiles')
-          .select('id')
-          .eq('email', adminEmail)
-          .maybeSingle() as any
-        if (profile?.id) return { id: profile.id, email: adminEmail }
+        // Try to find profile but proceed even if not found
+        const { data: profile } = await svc().from('profiles').select('id').eq('email', adminEmail).maybeSingle() as any
+        return { id: (profile?.id ?? null) as string | null, email: adminEmail }
       }
     } catch { /* ignore */ }
   }
   return null
 }
 
-// GET — own tickets
 export async function GET() {
   const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const { data, error } = await svc()
+  const service = svc()
+  let q = service
     .from('support_tickets')
     .select('id, ticket_number, subject, category, priority, status, created_at, updated_at')
-    .eq('created_by', user.id)
     .order('created_at', { ascending: false })
 
+  if (user.id) {
+    q = q.eq('created_by', user.id)
+  } else {
+    // admin_session user without a profile row — match by email stored in creator_name
+    q = q.eq('creator_name', user.email)
+  }
+
+  const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data ?? [])
 }
 
-// POST — create a new support ticket
 export async function POST(req: NextRequest) {
   const user = await resolveUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -66,19 +65,24 @@ export async function POST(req: NextRequest) {
 
   const service = svc()
 
-  const { data: profile } = await service
-    .from('profiles')
-    .select('full_name, role, sucursal_id')
-    .eq('id', user.id)
-    .maybeSingle() as any
+  let creatorName = user.email
+  let creatorRole = 'admin'
+  let sucursalId = null
+
+  if (user.id) {
+    const { data: profile } = await service.from('profiles').select('full_name, role, sucursal_id').eq('id', user.id).maybeSingle() as any
+    creatorName = profile?.full_name ?? user.email
+    creatorRole = profile?.role ?? 'admin'
+    sucursalId  = profile?.sucursal_id ?? null
+  }
 
   const { data, error } = await service
     .from('support_tickets')
     .insert({
       created_by:    user.id,
-      creator_name:  profile?.full_name ?? user.email ?? 'Usuario',
-      creator_role:  profile?.role ?? 'admin',
-      sucursal_id:   profile?.sucursal_id ?? null,
+      creator_name:  creatorName,
+      creator_role:  creatorRole,
+      sucursal_id:   sucursalId,
       subject:       subject.trim(),
       category:      category ?? 'otro',
       priority:      priority ?? 'media',
