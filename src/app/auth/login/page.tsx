@@ -39,6 +39,8 @@ function LoginForm() {
         router.push('/personal/validar')
       } else if (role === 'admin' || role === 'super_admin') {
         router.push('/admin/dashboard')
+      } else if (role === 'developer') {
+        router.push('/developer/dashboard')
       } else {
         router.push(nextPath || '/dashboard')
       }

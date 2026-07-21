@@ -4,11 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  const protectedCustomer = pathname.startsWith('/dashboard') || pathname.startsWith('/mis-tickets') || pathname.startsWith('/puntos') || pathname.startsWith('/perfil')
-  const protectedAdmin    = pathname.startsWith('/admin')
-  const protectedDriver   = pathname.startsWith('/conductor')
-  const protectedStaff    = pathname.startsWith('/personal')
-  const authPages         = pathname.startsWith('/auth')
+  const protectedCustomer   = pathname.startsWith('/dashboard') || pathname.startsWith('/mis-tickets') || pathname.startsWith('/puntos') || pathname.startsWith('/perfil')
+  const protectedAdmin      = pathname.startsWith('/admin')
+  const protectedDriver     = pathname.startsWith('/conductor')
+  const protectedStaff      = pathname.startsWith('/personal')
+  const protectedDeveloper  = pathname.startsWith('/developer')
+  const authPages           = pathname.startsWith('/auth')
 
   // Allow admin with local session cookie (no Supabase required)
   const adminCookie = request.cookies.get('admin_session')
@@ -54,7 +55,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user && !isValidAdminSession && (protectedCustomer || protectedAdmin || protectedDriver || protectedStaff)) {
+  if (!user && !isValidAdminSession && (protectedCustomer || protectedAdmin || protectedDriver || protectedStaff || protectedDeveloper)) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('next', pathname)
