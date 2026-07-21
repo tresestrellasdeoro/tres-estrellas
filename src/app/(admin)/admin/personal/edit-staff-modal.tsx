@@ -12,6 +12,7 @@ const ROLES = [
   { value: 'cajero',      label: 'Cajero',         desc: 'Acceso según permisos asignados' },
   { value: 'admin',       label: 'Administrador',   desc: 'Acceso completo al panel admin' },
   { value: 'super_admin', label: 'Super Admin',     desc: 'Control total del sistema' },
+  { value: 'developer',   label: 'Developer',       desc: 'Acceso total + portal exclusivo dev' },
 ]
 const PERMISOS = [
   { value: 'ventas',    label: 'Ventas',           desc: 'Venta de boletos y reservaciones' },

@@ -18,11 +18,13 @@ const ROLE_LABELS: Record<string, string> = {
   cajero:      'Cajero',
   admin:       'Administrador',
   super_admin: 'Super Admin',
+  developer:   'Developer',
 }
 const ROLE_COLORS: Record<string, string> = {
   cajero:      'bg-blue-50 text-blue-700',
   admin:       'bg-purple-50 text-purple-700',
   super_admin: 'bg-red-50 text-red-700',
+  developer:   'bg-violet-50 text-violet-700',
 }
 
 const PERMISO_LABELS: Record<string, string> = {
@@ -42,7 +44,7 @@ export default async function PersonalPage() {
     service
       .from('profiles')
       .select('id, full_name, email, role, departamento, permisos, sucursal_id, sucursales(name, code)')
-      .in('role', ['cajero', 'admin', 'super_admin'])
+      .in('role', ['cajero', 'admin', 'super_admin', 'developer'])
       .order('created_at', { ascending: false }),
     service
       .from('sucursales')
