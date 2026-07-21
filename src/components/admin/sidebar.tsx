@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck } from 'lucide-react'
+import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
@@ -66,8 +66,17 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-3 border-t border-white/8">
-        <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-sm font-semibold text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all">
+      <div className="px-3 pb-2 border-t border-white/8 pt-3">
+        <Link href="/admin/soporte" onClick={() => setOpen(false)}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            pathname.startsWith('/admin/soporte')
+              ? 'bg-[rgba(240,180,41,0.15)] text-[#f0b429] border border-[rgba(240,180,41,0.2)]'
+              : 'text-white/50 hover:text-white/90 hover:bg-white/5'
+          }`}>
+          <MessageCircle className="w-4 h-4 shrink-0" />
+          Soporte
+        </Link>
+        <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-sm font-semibold text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all mt-1">
           <LogOut className="w-4 h-4" />
           Cerrar sesión
         </button>
