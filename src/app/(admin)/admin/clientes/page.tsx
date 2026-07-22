@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { Users, Star, Bus, ArrowUpRight, Package } from 'lucide-react'
+import { Users, Star, Bus, Package } from 'lucide-react'
 import type { Profile } from '@/lib/types/database'
+import { DeleteCustomerButton } from './delete-customer-button'
 
 export const metadata = { title: 'Clientes — Admin' }
 export const revalidate = 60
@@ -246,9 +247,7 @@ export default async function ClientesPage() {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                            <ArrowUpRight className="w-4 h-4" />
-                          </button>
+                          {/* Guest: no tiene cuenta, no se puede eliminar */}
                         </td>
                       </tr>
                     )
@@ -292,9 +291,7 @@ export default async function ClientesPage() {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                          <ArrowUpRight className="w-4 h-4" />
-                        </button>
+                        <DeleteCustomerButton userId={client.id} name={client.name || client.email} />
                       </td>
                     </tr>
                   )
