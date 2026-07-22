@@ -1,4 +1,12 @@
 import { NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
+
+function signAdminToken(email: string): string {
+  const payload = `${email}:${Date.now()}`
+  const secret  = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
+  const sig     = createHmac('sha256', secret).update(payload).digest('hex')
+  return Buffer.from(`${payload}:${sig}`).toString('base64')
+}
 
 export async function POST(req: Request) {
   const formData = await req.formData()
@@ -11,7 +19,7 @@ export async function POST(req: Request) {
     email    === process.env.ADMIN_EMAIL &&
     password === process.env.ADMIN_PASSWORD
   ) {
-    const token    = Buffer.from(`${email}:${Date.now()}`).toString('base64')
+    const token    = signAdminToken(email)
     const response = NextResponse.redirect(`${base}/admin/dashboard`, { status: 303 })
     response.cookies.set('admin_session', token, {
       httpOnly: true,

@@ -1,8 +1,12 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { exchangeCode } from '@/lib/quickbooks/client'
+import { requireAdmin } from '@/lib/api-auth'
 
 export async function GET(req: NextRequest) {
+  const notAdmin = await requireAdmin(req)
+  if (notAdmin) return NextResponse.redirect(new URL('/auth/login?next=/admin/configuracion', req.url))
+
   const { searchParams } = req.nextUrl
   const code    = searchParams.get('code')
   const realmId = searchParams.get('realmId')

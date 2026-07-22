@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { Resend } from 'resend'
 import { ticketEmailHtml } from '@/lib/email/ticket-template'
 import { SquareClient, SquareEnvironment } from 'square'
+import { ROUTE_PRICES, LUGGAGE_OPTIONS } from '@/lib/data/bus-config'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -18,19 +19,21 @@ const squareClient = squareConfigured
   : null
 
 const BookingSchema = z.object({
-  ticket_type:        z.enum(['one_way', 'round_trip']),
-  total_amount:       z.number().positive(),
-  guest_email:        z.string().email().or(z.literal('')).optional(),
-  payment_method:     z.enum(['card', 'cash']).default('card'),
-  source_id:          z.string().optional(),
-  origin_name:        z.string(),
-  destination_name:   z.string(),
-  boarding_stop_code: z.string().optional(),
-  boarding_stop_name: z.string(),
-  sucursal_id:        z.string().uuid().optional(),
-  date:               z.string(),
-  departure_time:     z.string(),
-  return_date:        z.string().optional(),
+  ticket_type:           z.enum(['one_way', 'round_trip']),
+  total_amount:          z.number().positive(),
+  guest_email:           z.string().email().or(z.literal('')).optional(),
+  payment_method:        z.enum(['card', 'cash']).default('card'),
+  source_id:             z.string().optional(),
+  origin_name:           z.string(),
+  destination_name:      z.string(),
+  boarding_stop_code:    z.string().optional(),
+  destination_stop_code: z.string().optional(),
+  boarding_stop_name:    z.string(),
+  sucursal_id:           z.string().uuid().optional(),
+  date:                  z.string(),
+  departure_time:        z.string(),
+  return_date:           z.string().optional(),
+  luggage_price:         z.number().min(0).default(0),
   passengers: z.array(z.object({
     full_name:      z.string().min(2),
     passenger_type: z.enum(['adult', 'child', 'senior']),
@@ -40,6 +43,14 @@ const BookingSchema = z.object({
     promo_label:    z.string().optional(),
   })).min(1),
 })
+
+function calcLoyaltyTier(points: number): 'none' | 'bronze' | 'silver' | 'gold' | 'platinum' {
+  if (points >= 5000) return 'platinum'
+  if (points >= 2000) return 'gold'
+  if (points >= 500)  return 'silver'
+  if (points >= 100)  return 'bronze'
+  return 'none'
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -51,9 +62,66 @@ export async function POST(req: NextRequest) {
 
   const {
     ticket_type, total_amount, guest_email, payment_method, source_id,
-    origin_name, destination_name, boarding_stop_code, boarding_stop_name,
-    date, departure_time, return_date, passengers, sucursal_id,
+    origin_name, destination_name, boarding_stop_code, destination_stop_code,
+    boarding_stop_name, date, departure_time, return_date, passengers,
+    sucursal_id, luggage_price,
   } = parsed.data
+
+  const service = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // ── Determine caller identity BEFORE charging ──────────────────────────────
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  let customerId: string | null = null
+  let soldByUserId: string | null = null
+  let isStaff = false
+  if (user) {
+    const { data: callerProfile } = await service
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle() as { data: { role: string } | null }
+    isStaff = ['cajero', 'admin', 'super_admin', 'developer'].includes(callerProfile?.role ?? '')
+    if (!isStaff) customerId = user.id
+    else soldByUserId = user.id
+  }
+
+  // ── Server-side price validation (non-staff only) ──────────────────────────
+  if (!isStaff) {
+    if (boarding_stop_code && destination_stop_code) {
+      const priceKey     = `${boarding_stop_code}:${destination_stop_code}`
+      const officialPrices = ROUTE_PRICES[priceKey]
+      if (officialPrices) {
+        const multiplier    = ticket_type === 'round_trip' ? 1.5 : 1
+        const expectedAdult = Math.round(officialPrices.adult * multiplier)
+        const expectedChild = Math.round(officialPrices.child * multiplier)
+        for (const p of passengers) {
+          if (p.is_promo) {
+            return NextResponse.json({ error: 'Precios especiales solo para personal autorizado' }, { status: 403 })
+          }
+          const expectedPrice = p.passenger_type === 'adult' ? expectedAdult : expectedChild
+          if (Math.abs(p.price - expectedPrice) > 0.01) {
+            return NextResponse.json({ error: 'Precio de pasajero no válido' }, { status: 422 })
+          }
+        }
+      }
+    }
+
+    // Validate luggage price is a known multiple
+    if (luggage_price > 0) {
+      const paxCount    = passengers.length
+      const validTotals = LUGGAGE_OPTIONS.map(o => o.price * paxCount)
+      if (!validTotals.includes(luggage_price)) {
+        return NextResponse.json({ error: 'Precio de equipaje no válido' }, { status: 422 })
+      }
+    }
+  }
+
+  // Server-calculated total (overrides client value for payment and DB record)
+  const serverTotal = passengers.reduce((sum, p) => sum + p.price, 0) + luggage_price
 
   // ── Square payment charge ──────────────────────────────────────────────────
   let squarePaymentId: string | undefined
@@ -69,7 +137,7 @@ export async function POST(req: NextRequest) {
     try {
       const paymentResponse = await squareClient.payments.create({
         sourceId:       source_id,
-        amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+        amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
         locationId:     process.env.SQUARE_LOCATION_ID!,
         idempotencyKey: crypto.randomUUID(),
       })
@@ -86,31 +154,8 @@ export async function POST(req: NextRequest) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  const service = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  // Link booking to the authenticated customer — but NOT if the caller is staff/admin.
-  // When a cashier sells a ticket, they are authenticated as staff, so we must not
-  // set their user ID as the customer (it would give them loyalty points, etc.).
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  let customerId: string | null = null
-  let soldByUserId: string | null = null
-  if (user) {
-    const { data: callerProfile } = await service
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle() as { data: { role: string } | null }
-    const isStaff = ['cajero', 'admin', 'super_admin'].includes(callerProfile?.role ?? '')
-    if (!isStaff) customerId = user.id
-    else soldByUserId = user.id
-  }
-
-  // Find a trip matching the booking date; fall back to any trip if none scheduled for that day
-  let { data: tripData } = await service
+  // Find a trip matching the booking date; return 404 if none scheduled
+  const { data: tripData } = await service
     .from('trips')
     .select('id')
     .eq('departure_date', date)
@@ -120,26 +165,29 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (!tripData?.id) {
-    const { data: anyTrip } = await service
-      .from('trips')
-      .select('id')
-      .limit(1)
-      .maybeSingle()
-    tripData = anyTrip
+    if (squarePaymentId && squareClient) {
+      try {
+        await squareClient.refunds.refundPayment({
+          paymentId:      squarePaymentId,
+          amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
+          idempotencyKey: crypto.randomUUID(),
+          reason:         'No trips available for requested date — automatic refund',
+        })
+      } catch (refundErr: any) {
+        console.error('Refund failed for payment', squarePaymentId, refundErr)
+      }
+    }
+    return NextResponse.json({ error: 'No hay viajes programados para la fecha seleccionada. Por favor elige otra fecha.' }, { status: 404 })
   }
 
-  if (!tripData?.id) {
-    return NextResponse.json({ error: 'No hay viajes en el sistema. Ejecuta el seed SQL.' }, { status: 404 })
-  }
-
-  // Create booking (customer_id is optional for guest checkout)
+  // Create booking
   const bookingInsert: Record<string, unknown> = {
     trip_id:          tripData.id,
     ticket_type,
     status:           'confirmed',
-    total_amount,
+    total_amount:     serverTotal,
     payment_method,
-    points_earned:    Math.floor(total_amount),
+    points_earned:    Math.floor(serverTotal),
     guest_email:      guest_email || null,
     origin_name,
     destination_name,
@@ -158,12 +206,11 @@ export async function POST(req: NextRequest) {
 
   if (bookingError || !booking) {
     console.error('Booking error:', bookingError)
-    // Reembolsar el cobro de Square si el booking falló
     if (squarePaymentId && squareClient) {
       try {
         await squareClient.refunds.refundPayment({
           paymentId:      squarePaymentId,
-          amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+          amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
           idempotencyKey: crypto.randomUUID(),
           reason:         'Booking creation failed — automatic refund',
         })
@@ -179,7 +226,7 @@ export async function POST(req: NextRequest) {
   {
     const payRecord: Record<string, unknown> = {
       booking_id:     booking.id,
-      amount:         total_amount,
+      amount:         serverTotal,
       provider:       squarePaymentId ? 'square' : 'cash',
       status:         'completed',
       payment_method: payment_method,
@@ -229,7 +276,7 @@ export async function POST(req: NextRequest) {
       try {
         await squareClient.refunds.refundPayment({
           paymentId:      squarePaymentId,
-          amountMoney:    { amount: BigInt(Math.round(total_amount * 100)), currency: 'USD' },
+          amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
           idempotencyKey: crypto.randomUUID(),
           reason:         'Passenger creation failed — automatic refund',
         })
@@ -241,8 +288,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error al registrar los pasajeros' }, { status: 500 })
   }
 
-  // Credit loyalty points to authenticated users
-  const pointsEarned = (booking as any).points_earned ?? Math.floor(total_amount)
+  // Credit loyalty points to authenticated non-staff users
+  const pointsEarned = (booking as any).points_earned ?? Math.floor(serverTotal)
   if (customerId && pointsEarned > 0) {
     const { data: profile } = await service
       .from('profiles')
@@ -250,9 +297,11 @@ export async function POST(req: NextRequest) {
       .eq('id', customerId)
       .maybeSingle()
     const currentPoints = (profile as any)?.loyalty_points ?? 0
+    const newPoints     = currentPoints + pointsEarned
+    const newTier       = calcLoyaltyTier(newPoints)
     await service
       .from('profiles')
-      .update({ loyalty_points: currentPoints + pointsEarned })
+      .update({ loyalty_points: newPoints, loyalty_tier: newTier })
       .eq('id', customerId)
     const { error: loyaltyErr } = await service.from('loyalty_transactions').insert({
       customer_id: customerId,
@@ -264,9 +313,7 @@ export async function POST(req: NextRequest) {
     if (loyaltyErr) console.error('Failed to insert loyalty transaction:', loyaltyErr.message)
   }
 
-  // QB sync strategy:
-  // - In-person sales (sucursal_id set) → synced at cierre de caja, not here
-  // - Online sales (no sucursal_id) → synced immediately since there is no cashier cierre
+  // QB sync — online sales only (in-person synced at cierre de caja)
   if (!sucursal_id) {
     try {
       const { createSalesReceipt, logQBTransaction } = await import('@/lib/quickbooks/client')
@@ -274,7 +321,7 @@ export async function POST(req: NextRequest) {
         bookingNumber:   booking.booking_number,
         originName:      origin_name,
         destinationName: destination_name,
-        totalAmount:     total_amount,
+        totalAmount:     serverTotal,
         passengerNames:  passengers.map(p => p.full_name),
         date,
         paymentMethod:   payment_method,
@@ -287,11 +334,11 @@ export async function POST(req: NextRequest) {
         type:          'sales_receipt',
         docNumber:     booking.booking_number,
         qbId:          qbResult?.SalesReceipt?.Id ?? null,
-        amount:        total_amount,
+        amount:        serverTotal,
         description:   `[WEB] ${origin_name} → ${destination_name} — ${date}`,
         referenceType: 'booking_online',
         referenceId:   booking.id,
-        payload:       { bookingNumber: booking.booking_number, route: `${origin_name} → ${destination_name}`, paymentMethod: payment_method, amount: total_amount },
+        payload:       { bookingNumber: booking.booking_number, route: `${origin_name} → ${destination_name}`, paymentMethod: payment_method, amount: serverTotal },
       })
     } catch (qbErr: any) {
       console.error('QB online booking sync skipped:', qbErr.message)
@@ -305,7 +352,7 @@ export async function POST(req: NextRequest) {
     color: { dark: '#0a1e42', light: '#ffffff' },
   })
 
-  // Send email (skip if no email provided — e.g. cash sales at counter)
+  // Send email (skip if no email provided)
   let emailStatus = guest_email ? 'sent' : 'skipped'
   let emailError  = ''
   if (guest_email) try {
@@ -321,7 +368,7 @@ export async function POST(req: NextRequest) {
         boardingStop:    boarding_stop_name,
         date,
         departureTime:   departure_time,
-        total:           total_amount,
+        total:           serverTotal,
         qrDataUrl,
         tripType:        ticket_type,
         paymentMethod:   payment_method,
@@ -343,6 +390,7 @@ export async function POST(req: NextRequest) {
     qr_data_url:    qrDataUrl,
     booking_id:     booking.id,
     booking_number: booking.booking_number,
+    total_charged:  serverTotal,
     email_status:   emailStatus,
     email_error:    emailError || undefined,
   }, { status: 201 })

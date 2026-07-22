@@ -2,6 +2,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import QRCode from 'qrcode'
 import { PACKAGE_SIZES } from '@/lib/packages'
+import { requireStaff } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -11,6 +12,8 @@ function svc() {
 }
 
 export async function GET(req: NextRequest) {
+  const deny = await requireStaff(req); if (deny) return deny
+
   const tracking = req.nextUrl.searchParams.get('n')?.toUpperCase().trim()
   if (!tracking) return new NextResponse('Tracking requerido', { status: 400 })
 

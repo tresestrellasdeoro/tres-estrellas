@@ -2,6 +2,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
+import { requireStaff } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -21,9 +22,7 @@ const GastoSchema = z.object({
 
 // GET — list gastos (filtered by sucursal/date for staff, all for admin)
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const deny = await requireStaff(req); if (deny) return deny
 
   const { searchParams } = req.nextUrl
   const sucursalId = searchParams.get('sucursal_id')
@@ -46,9 +45,10 @@ export async function GET(req: NextRequest) {
 
 // POST — register a new expense
 export async function POST(req: NextRequest) {
+  const deny = await requireStaff(req); if (deny) return deny
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  // user can be null when authenticated via admin_session cookie — handle gracefully
 
   const body   = await req.json()
   const parsed = GastoSchema.safeParse(body)
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       .eq('id', sucursal_id)
       .maybeSingle()
     resolveSucursal(suc)
-  } else {
+  } else if (user) {
     // Fall back to the user's assigned sucursal
     const { data: profile } = await db
       .from('profiles')
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
   const { data: gasto, error } = await db
     .from('gastos')
     .insert({
-      user_id:        user.id,
+      user_id:        user?.id ?? null,
       sucursal_id:    sucursal_id ?? null,
       amount,
       category,

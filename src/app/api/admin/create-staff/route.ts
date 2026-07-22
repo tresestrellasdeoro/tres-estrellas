@@ -16,7 +16,7 @@ const Schema = z.object({
   name:         z.string().min(2),
   email:        z.string().email(),
   password:     z.string().min(8),
-  role:         z.enum(['cajero', 'admin', 'super_admin']).default('cajero'),
+  role:         z.enum(['cajero', 'admin', 'super_admin', 'developer']).default('cajero'),
   sucursal_id:  z.string().uuid().optional().nullable(),
   departamento: z.enum(DEPARTAMENTOS).optional().nullable(),
   permisos:     z.array(z.enum(PERMISOS_VALIDOS)).default([]),

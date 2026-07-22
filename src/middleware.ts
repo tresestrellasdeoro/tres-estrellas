@@ -1,5 +1,25 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createHmac, timingSafeEqual } from 'crypto'
+
+function verifyAdminSession(sessionValue: string | undefined): boolean {
+  if (!sessionValue) return false
+  try {
+    const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
+    const lastColon = decoded.lastIndexOf(':')
+    if (lastColon < 0) return false
+    const payload   = decoded.substring(0, lastColon)
+    const sig       = decoded.substring(lastColon + 1)
+    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
+    const expected  = createHmac('sha256', secret).update(payload).digest('hex')
+    const sigBuf    = Buffer.from(sig,      'hex')
+    const expBuf    = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expBuf.length) return false
+    return timingSafeEqual(sigBuf, expBuf) && payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')
+  } catch {
+    return false
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -11,17 +31,8 @@ export async function middleware(request: NextRequest) {
   const protectedDeveloper  = pathname.startsWith('/developer')
   const authPages           = pathname.startsWith('/auth')
 
-  // Allow admin with local session cookie (no Supabase required)
-  const adminCookie = request.cookies.get('admin_session')
-  const isValidAdminSession = (() => {
-    if (!adminCookie?.value) return false
-    try {
-      const decoded = atob(adminCookie.value)
-      return decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')
-    } catch {
-      return false
-    }
-  })()
+  // Allow admin with local session cookie (HMAC-verified)
+  const isValidAdminSession = verifyAdminSession(request.cookies.get('admin_session')?.value)
   if (isValidAdminSession && protectedAdmin) {
     return NextResponse.next({ request })
   }

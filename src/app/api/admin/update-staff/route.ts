@@ -14,7 +14,7 @@ const PERMISOS_VALIDOS = [
 
 const Schema = z.object({
   user_id:      z.string().uuid(),
-  role:         z.enum(['cajero', 'admin', 'super_admin']).optional(),
+  role:         z.enum(['cajero', 'admin', 'super_admin', 'developer']).optional(),
   sucursal_id:  z.string().uuid().nullable().optional(),
   departamento: z.enum(DEPARTAMENTOS).nullable().optional(),
   permisos:     z.array(z.enum(PERMISOS_VALIDOS)).optional(),

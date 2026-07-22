@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 function svc() {
   return createServiceClient(
@@ -9,17 +10,28 @@ function svc() {
   )
 }
 
+function verifyAdminSession(sessionValue: string | undefined): boolean {
+  if (!sessionValue) return false
+  try {
+    const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
+    const lastColon = decoded.lastIndexOf(':')
+    if (lastColon < 0) return false
+    const payload   = decoded.substring(0, lastColon)
+    const sig       = decoded.substring(lastColon + 1)
+    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
+    const expected  = createHmac('sha256', secret).update(payload).digest('hex')
+    const sigBuf    = Buffer.from(sig,      'hex')
+    const expBuf    = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expBuf.length) return false
+    return timingSafeEqual(sigBuf, expBuf) && payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')
+  } catch {
+    return false
+  }
+}
+
 /** Returns a 401/403 NextResponse if caller is not an admin, or null if allowed. */
 export async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
-  const sessionValue = req.cookies.get('admin_session')?.value
-  if (sessionValue) {
-    try {
-      const decoded = Buffer.from(sessionValue, 'base64').toString('utf-8')
-      if (decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return null
-    } catch {
-      // Invalid base64 — fall through to Supabase auth
-    }
-  }
+  if (verifyAdminSession(req.cookies.get('admin_session')?.value)) return null
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -66,16 +78,7 @@ export async function requireAuth(): Promise<NextResponse | null> {
 
 /** Returns a 401/403 NextResponse if caller is not an active staff member (cajero, admin, super_admin, developer), or null if allowed. */
 export async function requireStaff(req?: NextRequest): Promise<NextResponse | null> {
-  // admin_session cookie also counts as staff
-  if (req) {
-    const sessionValue = req.cookies.get('admin_session')?.value
-    if (sessionValue) {
-      try {
-        const decoded = Buffer.from(sessionValue, 'base64').toString('utf-8')
-        if (decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return null
-      } catch { /* fall through */ }
-    }
-  }
+  if (req && verifyAdminSession(req.cookies.get('admin_session')?.value)) return null
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

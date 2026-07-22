@@ -52,7 +52,7 @@ export default async function ReportesPage() {
   ] = await Promise.all([
     service
       .from('bookings')
-      .select('id, total_amount, payment_method, created_at, sucursal_id, customer_id, sucursales(name, code), profiles(full_name)')
+      .select('id, total_amount, payment_method, created_at, sucursal_id, sold_by_user_id, sucursales(name, code), seller:profiles!sold_by_user_id(full_name)')
       .gte('created_at', sixMonthsAgo.toISOString())
       .order('created_at', { ascending: true }) as any,
     service
@@ -131,13 +131,13 @@ export default async function ReportesPage() {
     .map(s => ({ ...s, revenue: Math.round(s.revenue) }))
     .sort((a, b) => b.revenue - a.revenue)
 
-  // Per-employee stats
+  // Per-employee stats (only bookings sold by a staff member, not online sales)
   const empMap = new Map<string, { id: string; name: string; revenue: number; bookings: number; sucursal: string }>()
   for (const b of bookings) {
-    if (!b.customer_id || !b.profiles) continue
-    const key = b.customer_id
+    if (!b.sold_by_user_id || !b.seller) continue
+    const key = b.sold_by_user_id
     if (!empMap.has(key)) {
-      empMap.set(key, { id: b.customer_id, name: b.profiles.full_name ?? '—', revenue: 0, bookings: 0, sucursal: b.sucursales?.name ?? '—' })
+      empMap.set(key, { id: b.sold_by_user_id, name: b.seller.full_name ?? '—', revenue: 0, bookings: 0, sucursal: b.sucursales?.name ?? '—' })
     }
     const e = empMap.get(key)!
     e.revenue  += b.total_amount || 0

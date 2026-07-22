@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
   const { data: pkg, error } = await db
     .from('packages')
     .select(`
-      id, tracking_number, sender_name, sender_phone,
-      recipient_name, recipient_phone,
+      id, tracking_number, sender_name,
+      recipient_name,
       size, weight_lbs, price, status, notes, created_at, updated_at,
       origin:stops!origin_stop_id(name, city),
       destination:stops!destination_stop_id(name, city)

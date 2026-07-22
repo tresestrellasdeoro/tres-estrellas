@@ -57,6 +57,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card')
   const [loading, setLoading]         = useState(false)
   const [bookingRef, setBookingRef]   = useState('')
+  const [bookingQr, setBookingQr]     = useState('')
   const [bookingError, setBookingError] = useState('')
   const [squareReady, setSquareReady] = useState(false)
 
@@ -96,15 +97,17 @@ export function BookingFlow({ tripId }: { tripId: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticket_type:        tripType,
-          total_amount:       grandTotal,
-          guest_email:        email,
-          payment_method:     paymentMethod,
-          source_id:          sourceId,
-          origin_name:        ALL_STOPS[boardingStop]?.name || boardingStop,
-          destination_name:   ALL_STOPS[destination]?.name || destination,
-          boarding_stop_code: boardingStop,
-          boarding_stop_name: ALL_STOPS[boardingStop]?.name || boardingStop,
+          ticket_type:           tripType,
+          total_amount:          grandTotal,
+          luggage_price:         luggageTotal,
+          guest_email:           email,
+          payment_method:        paymentMethod,
+          source_id:             sourceId,
+          origin_name:           ALL_STOPS[boardingStop]?.name || boardingStop,
+          destination_name:      ALL_STOPS[destination]?.name  || destination,
+          boarding_stop_code:    boardingStop,
+          destination_stop_code: destination,
+          boarding_stop_name:    ALL_STOPS[boardingStop]?.name || boardingStop,
           date,
           departure_time:     bus?.departs || '',
           return_date:        tripType === 'round_trip' ? returnDate : undefined,
@@ -119,6 +122,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al procesar')
       setBookingRef(data.booking_number)
+      setBookingQr(data.qr_data_url || '')
       if (data.email_error) setBookingError(`Reservación creada, pero el email falló: ${data.email_error}`)
       setStep(3)
     } catch (err: any) {
@@ -612,10 +616,20 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           <p className="text-slate-500 text-sm mb-2">Tu boleto con código QR fue enviado a:</p>
           <p className="text-[#c01515] font-bold text-sm mb-6">{email}</p>
 
-          <div className="inline-block bg-[#0f2c5c] rounded-2xl px-8 py-4 mb-6">
+          <div className="inline-block bg-[#0f2c5c] rounded-2xl px-8 py-4 mb-4">
             <p className="text-white/50 text-xs mb-1 uppercase tracking-widest">Número de reservación</p>
             <p className="text-[#c8a951] font-black text-2xl tracking-widest">{bookingRef}</p>
           </div>
+
+          {bookingQr && (
+            <div className="flex flex-col items-center mb-6">
+              <p className="text-slate-400 text-xs mb-2">Muestra este QR al abordar</p>
+              <div className="bg-white border-4 border-[#0f2c5c] rounded-2xl p-3 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={bookingQr} alt={`QR ${bookingRef}`} width={180} height={180} />
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-2 border border-slate-200">
             <div className="flex justify-between text-sm">

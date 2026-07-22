@@ -1,7 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
+import { requireStaff } from '@/lib/api-auth'
 
 function service() {
   return createServiceClient(
@@ -12,7 +12,7 @@ function service() {
 
 // POST — mark a stop as departed for today's trip
 export async function POST(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE — undo a stop departure for today's trip
 export async function DELETE(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
 
   const { schedule_id, stop_id } = await req.json()
   if (!schedule_id || !stop_id) {
