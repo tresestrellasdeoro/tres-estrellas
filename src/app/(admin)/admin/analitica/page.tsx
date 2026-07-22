@@ -179,7 +179,7 @@ export default function AnaliticaPage() {
                     <Pie data={data.channels} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} labelLine={false} label={PieLabel}>
                       {data.channels.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => `$${v.toLocaleString('en-US')}`} />
+                    <Tooltip formatter={(v) => `$${Number(v ?? 0).toLocaleString('en-US')}`} />
                     <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v, e: any) => `${v} — $${e.payload.value.toLocaleString('en-US')}`} />
                   </PieChart>
                 </ResponsiveContainer>

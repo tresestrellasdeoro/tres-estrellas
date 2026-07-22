@@ -2,7 +2,7 @@ import { createClient as createSupabaseService } from '@supabase/supabase-js'
 import { SquareClient, SquareEnvironment } from 'square'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
+import { requireStaff } from '@/lib/api-auth'
 
 function svc() {
   return createSupabaseService(
@@ -18,7 +18,7 @@ const squareClient = squareConfigured
 
 // POST — collect payment for an existing package (staff/admin only)
 export async function POST(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

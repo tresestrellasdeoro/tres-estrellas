@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
+import { requireStaff } from '@/lib/api-auth'
 
 function getService() {
   return createServiceClient(
@@ -10,7 +10,7 @@ function getService() {
 }
 
 export async function GET(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
   const booking = req.nextUrl.searchParams.get('booking')
   if (!booking) return NextResponse.json({ error: 'Número requerido' }, { status: 400 })
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
   const body = await req.json()
   const { booking_number, leg } = body as { booking_number: string; leg: 'outbound' | 'return' }
 

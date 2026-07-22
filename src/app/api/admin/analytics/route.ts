@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   const [txRes, gastosRes, bookingsRes] = await Promise.all([
     service.from('qb_transactions').select('created_at, type, amount, description, doc_number, reference_type').gte('created_at', fromISO),
     service.from('gastos').select('date, amount, category, sucursal_id, sucursales(name, code)').gte('date', fromISO.split('T')[0]) as any,
-    service.from('bookings').select('created_at, total_amount, sucursal_id, status, trips(rutas(origin, destination)), sucursales(name, code)').gte('created_at', fromISO) as any,
+    service.from('bookings').select('created_at, total_amount, sucursal_id, status, origin_name, destination_name, trips(schedules(routes(name, code))), sucursales(name, code)').gte('created_at', fromISO) as any,
   ])
 
   const txs     = (txRes.data      ?? []) as any[]
@@ -116,9 +116,11 @@ export async function GET(req: NextRequest) {
   const routeMap = new Map<string, { bookings: number; revenue: number }>()
   for (const b of bookings) {
     if (b.status !== 'confirmed') continue
-    const origin = b.trips?.rutas?.origin ?? '?'
-    const dest   = b.trips?.rutas?.destination ?? '?'
-    const key    = `${origin} → ${dest}`
+    // Use stored origin/destination names when available (new bookings),
+    // fall back to the route name from the trip → schedule → route join.
+    const key = b.origin_name && b.destination_name
+      ? `${b.origin_name} → ${b.destination_name}`
+      : (b.trips?.schedules?.routes?.name ?? '?')
     const entry  = routeMap.get(key) ?? { bookings: 0, revenue: 0 }
     entry.bookings++
     entry.revenue += Number(b.total_amount ?? 0)

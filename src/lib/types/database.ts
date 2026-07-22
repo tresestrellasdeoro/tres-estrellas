@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserRole = 'customer' | 'driver' | 'cajero' | 'admin' | 'super_admin'
+export type UserRole = 'customer' | 'driver' | 'cajero' | 'admin' | 'super_admin' | 'developer'
 export type TripStatus = 'scheduled' | 'boarding' | 'in_transit' | 'arrived' | 'cancelled' | 'delayed'
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'refunded' | 'used'
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'
@@ -23,6 +23,9 @@ export interface Database {
           loyalty_points: number
           total_trips: number
           avatar_url: string | null
+          sucursal_id: string | null    // added via staff-fields-migration
+          departamento: string | null   // added via staff-fields-migration
+          permisos: string[]            // added via staff-fields-migration
           created_at: string
           updated_at: string
         }
@@ -124,11 +127,19 @@ export interface Database {
           id: string
           booking_number: string
           trip_id: string
-          customer_id: string
+          customer_id: string | null     // nullable: guest checkout
           return_trip_id: string | null
           ticket_type: TicketType
           status: BookingStatus
           total_amount: number
+          payment_method: string         // 'card' | 'cash'
+          guest_email: string | null
+          return_date: string | null
+          origin_name: string | null     // added: route origin display name
+          destination_name: string | null // added: route destination display name
+          departure_time: string | null  // added: departure time string
+          sucursal_id: string | null     // added via sucursales-migration
+          sold_by_user_id: string | null // added via corridas-choferes-migration
           points_earned: number
           notes: string | null
           created_at: string
@@ -149,6 +160,10 @@ export interface Database {
           terminal_id: string
           checked_in: boolean
           checked_in_at: string | null
+          return_checked_in: boolean          // added via corridas-choferes-migration
+          return_checked_in_at: string | null // added via corridas-choferes-migration
+          is_promo: boolean                   // added via descuentos-migration
+          promo_label: string | null          // added via descuentos-migration
         }
         Insert: Omit<Database['public']['Tables']['passengers']['Row'], 'id' | 'qr_code'>
         Update: Partial<Database['public']['Tables']['passengers']['Insert']>

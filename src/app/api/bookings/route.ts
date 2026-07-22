@@ -134,18 +134,21 @@ export async function POST(req: NextRequest) {
 
   // Create booking (customer_id is optional for guest checkout)
   const bookingInsert: Record<string, unknown> = {
-    trip_id:       tripData.id,
+    trip_id:          tripData.id,
     ticket_type,
-    status:        'confirmed',
+    status:           'confirmed',
     total_amount,
     payment_method,
-    points_earned: Math.floor(total_amount),
-    guest_email:   guest_email || null,
+    points_earned:    Math.floor(total_amount),
+    guest_email:      guest_email || null,
+    origin_name,
+    destination_name,
+    departure_time,
   }
-  if (return_date)    bookingInsert.return_date    = return_date
-  if (customerId)     bookingInsert.customer_id    = customerId
-  if (sucursal_id)    bookingInsert.sucursal_id    = sucursal_id
-  if (soldByUserId)   bookingInsert.sold_by_user_id = soldByUserId
+  if (return_date)    bookingInsert.return_date      = return_date
+  if (customerId)     bookingInsert.customer_id      = customerId
+  if (sucursal_id)    bookingInsert.sucursal_id      = sucursal_id
+  if (soldByUserId)   bookingInsert.sold_by_user_id  = soldByUserId
 
   const { data: booking, error: bookingError } = await service
     .from('bookings')
@@ -172,17 +175,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error al crear la reservación' }, { status: 500 })
   }
 
-  // Save Square payment record for audit trail and future refunds
-  if (squarePaymentId) {
-    const { error: payErr } = await service.from('payments').insert({
-      booking_id:          booking.id,
-      amount:              total_amount,
-      provider:            'square',
-      provider_payment_id: squarePaymentId,
-      status:              'completed',
-      payment_method:      'card',
-      metadata:            {},
-    })
+  // Save payment record for audit trail (always — card and cash)
+  {
+    const payRecord: Record<string, unknown> = {
+      booking_id:     booking.id,
+      amount:         total_amount,
+      provider:       squarePaymentId ? 'square' : 'cash',
+      status:         'completed',
+      payment_method: payment_method,
+      metadata:       squarePaymentId ? { square_payment_id: squarePaymentId } : {},
+    }
+    if (squarePaymentId) payRecord.provider_payment_id = squarePaymentId
+    const { error: payErr } = await service.from('payments').insert(payRecord)
     if (payErr) console.error('Failed to save payment record:', payErr.message)
   }
 

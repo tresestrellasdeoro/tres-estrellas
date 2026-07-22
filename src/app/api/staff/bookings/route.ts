@@ -1,18 +1,11 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
-
-function svc() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { requireStaff } from '@/lib/api-auth'
 
 // GET /api/staff/bookings?q=...&date=YYYY-MM-DD
 // Busca reservaciones por nombre, correo o número — con filtro opcional de fecha de viaje
 export async function GET(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
 
   const q    = req.nextUrl.searchParams.get('q')?.trim() ?? ''
   const date = req.nextUrl.searchParams.get('date')?.trim() ?? ''
@@ -86,3 +79,4 @@ function getService() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
+

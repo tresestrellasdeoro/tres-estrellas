@@ -63,3 +63,33 @@ export async function requireAuth(): Promise<NextResponse | null> {
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   return null
 }
+
+/** Returns a 401/403 NextResponse if caller is not an active staff member (cajero, admin, super_admin, developer), or null if allowed. */
+export async function requireStaff(req?: NextRequest): Promise<NextResponse | null> {
+  // admin_session cookie also counts as staff
+  if (req) {
+    const sessionValue = req.cookies.get('admin_session')?.value
+    if (sessionValue) {
+      try {
+        const decoded = Buffer.from(sessionValue, 'base64').toString('utf-8')
+        if (decoded.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return null
+      } catch { /* fall through */ }
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { data: profile } = await svc()
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle() as { data: { role: string } | null }
+
+  const staffRoles = ['cajero', 'admin', 'super_admin', 'developer']
+  if (!staffRoles.includes(profile?.role ?? '')) {
+    return NextResponse.json({ error: 'Solo para personal autorizado' }, { status: 403 })
+  }
+  return null
+}

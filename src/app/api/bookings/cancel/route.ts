@@ -90,14 +90,14 @@ export async function POST(req: NextRequest) {
 
   // Restore seat availability
   if (booking.trip_id) {
-    const { data: paxCount } = await service
+    const { count: paxCount } = await service
       .from('passengers')
       .select('id', { count: 'exact', head: true })
-      .eq('booking_id', booking_id) as any
+      .eq('booking_id', booking_id)
 
-    const count = paxCount ?? 1
+    const seatCount = paxCount ?? 1
     try {
-      await service.rpc('increment_seats_available', { trip_id: booking.trip_id, amount: count })
+      await service.rpc('increment_seats_available', { trip_id: booking.trip_id, amount: seatCount })
     } catch { /* best-effort — ignore if RPC doesn't exist yet */ }
   }
 

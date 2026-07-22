@@ -22,7 +22,7 @@ export default async function MisTicketsPage() {
 
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('id, booking_number, status, ticket_type, total_amount, payment_method, guest_email, return_date, created_at, passengers(id, full_name, passenger_type, price, checked_in, return_checked_in)')
+    .select('id, booking_number, status, ticket_type, total_amount, payment_method, guest_email, return_date, origin_name, destination_name, departure_time, created_at, passengers(id, full_name, passenger_type, price, checked_in, return_checked_in)')
     .eq('customer_id', user.id)
     .order('created_at', { ascending: false })
 

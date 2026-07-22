@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================
 -- ENUMS
 -- ============================================================
-CREATE TYPE user_role AS ENUM ('customer', 'driver', 'admin', 'super_admin');
+CREATE TYPE user_role AS ENUM ('customer', 'driver', 'cajero', 'admin', 'super_admin', 'developer');
 CREATE TYPE trip_status AS ENUM ('scheduled', 'boarding', 'in_transit', 'arrived', 'cancelled', 'delayed');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'refunded', 'used');
 CREATE TYPE payment_status AS ENUM ('pending', 'completed', 'failed', 'refunded');
@@ -147,21 +147,26 @@ CREATE TABLE pricing (
 -- RESERVACIONES (Bookings)
 -- ============================================================
 CREATE TABLE bookings (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  booking_number TEXT NOT NULL UNIQUE,
-  trip_id        UUID NOT NULL REFERENCES trips(id),
-  customer_id    UUID REFERENCES profiles(id),           -- nullable: guest checkout
-  return_trip_id UUID REFERENCES trips(id),
-  ticket_type    ticket_type NOT NULL DEFAULT 'one_way',
-  status         booking_status NOT NULL DEFAULT 'confirmed',
-  total_amount   DECIMAL(8,2) NOT NULL,
-  payment_method TEXT NOT NULL DEFAULT 'card',
-  guest_email    TEXT,
-  points_earned  INT NOT NULL DEFAULT 0,
-  return_date    DATE,                                    -- fecha de regreso (hora abierta)
-  notes          TEXT,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  booking_number   TEXT NOT NULL UNIQUE,
+  trip_id          UUID NOT NULL REFERENCES trips(id),
+  customer_id      UUID REFERENCES profiles(id),           -- nullable: guest checkout
+  return_trip_id   UUID REFERENCES trips(id),
+  ticket_type      ticket_type NOT NULL DEFAULT 'one_way',
+  status           booking_status NOT NULL DEFAULT 'confirmed',
+  total_amount     DECIMAL(8,2) NOT NULL,
+  payment_method   TEXT NOT NULL DEFAULT 'card',
+  guest_email      TEXT,
+  points_earned    INT NOT NULL DEFAULT 0,
+  return_date      DATE,                                    -- fecha de regreso (hora abierta)
+  origin_name      TEXT,                                   -- nombre del origen (mostrar en UI)
+  destination_name TEXT,                                   -- nombre del destino (mostrar en UI)
+  departure_time   TEXT,                                   -- hora de salida legible "8:00 AM"
+  sucursal_id      UUID,                                   -- added via sucursales-migration
+  sold_by_user_id  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Auto-generar booking_number
@@ -192,8 +197,10 @@ CREATE TABLE passengers (
   terminal_id           UUID NOT NULL REFERENCES stops(id),
   checked_in            BOOLEAN NOT NULL DEFAULT false,
   checked_in_at         TIMESTAMPTZ,
-  return_checked_in     BOOLEAN NOT NULL DEFAULT false,  -- check-in tramo regreso
-  return_checked_in_at  TIMESTAMPTZ
+  return_checked_in     BOOLEAN NOT NULL DEFAULT false,
+  return_checked_in_at  TIMESTAMPTZ,
+  is_promo              BOOLEAN NOT NULL DEFAULT false,  -- precio especial / promo
+  promo_label           TEXT                             -- etiqueta: "Maestro", "3ra Edad", etc.
 );
 
 -- Auto-generar QR code
@@ -370,75 +377,86 @@ CREATE TRIGGER on_booking_status_change
 -- SEED DATA
 -- ============================================================
 
--- Paradas principales
+-- Paradas reales (coinciden con bus-config.ts y las rutas operativas LA → TJ)
 INSERT INTO stops (code, name, city, state, address, terminal_name, sort_order) VALUES
-  ('LA',  'Los Angeles',     'Los Angeles',   'CA', '1716 E 7th St, Los Angeles, CA 90021',      'Terminal Central LA',   1),
-  ('HP',  'Huntington Park', 'Huntington Park','CA', '7054 Pacific Blvd, Huntington Park, CA 90255', 'Taquilla Huntington Park', 2),
-  ('LTI', 'San Ysidro / LTI','San Diego',     'CA', '4570 Camino de la Plaza, San Diego, CA 92173', 'LTI Terminal',          3),
-  ('ATI', 'San Diego / ATI', 'San Diego',     'CA', '4450 Camino de la Plaza, San Diego, CA 92173', 'ATI Terminal',          4),
-  ('CAT', 'Otay / CAT',      'Chula Vista',   'CA', '1234 Otay Valley Rd, Chula Vista, CA 91911',   'CAT Terminal',          5);
+  ('LA',  'Los Angeles',         'Los Angeles',    'CA', '1716 E 7th St, Los Angeles, CA 90021',              'Terminal Central LA',                     1),
+  ('HP',  'Huntington Park',     'Huntington Park','CA', '7054 Pacific Blvd, Huntington Park, CA 90255',       'Taquilla Huntington Park',                2),
+  ('SYS', 'San Ysidro',          'San Diego',      'CA', '600 E San Ysidro Blvd, San Diego, CA 92173',        'San Ysidro Border Crossing',              3),
+  ('TIJ', 'Aeropuerto Tijuana',  'Tijuana',        'BC', 'Blvd Abelardo L. Rodríguez, Tijuana, BC, México',   'Aeropuerto Internacional de Tijuana',     4),
+  ('OTY', 'Garita de Otay',      'Tijuana',        'BC', 'Garita de Otay, Tijuana, BC, México',               'Garita de Otay / Otay Mesa Port of Entry',5);
 
--- Rutas
+-- Rutas LA → Tijuana (la principal de TEO)
 INSERT INTO routes (code, name, origin_stop_id, destination_stop_id, duration_minutes, is_active)
-SELECT 'LA-LTI', 'Los Angeles → San Ysidro (LTI)', la.id, lti.id, 150, true
-FROM stops la, stops lti WHERE la.code = 'LA' AND lti.code = 'LTI';
-
-INSERT INTO routes (code, name, origin_stop_id, destination_stop_id, duration_minutes, is_active)
-SELECT 'LA-ATI', 'Los Angeles → San Diego (ATI)', la.id, ati.id, 155, true
-FROM stops la, stops ati WHERE la.code = 'LA' AND ati.code = 'ATI';
+SELECT 'LA-SYS', 'Los Angeles → San Ysidro', la.id, sys.id, 150, true
+FROM stops la, stops sys WHERE la.code = 'LA' AND sys.code = 'SYS';
 
 INSERT INTO routes (code, name, origin_stop_id, destination_stop_id, duration_minutes, is_active)
-SELECT 'LA-CAT', 'Los Angeles → Otay (CAT)', la.id, cat.id, 160, true
-FROM stops la, stops cat WHERE la.code = 'LA' AND cat.code = 'CAT';
+SELECT 'LA-TIJ', 'Los Angeles → Aeropuerto Tijuana', la.id, tij.id, 240, true
+FROM stops la, stops tij WHERE la.code = 'LA' AND tij.code = 'TIJ';
 
--- Horarios (10 salidas diarias de LA)
+INSERT INTO routes (code, name, origin_stop_id, destination_stop_id, duration_minutes, is_active)
+SELECT 'LA-OTY', 'Los Angeles → Garita de Otay', la.id, oty.id, 250, true
+FROM stops la, stops oty WHERE la.code = 'LA' AND oty.code = 'OTY';
+
+-- Rutas TJ → LA (regreso)
+INSERT INTO routes (code, name, origin_stop_id, destination_stop_id, duration_minutes, is_active)
+SELECT 'OTY-LA', 'Garita de Otay → Los Angeles', oty.id, la.id, 250, true
+FROM stops oty, stops la WHERE oty.code = 'OTY' AND la.code = 'LA';
+
+-- Horarios (salidas diarias de LA — principales)
 INSERT INTO schedules (route_id, departure_time, days_of_week)
 SELECT r.id, t.departure_time::TIME, '{0,1,2,3,4,5,6}'
 FROM routes r, (VALUES
-  ('07:00'), ('09:00'), ('11:00'), ('13:00'), ('15:00'),
-  ('17:00'), ('19:00'), ('21:00'), ('22:00'), ('23:00')
+  ('03:20'), ('05:20'), ('07:20'), ('09:20'), ('11:20'),
+  ('13:20'), ('15:20'), ('17:20'), ('19:20'), ('21:20')
 ) AS t(departure_time)
-WHERE r.code IN ('LA-LTI', 'LA-ATI', 'LA-CAT');
+WHERE r.code IN ('LA-SYS', 'LA-TIJ', 'LA-OTY');
 
--- Precios (LTI)
-INSERT INTO pricing (route_id, terminal_id, passenger_type, ticket_type, price)
-SELECT r.id, s.id, p.type::passenger_type, t.ticket::ticket_type, p.price
-FROM routes r, stops s,
-(VALUES
-  ('adult',  'one_way',   35.00),
-  ('adult',  'round_trip', 65.00),
-  ('child',  'one_way',   20.00),
-  ('child',  'round_trip', 38.00)
-) AS p(type, ticket, price),
-(VALUES ('one_way'), ('round_trip')) AS t(ticket)
-WHERE r.code = 'LA-LTI' AND s.code = 'LTI'
-AND p.ticket = t.ticket
-ON CONFLICT DO NOTHING;
+-- Horarios de regreso TJ → LA
+INSERT INTO schedules (route_id, departure_time, days_of_week)
+SELECT r.id, t.departure_time::TIME, '{0,1,2,3,4,5,6}'
+FROM routes r, (VALUES
+  ('11:30'), ('13:30'), ('15:30'), ('19:30')
+) AS t(departure_time)
+WHERE r.code = 'OTY-LA';
 
--- Precios (ATI)
+-- Precios (SYS — San Ysidro)
 INSERT INTO pricing (route_id, terminal_id, passenger_type, ticket_type, price)
 SELECT r.id, s.id, p.type::passenger_type, p.ticket::ticket_type, p.price
 FROM routes r, stops s,
 (VALUES
-  ('adult',  'one_way',   38.00),
-  ('adult',  'round_trip', 70.00),
-  ('child',  'one_way',   22.00),
-  ('child',  'round_trip', 40.00)
+  ('adult',  'one_way',    45.00),
+  ('adult',  'round_trip', 80.00),
+  ('child',  'one_way',    40.00),
+  ('child',  'round_trip', 70.00)
 ) AS p(type, ticket, price)
-WHERE r.code = 'LA-ATI' AND s.code = 'ATI'
+WHERE r.code = 'LA-SYS' AND s.code = 'SYS'
 ON CONFLICT DO NOTHING;
 
--- Precios (CAT)
+-- Precios (TIJ — Aeropuerto Tijuana)
 INSERT INTO pricing (route_id, terminal_id, passenger_type, ticket_type, price)
 SELECT r.id, s.id, p.type::passenger_type, p.ticket::ticket_type, p.price
 FROM routes r, stops s,
 (VALUES
-  ('adult',  'one_way',   40.00),
-  ('adult',  'round_trip', 72.00),
-  ('child',  'one_way',   24.00),
-  ('child',  'round_trip', 44.00)
+  ('adult',  'one_way',    55.00),
+  ('adult',  'round_trip', 95.00),
+  ('child',  'one_way',    50.00),
+  ('child',  'round_trip', 85.00)
 ) AS p(type, ticket, price)
-WHERE r.code = 'LA-CAT' AND s.code = 'CAT'
+WHERE r.code = 'LA-TIJ' AND s.code = 'TIJ'
+ON CONFLICT DO NOTHING;
+
+-- Precios (OTY — Garita de Otay)
+INSERT INTO pricing (route_id, terminal_id, passenger_type, ticket_type, price)
+SELECT r.id, s.id, p.type::passenger_type, p.ticket::ticket_type, p.price
+FROM routes r, stops s,
+(VALUES
+  ('adult',  'one_way',    55.00),
+  ('adult',  'round_trip', 95.00),
+  ('child',  'one_way',    50.00),
+  ('child',  'round_trip', 85.00)
+) AS p(type, ticket, price)
+WHERE r.code = 'LA-OTY' AND s.code = 'OTY'
 ON CONFLICT DO NOTHING;
 
 -- Tiers de lealtad en settings
