@@ -255,6 +255,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No hay terminales configuradas en el sistema' }, { status: 500 })
   }
 
+  // Check for seat conflicts — reject if any requested seat is already taken on this trip
+  const seatsRequested = passengers.map(p => p.seat_number).filter(Boolean) as string[]
+  if (seatsRequested.length > 0) {
+    const { data: takenSeats } = await service
+      .from('passengers')
+      .select('seat_number, bookings!inner(trip_id, status)')
+      .in('seat_number', seatsRequested)
+      .not('bookings.status', 'in', '("cancelled","refunded")')
+      .eq('bookings.trip_id', tripData.id) as any
+    if (takenSeats && takenSeats.length > 0) {
+      const taken = takenSeats.map((r: any) => r.seat_number).join(', ')
+      if (squarePaymentId && squareClient) {
+        try {
+          await squareClient.refunds.refundPayment({
+            paymentId:      squarePaymentId,
+            amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
+            idempotencyKey: crypto.randomUUID(),
+            reason:         'Seat conflict — automatic refund',
+          })
+        } catch (e: any) { console.error('Refund failed:', e.message) }
+      }
+      return NextResponse.json({ error: `Asiento(s) ya ocupado(s): ${taken}` }, { status: 409 })
+    }
+  }
+
   // Create passengers
   const { error: passError } = await service.from('passengers').insert(
     passengers.map(p => ({

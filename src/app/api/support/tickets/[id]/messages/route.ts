@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
+import { getAdminEmailFromSession } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -15,17 +16,11 @@ async function resolveUser() {
   const { data: { user } } = await supabase.auth.getUser()
   if (user) return { id: user.id as string | null, email: user.email ?? '' }
 
-  const cookieStore = await cookies()
-  const session = cookieStore.get('admin_session')?.value
-  if (session) {
-    try {
-      const decoded = Buffer.from(session, 'base64').toString('utf-8')
-      const adminEmail = process.env.ADMIN_EMAIL ?? ''
-      if (decoded.startsWith(adminEmail + ':')) {
-        const { data: profile } = await svc().from('profiles').select('id').eq('email', adminEmail).maybeSingle() as any
-        return { id: (profile?.id ?? null) as string | null, email: adminEmail }
-      }
-    } catch { /* ignore */ }
+  const cookieStore  = await cookies()
+  const adminEmail   = getAdminEmailFromSession(cookieStore.get('admin_session')?.value)
+  if (adminEmail) {
+    const { data: profile } = await svc().from('profiles').select('id').eq('email', adminEmail).maybeSingle() as any
+    return { id: (profile?.id ?? null) as string | null, email: adminEmail }
   }
   return null
 }

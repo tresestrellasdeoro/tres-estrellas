@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   // Fetch the booking — verify ownership
   const { data: booking, error: fetchErr } = await service
     .from('bookings')
-    .select('id, booking_number, status, customer_id, total_amount, trip_id, trips(departure_date, departure_time)')
+    .select('id, booking_number, status, customer_id, total_amount, points_earned, trip_id, trips(departure_date, departure_time)')
     .eq('id', booking_id)
     .maybeSingle() as any
 
@@ -87,6 +87,33 @@ export async function POST(req: NextRequest) {
     .eq('id', booking_id)
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+  // Reverse loyalty points if any were earned
+  if (booking.customer_id && booking.points_earned && booking.points_earned > 0) {
+    const { data: profile } = await service
+      .from('profiles')
+      .select('loyalty_points')
+      .eq('id', booking.customer_id)
+      .maybeSingle() as any
+    const currentPoints = profile?.loyalty_points ?? 0
+    const newPoints     = Math.max(0, currentPoints - booking.points_earned)
+    const newTier       = newPoints >= 5000 ? 'platinum'
+      : newPoints >= 2000 ? 'gold'
+      : newPoints >= 500  ? 'silver'
+      : newPoints >= 100  ? 'bronze'
+      : 'none'
+    await service.from('profiles')
+      .update({ loyalty_points: newPoints, loyalty_tier: newTier })
+      .eq('id', booking.customer_id)
+    const loyaltyInsert = await service.from('loyalty_transactions').insert({
+      customer_id: booking.customer_id,
+      booking_id:  booking_id,
+      points:      -booking.points_earned,
+      type:        'earned',
+      description: `Cancelación boleto ${booking.booking_number}`,
+    })
+    if (loyaltyInsert.error) console.error('loyalty_transactions reversal failed:', loyaltyInsert.error.message)
+  }
 
   // Restore seat availability
   if (booking.trip_id) {

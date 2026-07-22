@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireAdmin } from '@/lib/api-auth'
+import { requireAdmin, getAdminEmailFromSession } from '@/lib/api-auth'
 import { cookies } from 'next/headers'
 
 function svc() {
@@ -18,18 +18,10 @@ async function resolveSender() {
     const { data: profile } = await svc().from('profiles').select('full_name').eq('id', user.id).maybeSingle() as any
     return { id: user.id as string | null, name: profile?.full_name ?? 'Developer' }
   }
-  // admin_session fallback
+  // admin_session fallback (HMAC-verified)
   const cookieStore = await cookies()
-  const session = cookieStore.get('admin_session')?.value
-  if (session) {
-    try {
-      const decoded = Buffer.from(session, 'base64').toString('utf-8')
-      const adminEmail = process.env.ADMIN_EMAIL ?? ''
-      if (decoded.startsWith(adminEmail + ':')) {
-        return { id: null as string | null, name: adminEmail }
-      }
-    } catch { /* ignore */ }
-  }
+  const adminEmail  = getAdminEmailFromSession(cookieStore.get('admin_session')?.value)
+  if (adminEmail) return { id: null as string | null, name: adminEmail }
   return { id: null as string | null, name: 'Developer' }
 }
 

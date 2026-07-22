@@ -37,6 +37,35 @@ function verifyAdminSession(sessionValue: string | undefined): boolean {
   }
 }
 
+/**
+ * Verifies an admin_session cookie value using HMAC-SHA256.
+ * Returns the admin email if valid, null otherwise.
+ */
+export function getAdminEmailFromSession(sessionValue: string | undefined): string | null {
+  if (!sessionValue) return null
+  try {
+    const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
+    const lastColon = decoded.lastIndexOf(':')
+    if (lastColon < 0) return null
+    const payload   = decoded.substring(0, lastColon)
+    const sig       = decoded.substring(lastColon + 1)
+    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
+    const expected  = createHmac('sha256', secret).update(payload).digest('hex')
+    const sigBuf    = Buffer.from(sig,      'hex')
+    const expBuf    = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expBuf.length) return null
+    if (!timingSafeEqual(sigBuf, expBuf)) return null
+    const parts     = payload.split(':')
+    const timestamp = parseInt(parts[parts.length - 1], 10)
+    if (isNaN(timestamp) || Date.now() - timestamp > SESSION_MAX_AGE_MS) return null
+    const adminEmail = process.env.ADMIN_EMAIL ?? ''
+    if (!payload.startsWith(adminEmail + ':')) return null
+    return adminEmail
+  } catch {
+    return null
+  }
+}
+
 /** Returns a 401/403 NextResponse if caller is not an admin, or null if allowed. */
 export async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
   if (verifyAdminSession(req.cookies.get('admin_session')?.value)) return null

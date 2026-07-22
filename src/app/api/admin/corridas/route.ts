@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const from   = searchParams.get('from')  ?? new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
   const to     = searchParams.get('to')    ?? new Date(Date.now() + 7  * 86400000).toISOString().split('T')[0]
   const route  = searchParams.get('route') ?? undefined
-  const limit  = parseInt(searchParams.get('limit') ?? '200')
+  const limit  = Math.min(parseInt(searchParams.get('limit') ?? '200'), 1000)
 
   const db = svc()
 
