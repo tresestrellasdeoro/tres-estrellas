@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X,
   Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
-  MessageCircle, HeadphonesIcon, Terminal
+  MessageCircle, HeadphonesIcon, Terminal, TrendingUp
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,7 @@ const ADMIN_NAV = [
   { href: '/developer/buses',        icon: Bus,             label: 'Autobuses' },
   { href: '/developer/clientes',     icon: Users,           label: 'Clientes' },
   { href: '/developer/reportes',     icon: BarChart3,       label: 'Reportes' },
+  { href: '/developer/analitica',    icon: TrendingUp,      label: 'Analítica' },
   { href: '/developer/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
   { href: '/developer/personal',     icon: UserCog,         label: 'Personal' },
   { href: '/developer/paquetes',     icon: Package,         label: 'Paquetes' },
