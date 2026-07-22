@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
 function verifyAdminSession(sessionValue: string | undefined): boolean {
   if (!sessionValue) return false
   try {
@@ -15,7 +17,12 @@ function verifyAdminSession(sessionValue: string | undefined): boolean {
     const sigBuf    = Buffer.from(sig,      'hex')
     const expBuf    = Buffer.from(expected, 'hex')
     if (sigBuf.length !== expBuf.length) return false
-    return timingSafeEqual(sigBuf, expBuf) && payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')
+    if (!timingSafeEqual(sigBuf, expBuf)) return false
+    if (!payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return false
+    const parts     = payload.split(':')
+    const timestamp = parseInt(parts[parts.length - 1], 10)
+    if (isNaN(timestamp) || Date.now() - timestamp > SESSION_MAX_AGE_MS) return false
+    return true
   } catch {
     return false
   }

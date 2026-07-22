@@ -57,6 +57,17 @@ export async function POST(req: NextRequest) {
 
   const svc = service()
 
+  // Prevent duplicate cierres for same sucursal+fecha
+  const { data: existing } = await svc
+    .from('cierres_turno')
+    .select('id')
+    .eq('sucursal_id', sucursal_id)
+    .eq('fecha', fecha)
+    .maybeSingle()
+  if (existing) {
+    return NextResponse.json({ error: `Ya existe un cierre para esta sucursal el ${fecha}` }, { status: 409 })
+  }
+
   // Branches are in Pacific Time (UTC-7). Midnight local = 07:00 UTC.
   // Filter created_at using UTC boundaries that correspond to the local calendar day.
   const fechaStart = `${fecha}T07:00:00.000Z`
@@ -72,7 +83,7 @@ export async function POST(req: NextRequest) {
     .eq('status', 'confirmed')
 
   if (sucursal_id) bookingQuery = bookingQuery.eq('sucursal_id', sucursal_id) as any
-  if (user_id)     bookingQuery = bookingQuery.eq('customer_id', user_id) as any
+  if (user_id)     bookingQuery = bookingQuery.eq('sold_by_user_id', user_id) as any
 
   const { data: bookings } = await bookingQuery
 

@@ -3,7 +3,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { generateTrackingNumber, PACKAGE_SIZES, type PackageSize } from '@/lib/packages'
-import { requireAuth } from '@/lib/api-auth'
+import { requireAuth, requireStaff } from '@/lib/api-auth'
 
 function svc() {
   return createServiceClient(
@@ -59,10 +59,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ packages: data ?? [] })
 }
 
-// POST — create new package (optionally charge card with Square)
+// POST — create new package (staff at counter, or authenticated customer online)
 export async function POST(req: NextRequest) {
+  const deny = await requireAuth(); if (deny) return deny
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const body = await req.json()
   const {
@@ -171,9 +173,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ package: pkg }, { status: 201 })
 }
 
-// PATCH — update status (staff/admin)
+// PATCH — update status (staff/admin only)
 export async function PATCH(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

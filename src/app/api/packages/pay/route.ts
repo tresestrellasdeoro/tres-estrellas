@@ -29,7 +29,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Faltan campos' }, { status: 422 })
   }
 
-  const method: 'card' | 'cash' | 'terminal' = payment_method
+  const VALID_METHODS = ['card', 'cash', 'terminal'] as const
+  type Method = typeof VALID_METHODS[number]
+  if (!VALID_METHODS.includes(payment_method)) {
+    return NextResponse.json({ error: 'Método de pago inválido' }, { status: 422 })
+  }
+  const method: Method = payment_method
 
   const db = svc()
 

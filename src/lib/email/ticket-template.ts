@@ -69,15 +69,15 @@ export function ticketEmailHtml(d: TicketEmailData): string {
               <tr>
                 <td style="width:50%;padding-right:16px;">
                   <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Origen</p>
-                  <p style="margin:0;color:#111827;font-size:18px;font-weight:900;">${d.origin}</p>
-                  <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">${d.boardingStop}</p>
+                  <p style="margin:0;color:#111827;font-size:18px;font-weight:900;">${esc(d.origin)}</p>
+                  <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">${esc(d.boardingStop)}</p>
                 </td>
                 <td style="width:0;text-align:center;padding:0 8px;">
                   <span style="font-size:24px;color:#c01515;">→</span>
                 </td>
                 <td style="width:50%;padding-left:16px;text-align:right;">
                   <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Destino</p>
-                  <p style="margin:0;color:#111827;font-size:18px;font-weight:900;">${d.destination}</p>
+                  <p style="margin:0;color:#111827;font-size:18px;font-weight:900;">${esc(d.destination)}</p>
                 </td>
               </tr>
             </table>
@@ -86,11 +86,11 @@ export function ticketEmailHtml(d: TicketEmailData): string {
               <tr>
                 <td style="padding:6px 16px;width:33%;">
                   <p style="margin:0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;">Fecha ida</p>
-                  <p style="margin:4px 0 0;color:#111827;font-size:14px;font-weight:700;">${d.date}</p>
+                  <p style="margin:4px 0 0;color:#111827;font-size:14px;font-weight:700;">${esc(d.date)}</p>
                 </td>
                 <td style="padding:6px 16px;width:33%;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
                   <p style="margin:0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;">Salida</p>
-                  <p style="margin:4px 0 0;color:#c01515;font-size:14px;font-weight:900;">${d.departureTime}</p>
+                  <p style="margin:4px 0 0;color:#c01515;font-size:14px;font-weight:900;">${esc(d.departureTime)}</p>
                 </td>
                 <td style="padding:6px 16px;width:33%;">
                   <p style="margin:0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;">Tipo</p>
@@ -102,7 +102,7 @@ export function ticketEmailHtml(d: TicketEmailData): string {
                 <td colspan="3" style="padding:0 16px 10px;">
                   <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;">
                     <p style="margin:0;color:#1e40af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Regreso</p>
-                    <p style="margin:4px 0 0;color:#1e3a8a;font-size:15px;font-weight:900;">${d.returnDate}</p>
+                    <p style="margin:4px 0 0;color:#1e3a8a;font-size:15px;font-weight:900;">${esc(d.returnDate)}</p>
                     <p style="margin:4px 0 0;color:#3b82f6;font-size:12px;font-weight:600;">⏰ Hora abierta — puedes abordar cualquier autobús disponible ese día</p>
                   </div>
                 </td>
