@@ -78,7 +78,7 @@ export default async function MisTicketsPage() {
                           <span className={`text-xs font-bold ${outboundDone ? 'text-emerald-700' : 'text-slate-500'}`}>Ida</span>
                           {outboundDone && <CheckCircle2 className="w-3 h-3 text-emerald-500 ml-auto" />}
                         </div>
-                        <p className="text-slate-400 text-[10px]">Los Angeles → Tijuana</p>
+                        <p className="text-slate-400 text-[10px]">{booking.origin_name || 'Los Angeles'} → {booking.destination_name || 'Tijuana'}</p>
                       </div>
                       <div className={`rounded-xl p-3 border ${returnDone ? 'bg-blue-50 border-blue-200' : outboundDone ? 'bg-blue-50/40 border-blue-100' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
                         <div className="flex items-center gap-1.5 mb-1">
@@ -92,7 +92,7 @@ export default async function MisTicketsPage() {
                             <p className="text-slate-500 text-[10px] font-semibold">{booking.return_date}</p>
                           </div>
                         ) : (
-                          <p className="text-slate-400 text-[10px]">Tijuana → Los Angeles</p>
+                          <p className="text-slate-400 text-[10px]">{booking.destination_name || 'Tijuana'} → {booking.origin_name || 'Los Angeles'}</p>
                         )}
                         {!returnDone && outboundDone && (
                           <div className="flex items-center gap-1 mt-0.5">

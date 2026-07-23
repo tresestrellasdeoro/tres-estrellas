@@ -154,15 +154,21 @@ export async function POST(req: NextRequest) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // Find a trip matching the booking date; return 404 if none scheduled
-  const { data: tripData } = await service
-    .from('trips')
-    .select('id')
-    .eq('departure_date', date)
-    .eq('status', 'scheduled')
-    .order('departure_time', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  // Convert "3:20 AM" → "03:20:00" to match DB TIME column format
+  const _tm = departure_time?.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  const departureTimeDb: string | null = _tm
+    ? (() => {
+        let h = parseInt(_tm[1])
+        if (_tm[3].toUpperCase() === 'PM' && h !== 12) h += 12
+        if (_tm[3].toUpperCase() === 'AM' && h === 12) h = 0
+        return `${String(h).padStart(2, '0')}:${_tm[2]}:00`
+      })()
+    : null
+
+  // Find the specific trip matching date + departure time
+  const { data: tripData } = departureTimeDb
+    ? await service.from('trips').select('id').eq('departure_date', date).eq('departure_time', departureTimeDb).eq('status', 'scheduled').maybeSingle()
+    : await service.from('trips').select('id').eq('departure_date', date).eq('status', 'scheduled').order('departure_time', { ascending: true }).limit(1).maybeSingle()
 
   if (!tripData?.id) {
     if (squarePaymentId && squareClient) {

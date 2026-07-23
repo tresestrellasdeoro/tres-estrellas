@@ -125,7 +125,7 @@ export function ticketEmailHtml(d: TicketEmailData): string {
         <tr>
           <td style="padding:20px 40px;background:#0f2c5c;text-align:right;">
             <span style="color:rgba(255,255,255,0.6);font-size:13px;">${d.paymentMethod === 'cash' ? 'Total a pagar en ventanilla: ' : 'Total pagado: '}</span>
-            <span style="color:#c8a951;font-size:22px;font-weight:900;">$${d.total} USD</span>
+            <span style="color:#c8a951;font-size:22px;font-weight:900;">$${Number(d.total).toFixed(2)} USD</span>
             ${d.paymentMethod === 'cash' ? `<br><span style="color:#f59e0b;font-size:12px;font-weight:700;">💵 Pago en efectivo — cobra en taquilla antes de abordar</span>` : ''}
           </td>
         </tr>

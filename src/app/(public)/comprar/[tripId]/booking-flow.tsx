@@ -60,6 +60,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [bookingQr, setBookingQr]     = useState('')
   const [bookingError, setBookingError] = useState('')
   const [squareReady, setSquareReady] = useState(false)
+  const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
 
   const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
     setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -423,7 +424,16 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           </div>
 
           <div className="flex justify-end">
-            <Button disabled={!canStep0} onClick={() => setStep(1)}
+            <Button disabled={!canStep0} onClick={async () => {
+              setStep(1)
+              try {
+                const res = await fetch(`/api/bookings/seats?date=${encodeURIComponent(date)}&departure_time=${encodeURIComponent(bus?.departs || '')}`)
+                if (res.ok) {
+                  const d = await res.json()
+                  setOccupiedSeats(d.seats ?? [])
+                }
+              } catch {}
+            }}
               className="bg-[#c01515] hover:bg-[#a01010] text-white font-black px-6 rounded-xl disabled:opacity-40">
               Elegir asientos
               <Armchair className="w-4 h-4 ml-2" />
@@ -445,6 +455,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
 
           <SeatMap
             passengers={passengers}
+            occupiedSeats={occupiedSeats}
             onChange={seats => setSelectedSeats(seats)}
           />
 
