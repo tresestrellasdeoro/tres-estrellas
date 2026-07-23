@@ -59,12 +59,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ packages: data ?? [] })
 }
 
-// POST — create new package (staff at counter, or authenticated customer online)
+// POST — create new package (staff/admin at counter, or authenticated customer online)
 export async function POST(req: NextRequest) {
-  const deny = await requireAuth(); if (deny) return deny
+  const deny = await requireStaff(req); if (deny) return deny
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  // user may be null for cookie-based admin — that's fine, we just won't link a customer_id
 
   const body = await req.json()
   const {
