@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart,
+  PieChart, Pie, Cell, Legend, Area, AreaChart,
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, BarChart3, Loader2, RefreshCw,
