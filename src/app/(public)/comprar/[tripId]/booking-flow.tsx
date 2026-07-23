@@ -30,6 +30,12 @@ interface Passenger {
   type: 'adult' | 'child'
 }
 
+// Card payments are only available if Square env vars are configured at build time
+const SQUARE_ENABLED = !!(
+  process.env.NEXT_PUBLIC_SQUARE_APP_ID &&
+  process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID
+)
+
 export function BookingFlow({ tripId }: { tripId: string }) {
   const params      = useSearchParams()
   const router      = useRouter()
@@ -54,7 +60,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
 
   const [returnDate, setReturnDate]  = useState('')
   const [email, setEmail]           = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card')
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>(SQUARE_ENABLED ? 'card' : 'cash')
   const [loading, setLoading]         = useState(false)
   const [bookingRef, setBookingRef]   = useState('')
   const [bookingQr, setBookingQr]     = useState('')
@@ -488,7 +494,8 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           <p className="text-slate-400 text-sm mb-5">Elige cómo deseas pagar tu boleto.</p>
 
           {/* Payment method selector */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className={`grid gap-3 mb-6 ${SQUARE_ENABLED ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {SQUARE_ENABLED && (
             <button
               onClick={() => setPaymentMethod('card')}
               className={`p-4 rounded-xl border-2 text-left transition-all ${
@@ -507,6 +514,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 </div>
               </div>
             </button>
+            )}
             <button
               onClick={() => setPaymentMethod('cash')}
               className={`p-4 rounded-xl border-2 text-left transition-all ${
@@ -528,7 +536,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           </div>
 
           {/* Square card form */}
-          {paymentMethod === 'card' && (
+          {SQUARE_ENABLED && paymentMethod === 'card' && (
             <div>
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
                 Datos de tarjeta
