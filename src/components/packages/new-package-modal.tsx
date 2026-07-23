@@ -23,6 +23,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
   const [error, setError]         = useState('')
   const [squareReady, setSquareReady] = useState(false)
   const squareRef                 = useRef<SquareCardHandle>(null)
+  const [dbPrices, setDbPrices]   = useState<Record<string, number>>({})
 
   const [form, setForm] = useState({
     sender_name:         defaultSenderName,
@@ -46,10 +47,21 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
       .then(r => r.json())
       .then(d => setStops(d.stops ?? d ?? []))
       .catch(() => {})
+    fetch('/api/admin/package-pricing')
+      .then(r => r.json())
+      .then(d => {
+        if (d.pricing) {
+          const map: Record<string, number> = {}
+          d.pricing.forEach((p: { id: string; price: number }) => { map[p.id] = p.price })
+          setDbPrices(map)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
+  const getPrice = (key: string) => dbPrices[key] ?? PACKAGE_SIZES[key as PackageSize]?.price ?? 0
   const selectedSize = PACKAGE_SIZES[form.size]
 
   const submit = async (e: React.FormEvent) => {
@@ -150,7 +162,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
                     <p className="text-sm font-bold text-slate-800">{info.label} <span className="text-slate-400 font-normal text-xs">· {info.dims}</span></p>
                     <p className="text-xs text-slate-500">{info.desc}</p>
                   </div>
-                  <p className="font-black text-[#c01515] text-lg">${info.price}</p>
+                  <p className="font-black text-[#c01515] text-lg">${getPrice(key)}</p>
                 </label>
               ))}
             </div>
@@ -208,7 +220,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
             {paymentMethod === 'cash' && (
               <div className="mt-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <p className="text-xs text-amber-700">El cajero cobrará <strong>${selectedSize?.price ?? 0}</strong> cuando el cliente llegue a la terminal con el paquete.</p>
+                <p className="text-xs text-amber-700">El cajero cobrará <strong>${getPrice(form.size)}</strong> cuando el cliente llegue a la terminal con el paquete.</p>
               </div>
             )}
           </div>
@@ -221,7 +233,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
                 {paymentMethod === 'card' ? 'Total a cobrar ahora' : 'Total a cobrar en caja'}
               </p>
-              <p className="text-2xl font-black text-[#c01515]">${selectedSize?.price ?? 0}.00</p>
+              <p className="text-2xl font-black text-[#c01515]">${getPrice(form.size).toFixed(2)}</p>
             </div>
             <button type="submit" disabled={saving || (paymentMethod === 'card' && !squareReady)}
               className="flex items-center gap-2 px-6 py-2.5 bg-[#c01515] hover:bg-[#a01010] disabled:bg-slate-300 text-white font-bold rounded-xl transition-colors text-sm">
