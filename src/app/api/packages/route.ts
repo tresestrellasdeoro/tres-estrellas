@@ -79,8 +79,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 422 })
   }
 
-  const sizeInfo = PACKAGE_SIZES[size as PackageSize]
-  if (!sizeInfo) return NextResponse.json({ error: 'Tamaño inválido' }, { status: 422 })
+  const staticInfo = PACKAGE_SIZES[size as PackageSize]
+  if (!staticInfo) return NextResponse.json({ error: 'Tamaño inválido' }, { status: 422 })
+
+  // Read price from DB (admin-editable); fall back to static config
+  const { data: dbPricing } = await svc()
+    .from('package_pricing')
+    .select('price, max_lbs, dims')
+    .eq('id', size)
+    .maybeSingle()
+  const sizeInfo = { ...staticInfo, price: dbPricing?.price ?? staticInfo.price }
 
   const method: 'card' | 'cash' | 'terminal' = payment_method ?? 'cash'
 

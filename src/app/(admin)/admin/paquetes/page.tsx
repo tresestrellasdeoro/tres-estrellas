@@ -1,9 +1,114 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Package, Plus, Printer, Search, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Package, Plus, Printer, Search, RefreshCw, ChevronDown, ChevronUp, Settings, Check, X } from 'lucide-react'
 import { PACKAGE_SIZES, STATUS_META, type PackageSize, type PackageStatus } from '@/lib/packages'
 import { NewPackageModal } from '@/components/packages/new-package-modal'
+
+interface PricingRow {
+  id: string
+  label: string
+  price: number
+  max_lbs: number | null
+  dims: string | null
+}
+
+function PricingConfig() {
+  const [rows, setRows]       = useState<PricingRow[]>([])
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draft, setDraft]     = useState<Partial<PricingRow>>({})
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin/package-pricing')
+      .then(r => r.json())
+      .then(d => { if (d.pricing) setRows(d.pricing) })
+  }, [])
+
+  const startEdit = (row: PricingRow) => {
+    setEditing(row.id)
+    setDraft({ price: row.price, max_lbs: row.max_lbs ?? undefined, dims: row.dims ?? undefined })
+    setError('')
+  }
+
+  const save = async (id: string) => {
+    if (!draft.price || Number(draft.price) <= 0) { setError('El precio debe ser mayor a 0'); return }
+    setSaving(true)
+    const res  = await fetch('/api/admin/package-pricing', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, price: draft.price, max_lbs: draft.max_lbs, dims: draft.dims }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error || 'Error al guardar'); setSaving(false); return }
+    setRows(prev => prev.map(r => r.id === id ? data.pricing : r))
+    setEditing(null)
+    setSaving(false)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Settings className="w-5 h-5 text-[#c01515]" />
+        <h2 className="font-black text-lg text-[#0a1628]">Configuración de precios</h2>
+      </div>
+      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+      <div className="space-y-2">
+        {rows.map(row => (
+          <div key={row.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-700 text-sm">{row.label}</p>
+              {editing !== row.id && (
+                <p className="text-slate-400 text-xs">{row.dims || ''}</p>
+              )}
+            </div>
+            {editing === row.id ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-sm">$</span>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={draft.price ?? ''}
+                    onChange={e => setDraft(d => ({ ...d, price: Number(e.target.value) }))}
+                    className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:border-[#c01515]"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-400 text-xs">lbs:</span>
+                  <input
+                    type="number" min="0" step="0.1"
+                    value={draft.max_lbs ?? ''}
+                    onChange={e => setDraft(d => ({ ...d, max_lbs: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#c01515]"
+                  />
+                </div>
+                <button onClick={() => save(row.id)} disabled={saving}
+                  className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setEditing(null)} disabled={saving}
+                  className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="font-black text-[#0a1628]">${Number(row.price).toFixed(2)}</span>
+                {row.max_lbs && <span className="text-xs text-slate-400">{row.max_lbs} lbs</span>}
+                <button onClick={() => startEdit(row)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-[#c01515] hover:text-[#c01515] transition-colors">
+                  Editar
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 interface Pkg {
   id: string
@@ -59,6 +164,7 @@ export default function AdminPaquetesPage() {
 
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
+      <PricingConfig />
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="font-black text-2xl text-[#0a1628] flex items-center gap-2">
