@@ -26,30 +26,44 @@ function LoginForm() {
     setLoading(true)
     setError('')
 
-    // 1. Try Supabase auth first (cajeros, buseros, customers)
-    const supabase = createClient()
-    const { data, error: sbError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      // 1. Try Supabase auth first (cajeros, buseros, customers)
+      // Race with 8-second timeout so it never hangs indefinitely
+      const supabase = createClient()
+      const timeout = new Promise<{ data: { user: null }, error: Error }>(resolve =>
+        setTimeout(() => resolve({ data: { user: null }, error: new Error('timeout') }), 8000)
+      )
+      const { data } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeout,
+      ])
 
-    if (data?.user) {
-      // Get role via server API (bypasses RLS, guaranteed to read correct role)
-      const res = await fetch('/api/auth/me')
-      const { role } = await res.json()
+      if (data?.user) {
+        // Get role via server API (bypasses RLS, guaranteed to read correct role)
+        const res = await fetch('/api/auth/me')
+        const json = await res.json()
+        const role = json?.role
 
-      if (role === 'cajero' || role === 'driver') {
-        router.push('/personal/validar')
-      } else if (role === 'admin' || role === 'super_admin') {
-        router.push('/admin/dashboard')
-      } else if (role === 'developer') {
-        router.push('/developer/dashboard')
-      } else {
-        router.push(nextPath || '/dashboard')
+        if (role === 'cajero' || role === 'driver') {
+          router.push('/personal/validar')
+        } else if (role === 'admin' || role === 'super_admin') {
+          router.push('/admin/dashboard')
+        } else if (role === 'developer') {
+          router.push('/developer/dashboard')
+        } else {
+          router.push(nextPath || '/dashboard')
+        }
+        return
       }
-      return
+    } catch {
+      // Supabase unavailable — fall through to admin login below
     }
 
     // 2. Fallback to admin env-var login (native form POST so cookie is set properly)
     adminFormRef.current?.submit()
-    // Don't setLoading(false) — page will navigate away if admin login succeeds
+    // Don't setLoading(false) here — page will navigate away if admin login succeeds
+    // But reset after 10s in case the form redirect comes back with an error
+    setTimeout(() => setLoading(false), 10_000)
   }
 
   return (
