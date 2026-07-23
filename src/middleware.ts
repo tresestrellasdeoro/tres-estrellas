@@ -1,23 +1,39 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { createHmac, timingSafeEqual } from 'crypto'
 
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
-function verifyAdminSession(sessionValue: string | undefined): boolean {
+// Web Crypto HMAC-SHA256 — works in Next.js Edge Runtime (no Node.js crypto needed)
+async function hmacHex(secret: string, data: string): Promise<string> {
+  const enc = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data))
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Timing-safe string comparison (Edge-compatible)
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+async function verifyAdminSession(sessionValue: string | undefined): Promise<boolean> {
   if (!sessionValue) return false
   try {
-    const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
+    const decoded   = atob(sessionValue)
     const lastColon = decoded.lastIndexOf(':')
     if (lastColon < 0) return false
     const payload   = decoded.substring(0, lastColon)
     const sig       = decoded.substring(lastColon + 1)
     const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
-    const expected  = createHmac('sha256', secret).update(payload).digest('hex')
-    const sigBuf    = Buffer.from(sig,      'hex')
-    const expBuf    = Buffer.from(expected, 'hex')
-    if (sigBuf.length !== expBuf.length) return false
-    if (!timingSafeEqual(sigBuf, expBuf)) return false
+    const expected  = await hmacHex(secret, payload)
+    if (!safeEqual(sig, expected)) return false
     if (!payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return false
     const parts     = payload.split(':')
     const timestamp = parseInt(parts[parts.length - 1], 10)
@@ -39,7 +55,7 @@ export async function middleware(request: NextRequest) {
   const authPages           = pathname.startsWith('/auth')
 
   // Allow admin with local session cookie (HMAC-verified)
-  const isValidAdminSession = verifyAdminSession(request.cookies.get('admin_session')?.value)
+  const isValidAdminSession = await verifyAdminSession(request.cookies.get('admin_session')?.value)
   if (isValidAdminSession && protectedAdmin) {
     return NextResponse.next({ request })
   }
