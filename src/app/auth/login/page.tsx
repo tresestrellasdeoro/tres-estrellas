@@ -39,26 +39,10 @@ function LoginForm() {
       ])
 
       if (data?.user) {
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .maybeSingle()
-
-        const role = (profile as { role: string } | null)?.role ?? null
-
-        // DEBUG — remove after diagnosis
-        console.log('[LOGIN DEBUG]', { userId: data.user.id, profile, role, profileErr })
-
-        if (role === 'cajero' || role === 'driver') {
-          router.push('/personal/validar')
-        } else if (role === 'admin' || role === 'super_admin') {
-          router.push('/admin/dashboard')
-        } else if (role === 'developer') {
-          router.push('/developer/dashboard')
-        } else {
-          router.push(nextPath || '/dashboard')
-        }
+        // Delegate role-based routing to a server page that uses service role.
+        // This avoids all client-side RLS / session-cookie timing issues.
+        const dest = nextPath ? `/auth/redirect?next=${encodeURIComponent(nextPath)}` : '/auth/redirect'
+        router.push(dest)
         return
       }
     } catch {

@@ -52,7 +52,8 @@ export async function middleware(request: NextRequest) {
   const protectedDriver     = pathname.startsWith('/conductor')
   const protectedStaff      = pathname.startsWith('/personal')
   const protectedDeveloper  = pathname.startsWith('/developer')
-  const authPages           = pathname.startsWith('/auth')
+  // /auth/redirect is the post-login router — allow authenticated users through
+  const authPages           = pathname.startsWith('/auth') && pathname !== '/auth/redirect'
 
   // Allow admin with local session cookie (HMAC-verified)
   const isValidAdminSession = await verifyAdminSession(request.cookies.get('admin_session')?.value)
