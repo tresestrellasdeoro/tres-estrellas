@@ -181,6 +181,8 @@ export default function ContabilidadPage() {
   const [mappingDraft,   setMappingDraft]   = useState<Record<string, string>>({})
   const [savingMapping,  setSavingMapping]  = useState(false)
   const [loadingMapping, setLoadingMapping] = useState(false)
+  const [sucursalFilt,   setSucursalFilt]   = useState<string>('')
+  const [sucursalOpts,   setSucursalOpts]   = useState<{ id: string; code: string; name: string }[]>([])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -317,22 +319,42 @@ export default function ContabilidadPage() {
   useEffect(() => { fetchAll() }, [])
 
   useEffect(() => {
+    if (!cierres.length && !gastos.length) return
+    const map = new Map<string, string>()
+    cierres.forEach(c => { if (c.sucursales?.code) map.set(c.sucursales.code, c.sucursales.name) })
+    gastos.forEach(g => { if (g.sucursales?.code) map.set(g.sucursales.code, g.sucursales.name) })
+    setSucursalOpts(
+      Array.from(map.entries())
+        .map(([code, name]) => ({ id: code, code, name }))
+        .sort((a, b) => a.code.localeCompare(b.code))
+    )
+  }, [cierres, gastos])
+
+  useEffect(() => {
     if (mes !== 'all') fetchPresupuestos(mes as string)
   }, [mes])
 
-  // ── Filtered data by period ──────────────────────────────────────────────
+  // (sucursalOpts loaded directly from API in fetchAll)
 
-  const txFiltered = useMemo(() =>
-    mes === 'all' ? transactions : transactions.filter(t => t.created_at.startsWith(mes))
-  , [transactions, mes])
+  // ── Filtered data by period + sucursal ──────────────────────────────────
 
-  const gastosFiltered = useMemo(() =>
-    mes === 'all' ? gastos : gastos.filter(g => g.date.startsWith(mes))
-  , [gastos, mes])
+  const txFiltered = useMemo(() => {
+    let tx = mes === 'all' ? transactions : transactions.filter(t => t.created_at.startsWith(mes))
+    if (sucursalFilt) tx = tx.filter(t => getSucursalCode(t) === sucursalFilt)
+    return tx
+  }, [transactions, mes, sucursalFilt])
 
-  const cierresFiltered = useMemo(() =>
-    mes === 'all' ? cierres : cierres.filter(c => c.fecha.startsWith(mes))
-  , [cierres, mes])
+  const gastosFiltered = useMemo(() => {
+    let gs = mes === 'all' ? gastos : gastos.filter(g => g.date.startsWith(mes))
+    if (sucursalFilt) gs = gs.filter(g => g.sucursales?.code === sucursalFilt)
+    return gs
+  }, [gastos, mes, sucursalFilt])
+
+  const cierresFiltered = useMemo(() => {
+    let cs = mes === 'all' ? cierres : cierres.filter(c => c.fecha.startsWith(mes))
+    if (sucursalFilt) cs = cs.filter(c => c.sucursales?.code === sucursalFilt)
+    return cs
+  }, [cierres, mes, sucursalFilt])
 
   // ── Period totals ────────────────────────────────────────────────────────
 
@@ -452,7 +474,8 @@ export default function ContabilidadPage() {
         </div>
       </div>
 
-      {/* Period selector */}
+      {/* Period selector + sucursal filter */}
+      <div className="flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl p-2 w-fit">
         <button
           onClick={() => mes !== 'all' && setMes(shiftMonth(mes, -1))}
@@ -486,6 +509,21 @@ export default function ContabilidadPage() {
         >
           Histórico
         </button>
+      </div>
+
+      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl p-2">
+        <Building2 className="w-4 h-4 text-slate-400 ml-1" />
+        <select
+          value={sucursalFilt}
+          onChange={e => setSucursalFilt(e.target.value)}
+          className="text-sm font-bold text-[#0a1628] bg-transparent border-none outline-none cursor-pointer pr-2"
+        >
+          <option value="">Todas las sucursales</option>
+          {sucursalOpts.map(s => (
+            <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+          ))}
+        </select>
+      </div>
       </div>
 
       {/* Alert: cierres sin QB */}
@@ -995,13 +1033,93 @@ export default function ContabilidadPage() {
       ) : tab === 'cierres' ? (
 
         /* ── CIERRES ── */
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex justify-end">
             <button onClick={exportCierres}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
               <Download className="w-3.5 h-3.5" /> Exportar CSV
             </button>
           </div>
+
+          {/* Resumen por cajero */}
+          {cierresFiltered.length > 0 && (() => {
+            const cajeroMap = new Map<string, {
+              nombre: string
+              sucursales: Set<string>
+              turnos: number
+              boletos: number
+              efectivo: number
+              tarjeta: number
+              paquetes: number
+              total: number
+            }>()
+            cierresFiltered.forEach(c => {
+              const key = c.profiles?.full_name ?? c.profiles?.email ?? 'Desconocido'
+              if (!cajeroMap.has(key)) {
+                cajeroMap.set(key, { nombre: key, sucursales: new Set(), turnos: 0, boletos: 0, efectivo: 0, tarjeta: 0, paquetes: 0, total: 0 })
+              }
+              const row = cajeroMap.get(key)!
+              if (c.sucursales?.code) row.sucursales.add(c.sucursales.code)
+              row.turnos   += 1
+              row.boletos  += c.total_boletos
+              row.efectivo += Number(c.total_efectivo)
+              row.tarjeta  += Number(c.total_tarjeta)
+              row.paquetes += Number(c.total_paquetes)
+              row.total    += Number(c.total_general)
+            })
+            const rows = Array.from(cajeroMap.values()).sort((a, b) => b.total - a.total)
+            return (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#0a1e42]" />
+                  <p className="font-black text-slate-700 text-sm">Reporte por cajero</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Cajero</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Sucursal</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Turnos</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Boletos</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Efectivo</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Tarjeta</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Paquetes</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rows.map(r => (
+                        <tr key={r.nombre} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-800 text-xs">{r.nombre}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">{Array.from(r.sucursales).join(', ')}</td>
+                          <td className="px-4 py-3 text-center text-xs text-slate-600 font-bold">{r.turnos}</td>
+                          <td className="px-4 py-3 text-center text-xs text-slate-600 font-bold">{r.boletos}</td>
+                          <td className="px-4 py-3 text-right text-xs text-emerald-600 font-bold">${usd(r.efectivo)}</td>
+                          <td className="px-4 py-3 text-right text-xs text-blue-600 font-bold">${usd(r.tarjeta)}</td>
+                          <td className="px-4 py-3 text-right text-xs text-slate-600 font-bold">${usd(r.paquetes)}</td>
+                          <td className="px-4 py-3 text-right text-xs font-black text-slate-800">${usd(r.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 border-t-2 border-slate-200">
+                        <td colSpan={2} className="px-4 py-3 text-xs font-black text-slate-600 uppercase tracking-wide">Total</td>
+                        <td className="px-4 py-3 text-center text-xs font-black text-slate-700">{cierresFiltered.length}</td>
+                        <td className="px-4 py-3 text-center text-xs font-black text-slate-700">{rows.reduce((s, r) => s + r.boletos, 0)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-black text-emerald-700">${usd(rows.reduce((s, r) => s + r.efectivo, 0))}</td>
+                        <td className="px-4 py-3 text-right text-xs font-black text-blue-700">${usd(rows.reduce((s, r) => s + r.tarjeta, 0))}</td>
+                        <td className="px-4 py-3 text-right text-xs font-black text-slate-700">${usd(rows.reduce((s, r) => s + r.paquetes, 0))}</td>
+                        <td className="px-4 py-3 text-right text-xs font-black text-slate-800">${usd(rows.reduce((s, r) => s + r.total, 0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Detalle individual de cierres */}
           {cierresFiltered.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
