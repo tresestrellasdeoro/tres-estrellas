@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Monitor, RefreshCw, Loader2, Clock, CheckCircle2, AlertCircle, Banknote, CreditCard, Ticket, Package, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Monitor, RefreshCw, Loader2, Clock, CheckCircle2, Banknote, CreditCard, Ticket, Package, ChevronDown, ChevronUp, Filter } from 'lucide-react'
 
 interface Turno {
   id:             string
@@ -25,9 +25,9 @@ function formatTime(iso: string) {
 }
 
 function formatDuration(start: string, end?: string | null) {
-  const ms   = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime()
-  const h    = Math.floor(ms / 3_600_000)
-  const m    = Math.floor((ms % 3_600_000) / 60_000)
+  const ms = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime()
+  const h  = Math.floor(ms / 3_600_000)
+  const m  = Math.floor((ms % 3_600_000) / 60_000)
   if (h > 0) return `${h}h ${m}m`
   return `${m} min`
 }
@@ -37,11 +37,13 @@ function today() {
 }
 
 export default function PuntosDeVentaPage() {
-  const [turnos,    setTurnos]    = useState<Turno[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [fecha,     setFecha]     = useState(today())
-  const [expanded,  setExpanded]  = useState<Set<string>>(new Set())
-  const [tick,      setTick]      = useState(0)
+  const [turnos,       setTurnos]       = useState<Turno[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [fecha,        setFecha]        = useState(today())
+  const [expanded,     setExpanded]     = useState<Set<string>>(new Set())
+  const [tick,         setTick]         = useState(0)
+  const [filtroCajero, setFiltroCajero] = useState('')
+  const [filtroSucur,  setFiltroSucur]  = useState('')
 
   const fetchTurnos = useCallback(async () => {
     setLoading(true)
@@ -58,7 +60,6 @@ export default function PuntosDeVentaPage() {
 
   useEffect(() => { fetchTurnos() }, [fetchTurnos])
 
-  // Actualizar duración cada minuto
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000)
     return () => clearInterval(id)
@@ -71,17 +72,45 @@ export default function PuntosDeVentaPage() {
       return next
     })
 
-  const activos  = turnos.filter(t => t.estado === 'activo')
-  const cerrados = turnos.filter(t => t.estado === 'cerrado')
+  // Opciones únicas para los selects
+  const cajeroOpts = useMemo(() => {
+    const seen = new Map<string, string>()
+    turnos.forEach(t => {
+      if (t.profiles?.id)
+        seen.set(t.profiles.id, t.profiles.full_name ?? t.profiles.email)
+    })
+    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [turnos])
+
+  const sucursalOpts = useMemo(() => {
+    const seen = new Map<string, string>()
+    turnos.forEach(t => {
+      if (t.sucursales?.id)
+        seen.set(t.sucursales.id, `${t.sucursales.code} · ${t.sucursales.name}`)
+    })
+    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [turnos])
+
+  // Aplicar filtros
+  const turnosFiltrados = useMemo(() => turnos.filter(t => {
+    if (filtroCajero && t.profiles?.id !== filtroCajero) return false
+    if (filtroSucur  && t.sucursales?.id !== filtroSucur)  return false
+    return true
+  }), [turnos, filtroCajero, filtroSucur])
+
+  const activos  = turnosFiltrados.filter(t => t.estado === 'activo')
+  const cerrados = turnosFiltrados.filter(t => t.estado === 'cerrado')
 
   const totalActivo = activos.reduce((s, t) => s + t.total_general, 0)
-  const totalDia    = turnos.reduce((s, t) => s + t.total_general, 0)
+  const totalDia    = turnosFiltrados.reduce((s, t) => s + t.total_general, 0)
+
+  const hayFiltros = filtroCajero || filtroSucur
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Monitor className="w-6 h-6 text-[#c8a951]" />
@@ -106,7 +135,46 @@ export default function PuntosDeVentaPage() {
         </div>
       </div>
 
-      {/* Resumen del día */}
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex items-center gap-1.5 text-slate-500">
+          <Filter className="w-4 h-4" />
+          <span className="text-xs font-bold uppercase tracking-wider">Filtrar</span>
+        </div>
+
+        <select
+          value={filtroCajero}
+          onChange={e => setFiltroCajero(e.target.value)}
+          className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#0a1e42]/30 text-slate-700 min-w-[160px]"
+        >
+          <option value="">Todos los cajeros</option>
+          {cajeroOpts.map(([id, nombre]) => (
+            <option key={id} value={id}>{nombre}</option>
+          ))}
+        </select>
+
+        <select
+          value={filtroSucur}
+          onChange={e => setFiltroSucur(e.target.value)}
+          className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#0a1e42]/30 text-slate-700 min-w-[160px]"
+        >
+          <option value="">Todas las sucursales</option>
+          {sucursalOpts.map(([id, nombre]) => (
+            <option key={id} value={id}>{nombre}</option>
+          ))}
+        </select>
+
+        {hayFiltros && (
+          <button
+            onClick={() => { setFiltroCajero(''); setFiltroSucur('') }}
+            className="text-xs font-semibold text-slate-500 hover:text-red-500 underline transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {/* Resumen */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">En turno</p>
@@ -132,17 +200,26 @@ export default function PuntosDeVentaPage() {
         </div>
       )}
 
-      {!loading && turnos.length === 0 && (
+      {!loading && turnosFiltrados.length === 0 && (
         <div className="text-center py-12 text-slate-400">
           <Monitor className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          <p className="font-semibold">Sin turnos para esta fecha</p>
+          <p className="font-semibold">
+            {hayFiltros ? 'Sin turnos para este filtro' : 'Sin turnos para esta fecha'}
+          </p>
+          {hayFiltros && (
+            <button
+              onClick={() => { setFiltroCajero(''); setFiltroSucur('') }}
+              className="mt-2 text-sm text-[#0a1e42] underline font-semibold"
+            >
+              Limpiar filtros
+            </button>
+          )}
         </div>
       )}
 
-      {!loading && turnos.length > 0 && (
+      {!loading && turnosFiltrados.length > 0 && (
         <div className="space-y-3">
 
-          {/* Turnos activos primero */}
           {activos.length > 0 && (
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-green-600 mb-2 flex items-center gap-1.5">
@@ -155,7 +232,6 @@ export default function PuntosDeVentaPage() {
             </div>
           )}
 
-          {/* Turnos cerrados */}
           {cerrados.length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
@@ -185,10 +261,8 @@ function TurnoCard({ turno, expanded, onToggle, tick: _tick }: {
         onClick={onToggle}
         className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 transition-colors"
       >
-        {/* Estado */}
         <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${activo ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
 
-        {/* Info principal */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-slate-800 truncate">
@@ -215,7 +289,6 @@ function TurnoCard({ turno, expanded, onToggle, tick: _tick }: {
           </p>
         </div>
 
-        {/* Total */}
         <div className="text-right shrink-0 mr-2">
           <p className="font-black text-[#0a1e42]">${turno.total_general.toFixed(2)}</p>
           <p className="text-xs text-slate-400">{turno.total_boletos} boletos</p>
@@ -224,7 +297,6 @@ function TurnoCard({ turno, expanded, onToggle, tick: _tick }: {
         {expanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
       </button>
 
-      {/* Detalle expandido */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-slate-100">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
