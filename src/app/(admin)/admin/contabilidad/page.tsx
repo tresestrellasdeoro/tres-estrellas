@@ -1,12 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell,
+} from 'recharts'
 import {
   BookOpen, TrendingUp, TrendingDown, Loader2, CheckCircle2,
   RefreshCw, XCircle, Banknote, CreditCard, Building2,
-  Globe, Wallet, Scale, ArrowUpRight, ArrowDownRight,
-  AlertTriangle, RotateCw,
+  Globe, Scale, AlertTriangle, RotateCw,
+  ChevronLeft, ChevronRight, Download, BarChart2, Wallet,
 } from 'lucide-react'
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface QBTransaction {
   id:             string
@@ -48,8 +54,10 @@ interface Cierre {
   profiles:       { full_name: string; email: string } | null
 }
 
-type Tab = 'qb' | 'gastos' | 'cierres'
-type TxFilter = 'all' | 'online' | 'efectivo' | 'tarjeta' | 'gasto'
+type Tab       = 'resumen' | 'qb' | 'gastos' | 'cierres'
+type TxFilter  = 'all' | 'online' | 'efectivo' | 'tarjeta' | 'gasto'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getTxSubtype(t: QBTransaction): 'online' | 'efectivo' | 'tarjeta' | 'gasto' {
   if (t.reference_type === 'booking_online') return 'online'
@@ -59,35 +67,87 @@ function getTxSubtype(t: QBTransaction): 'online' | 'efectivo' | 'tarjeta' | 'ga
 }
 
 function getSucursalCode(t: QBTransaction): string | null {
-  // Parse from description: "[HP] ..." or "[WEB] ..."
   const match = t.description?.match(/^\[([A-Z]+)\]/)
   return match?.[1] ?? null
 }
+
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7)
+}
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1, 1)
+    .toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+    .replace(/^\w/, c => c.toUpperCase())
+}
+
+function monthShort(ym: string) {
+  const [y, m] = ym.split('-')
+  const label = new Date(Number(y), Number(m) - 1, 1)
+    .toLocaleDateString('es-MX', { month: 'short' })
+  return label.charAt(0).toUpperCase() + label.slice(1) + ' ' + y.slice(2)
+}
+
+function shiftMonth(ym: string, delta: number) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function last6Months(): string[] {
+  return Array.from({ length: 6 }, (_, i) => shiftMonth(currentMonth(), -(5 - i)))
+}
+
+function usd(n: number) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function downloadCsv(rows: Record<string, unknown>[], filename: string) {
+  if (!rows.length) return
+  const keys = Object.keys(rows[0])
+  const csv = [
+    keys.join(','),
+    ...rows.map(r =>
+      keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(',')
+    ),
+  ].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
+const PIE_COLORS = ['#0a1e42','#c01515','#c8a951','#3b82f6','#22c55e','#a855f7','#f97316','#06b6d4','#ec4899','#84cc16']
 
 const SUBTYPE_CONFIG = {
   online:   { label: 'Online',            color: 'bg-purple-100 text-purple-700',  icon: Globe },
   efectivo: { label: 'Efectivo Sucursal', color: 'bg-emerald-100 text-emerald-700', icon: Banknote },
   tarjeta:  { label: 'Tarjeta Sucursal',  color: 'bg-blue-100 text-blue-700',      icon: CreditCard },
-  gasto:    { label: 'Gasto',             color: 'bg-red-100 text-red-700',         icon: ArrowDownRight },
+  gasto:    { label: 'Gasto',             color: 'bg-red-100 text-red-700',         icon: TrendingDown },
 } as const
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function ContabilidadPage() {
-  const [tab,          setTab]          = useState<Tab>('qb')
+  const [tab,          setTab]          = useState<Tab>('resumen')
   const [transactions, setTransactions] = useState<QBTransaction[]>([])
   const [gastos,       setGastos]       = useState<Gasto[]>([])
   const [cierres,      setCierres]      = useState<Cierre[]>([])
   const [loading,      setLoading]      = useState(true)
-  const [filter,       setFilter]       = useState<TxFilter>('all')
+  const [txFilter,     setTxFilter]     = useState<TxFilter>('all')
   const [retrying,     setRetrying]     = useState<string | null>(null)
   const [retryMsg,     setRetryMsg]     = useState<{ id: string; ok: boolean; text: string } | null>(null)
+  const [mes,          setMes]          = useState<string | 'all'>(currentMonth())
 
   const fetchAll = async () => {
     setLoading(true)
     try {
       const [qbRes, gastosRes, cierresRes] = await Promise.all([
-        fetch('/api/admin/qb-transactions?limit=500'),
-        fetch('/api/staff/gastos?limit=500'),
-        fetch('/api/admin/cierres?limit=200'),
+        fetch('/api/admin/qb-transactions?limit=1000'),
+        fetch('/api/staff/gastos?limit=1000'),
+        fetch('/api/admin/cierres?limit=500'),
       ])
       const qbData      = await qbRes.json()
       const gastosData  = await gastosRes.json()
@@ -110,91 +170,175 @@ export default function ContabilidadPage() {
       })
       const d = await r.json()
       setRetryMsg({ id: cierreId, ok: r.ok && d.ok, text: d.message ?? d.error ?? 'Error desconocido' })
-      if (r.ok && d.ok) {
-        setCierres(prev => prev.map(c => c.id === cierreId ? { ...c, qb_synced: true } : c))
-      }
+      if (r.ok && d.ok) setCierres(prev => prev.map(c => c.id === cierreId ? { ...c, qb_synced: true } : c))
     } catch {
       setRetryMsg({ id: cierreId, ok: false, text: 'No se pudo conectar al servidor.' })
-    } finally {
-      setRetrying(null)
-    }
+    } finally { setRetrying(null) }
   }
 
   useEffect(() => { fetchAll() }, [])
 
-  // Totals by subtype
-  const online      = transactions.filter(t => getTxSubtype(t) === 'online').reduce((s, t) => s + Number(t.amount), 0)
-  const efectivo    = transactions.filter(t => getTxSubtype(t) === 'efectivo').reduce((s, t) => s + Number(t.amount), 0)
-  const tarjeta     = transactions.filter(t => getTxSubtype(t) === 'tarjeta').reduce((s, t) => s + Number(t.amount), 0)
-  const gastosQB    = transactions.filter(t => getTxSubtype(t) === 'gasto').reduce((s, t) => s + Number(t.amount), 0)
-  const totalIngresos = online + efectivo + tarjeta
-  const balance       = totalIngresos - gastosQB
-  const gastosPend    = gastos.filter(g => !g.qb_synced).reduce((s, g) => s + Number(g.amount), 0)
-  const cierresPend   = cierres.filter(c => !c.qb_synced)
+  // ── Filtered data by period ──────────────────────────────────────────────
 
-  const filtered = filter === 'all'
-    ? transactions
-    : transactions.filter(t => getTxSubtype(t) === filter)
+  const txFiltered = useMemo(() =>
+    mes === 'all' ? transactions : transactions.filter(t => t.created_at.startsWith(mes))
+  , [transactions, mes])
+
+  const gastosFiltered = useMemo(() =>
+    mes === 'all' ? gastos : gastos.filter(g => g.date.startsWith(mes))
+  , [gastos, mes])
+
+  const cierresFiltered = useMemo(() =>
+    mes === 'all' ? cierres : cierres.filter(c => c.fecha.startsWith(mes))
+  , [cierres, mes])
+
+  // ── Period totals ────────────────────────────────────────────────────────
+
+  const online       = txFiltered.filter(t => getTxSubtype(t) === 'online').reduce((s, t) => s + Number(t.amount), 0)
+  const efectivo     = txFiltered.filter(t => getTxSubtype(t) === 'efectivo').reduce((s, t) => s + Number(t.amount), 0)
+  const tarjeta      = txFiltered.filter(t => getTxSubtype(t) === 'tarjeta').reduce((s, t) => s + Number(t.amount), 0)
+  const gastosQB     = txFiltered.filter(t => getTxSubtype(t) === 'gasto').reduce((s, t) => s + Number(t.amount), 0)
+  const totalIngresos = online + efectivo + tarjeta
+  const utilidad      = totalIngresos - gastosQB
+  const margen        = totalIngresos > 0 ? (utilidad / totalIngresos) * 100 : 0
+
+  const cierresPend   = cierres.filter(c => !c.qb_synced)
+  const gastosPend    = gastos.filter(g => !g.qb_synced).reduce((s, g) => s + Number(g.amount), 0)
+
+  // ── Chart data ───────────────────────────────────────────────────────────
+
+  const barData = useMemo(() => last6Months().map(m => {
+    const txM   = transactions.filter(t => t.created_at.startsWith(m))
+    const ing   = txM.filter(t => t.type === 'sales_receipt').reduce((s, t) => s + Number(t.amount), 0)
+    const gas   = txM.filter(t => t.type === 'purchase').reduce((s, t) => s + Number(t.amount), 0)
+    return { mes: monthShort(m), ingresos: +ing.toFixed(2), gastos: +gas.toFixed(2), utilidad: +(ing - gas).toFixed(2) }
+  }), [transactions])
+
+  const pieData = useMemo(() => {
+    const map = new Map<string, number>()
+    gastosFiltered.forEach(g => map.set(g.category, (map.get(g.category) ?? 0) + Number(g.amount)))
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value: +value.toFixed(2) }))
+      .sort((a, b) => b.value - a.value)
+  }, [gastosFiltered])
+
+  // ── P&L monthly table (last 6 months) ───────────────────────────────────
+
+  const plTable = useMemo(() => last6Months().map(m => {
+    const txM    = transactions.filter(t => t.created_at.startsWith(m))
+    const ing    = txM.filter(t => t.type === 'sales_receipt').reduce((s, t) => s + Number(t.amount), 0)
+    const gas    = txM.filter(t => t.type === 'purchase').reduce((s, t) => s + Number(t.amount), 0)
+    const util   = ing - gas
+    const mgn    = ing > 0 ? (util / ing) * 100 : 0
+    return { mes: monthLabel(m), ingresos: ing, gastos: gas, utilidad: util, margen: mgn }
+  }), [transactions])
+
+  // ── TX filtered for QB tab ────────────────────────────────────────────────
+
+  const txDisplay = txFilter === 'all'
+    ? txFiltered
+    : txFiltered.filter(t => getTxSubtype(t) === txFilter)
+
+  // ── CSV exports ───────────────────────────────────────────────────────────
+
+  const exportQB = () => downloadCsv(
+    txFiltered.map(t => ({
+      Fecha:       new Date(t.created_at).toLocaleDateString('es-MX'),
+      Tipo:        getTxSubtype(t),
+      Sucursal:    getSucursalCode(t) ?? '',
+      Documento:   t.doc_number ?? '',
+      Descripcion: t.description ?? '',
+      Monto:       Number(t.amount).toFixed(2),
+      QB_Sync:     t.qb_id ? 'Sí' : 'No',
+    })),
+    `QB_${mes === 'all' ? 'historico' : mes}.csv`
+  )
+
+  const exportGastos = () => downloadCsv(
+    gastosFiltered.map(g => ({
+      Fecha:       g.date,
+      Sucursal:    g.sucursales?.code ?? '',
+      Categoria:   g.category,
+      Descripcion: g.description ?? '',
+      Empleado:    g.profiles?.full_name ?? '',
+      Pago:        g.payment_method === 'cash' ? 'Efectivo' : 'Tarjeta',
+      Monto:       Number(g.amount).toFixed(2),
+      QB_Sync:     g.qb_synced ? 'Sí' : 'No',
+    })),
+    `Gastos_${mes === 'all' ? 'historico' : mes}.csv`
+  )
+
+  const exportCierres = () => downloadCsv(
+    cierresFiltered.map(c => ({
+      Fecha:      c.fecha,
+      Sucursal:   c.sucursales?.code ?? '',
+      Cajero:     c.profiles?.full_name ?? c.profiles?.email ?? '',
+      Boletos:    c.total_boletos,
+      Efectivo:   Number(c.total_efectivo).toFixed(2),
+      Tarjeta:    Number(c.total_tarjeta).toFixed(2),
+      Paquetes:   Number(c.total_paquetes).toFixed(2),
+      Total:      Number(c.total_general).toFixed(2),
+      QB_Sync:    c.qb_synced ? 'Sí' : 'No',
+    })),
+    `Cierres_${mes === 'all' ? 'historico' : mes}.csv`
+  )
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-black text-2xl text-[#0a1628] flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-[#c01515]" />
             Contabilidad
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Espejo exacto de lo que llega a QuickBooks</p>
+          <p className="text-slate-500 text-sm mt-1">Estado financiero y registro QuickBooks</p>
         </div>
-        <button onClick={fetchAll}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
-          <RefreshCw className="w-4 h-4" /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchAll}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
+            <RefreshCw className="w-4 h-4" /> Actualizar
+          </button>
+        </div>
       </div>
 
-      {/* Summary cards — row 1: income breakdown */}
-      <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ingresos registrados en QB</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Period selector */}
+      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl p-2 w-fit">
+        <button
+          onClick={() => mes !== 'all' && setMes(shiftMonth(mes, -1))}
+          disabled={mes === 'all'}
+          className="p-1.5 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4 text-slate-600" />
+        </button>
 
-          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Globe className="w-4 h-4 text-purple-600" />
-              <p className="text-purple-700 text-xs font-bold uppercase tracking-wider">Ventas Online</p>
-            </div>
-            <p className="text-2xl font-black text-purple-700">${online.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            <p className="text-purple-400 text-xs mt-0.5">{transactions.filter(t => getTxSubtype(t) === 'online').length} boletos</p>
-          </div>
+        <span className="px-3 py-1 font-black text-[#0a1628] text-sm min-w-[160px] text-center">
+          {mes === 'all' ? 'Histórico completo' : monthLabel(mes)}
+        </span>
 
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Banknote className="w-4 h-4 text-emerald-600" />
-              <p className="text-emerald-700 text-xs font-bold uppercase tracking-wider">Efectivo Sucursales</p>
-            </div>
-            <p className="text-2xl font-black text-emerald-700">${efectivo.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            <p className="text-emerald-400 text-xs mt-0.5">{transactions.filter(t => getTxSubtype(t) === 'efectivo').length} cierres</p>
-          </div>
+        <button
+          onClick={() => mes !== 'all' && setMes(shiftMonth(mes, 1))}
+          disabled={mes === 'all' || mes >= currentMonth()}
+          className="p-1.5 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4 text-slate-600" />
+        </button>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-4 h-4 text-blue-600" />
-              <p className="text-blue-700 text-xs font-bold uppercase tracking-wider">Tarjeta Sucursales</p>
-            </div>
-            <p className="text-2xl font-black text-blue-700">${tarjeta.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            <p className="text-blue-400 text-xs mt-0.5">{transactions.filter(t => getTxSubtype(t) === 'tarjeta').length} cierres</p>
-          </div>
+        <div className="w-px h-6 bg-slate-200" />
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-4 h-4 text-slate-600" />
-              <p className="text-slate-600 text-xs font-bold uppercase tracking-wider">Total Ingresos QB</p>
-            </div>
-            <p className="text-2xl font-black text-slate-700">${totalIngresos.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            <p className="text-slate-400 text-xs mt-0.5">online + efectivo + tarjeta</p>
-          </div>
-        </div>
+        <button
+          onClick={() => setMes(mes === 'all' ? currentMonth() : 'all')}
+          className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors ${
+            mes === 'all'
+              ? 'bg-[#0a1e42] text-white'
+              : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          Histórico
+        </button>
       </div>
 
       {/* Alert: cierres sin QB */}
@@ -216,54 +360,73 @@ export default function ContabilidadPage() {
         </div>
       )}
 
-      {/* Row 2: expenses + balance */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <p className="text-emerald-700 text-xs font-bold uppercase tracking-wider">Ingresos</p>
+          </div>
+          <p className="text-2xl font-black text-emerald-700">${usd(totalIngresos)}</p>
+          <p className="text-emerald-400 text-xs mt-0.5">
+            {txFiltered.filter(t => t.type === 'sales_receipt').length} operaciones
+          </p>
+        </div>
+
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="w-4 h-4 text-red-600" />
-            <p className="text-red-700 text-xs font-bold uppercase tracking-wider">Gastos en QB</p>
+            <p className="text-red-700 text-xs font-bold uppercase tracking-wider">Gastos QB</p>
           </div>
-          <p className="text-2xl font-black text-red-700">${gastosQB.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-          <p className="text-red-400 text-xs mt-0.5">{transactions.filter(t => getTxSubtype(t) === 'gasto').length} registros</p>
+          <p className="text-2xl font-black text-red-700">${usd(gastosQB)}</p>
+          {gastosPend > 0 && (
+            <p className="text-amber-500 text-xs mt-0.5">+${usd(gastosPend)} pendiente QB</p>
+          )}
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+        <div className={`rounded-2xl p-4 border ${utilidad >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-orange-50 border-orange-200'}`}>
           <div className="flex items-center gap-2 mb-1">
-            <XCircle className="w-4 h-4 text-amber-600" />
-            <p className="text-amber-700 text-xs font-bold uppercase tracking-wider">Gastos pendientes QB</p>
+            <Scale className={`w-4 h-4 ${utilidad >= 0 ? 'text-teal-600' : 'text-orange-600'}`} />
+            <p className={`text-xs font-bold uppercase tracking-wider ${utilidad >= 0 ? 'text-teal-700' : 'text-orange-700'}`}>Utilidad</p>
           </div>
-          <p className="text-2xl font-black text-amber-700">${gastosPend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-          <p className="text-amber-500 text-xs mt-0.5">{gastos.filter(g => !g.qb_synced).length} sin sincronizar</p>
-        </div>
-
-        <div className={`col-span-2 lg:col-span-1 rounded-2xl p-4 border ${balance >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-orange-50 border-orange-200'}`}>
-          <div className="flex items-center gap-2 mb-1">
-            <Scale className={`w-4 h-4 ${balance >= 0 ? 'text-teal-600' : 'text-orange-600'}`} />
-            <p className={`text-xs font-bold uppercase tracking-wider ${balance >= 0 ? 'text-teal-700' : 'text-orange-700'}`}>Balance en QB</p>
-          </div>
-          <p className={`text-2xl font-black ${balance >= 0 ? 'text-teal-700' : 'text-orange-700'}`}>
-            {balance >= 0 ? '+' : ''}${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          <p className={`text-2xl font-black ${utilidad >= 0 ? 'text-teal-700' : 'text-orange-700'}`}>
+            {utilidad >= 0 ? '+' : ''}${usd(utilidad)}
           </p>
-          <p className={`text-xs mt-0.5 ${balance >= 0 ? 'text-teal-400' : 'text-orange-400'}`}>ingresos − gastos en QB</p>
+          <p className={`text-xs mt-0.5 ${utilidad >= 0 ? 'text-teal-400' : 'text-orange-400'}`}>
+            ingresos − gastos QB
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet className="w-4 h-4 text-slate-600" />
+            <p className="text-slate-600 text-xs font-bold uppercase tracking-wider">Margen</p>
+          </div>
+          <p className={`text-2xl font-black ${margen >= 20 ? 'text-emerald-600' : margen >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+            {margen.toFixed(1)}%
+          </p>
+          <p className="text-slate-400 text-xs mt-0.5">margen de utilidad</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 border-b border-slate-200 overflow-x-auto">
         {([
-          ['qb',      'Registro QuickBooks'],
-          ['gastos',  'Todos los gastos'],
-          ['cierres', 'Cierres de turno'],
-        ] as const).map(([val, label]) => (
-          <button key={val} onClick={() => setTab(val)}
-            className={`relative px-5 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px ${
+          ['resumen', 'Resumen P&L',       BarChart2],
+          ['qb',      'Registro QB',        BookOpen],
+          ['gastos',  'Gastos',             TrendingDown],
+          ['cierres', 'Cierres de turno',   Banknote],
+        ] as const).map(([val, label, Icon]) => (
+          <button key={val} onClick={() => setTab(val as Tab)}
+            className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px whitespace-nowrap ${
               tab === val
                 ? 'border-[#c01515] text-[#c01515]'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}>
+            <Icon className="w-3.5 h-3.5" />
             {label}
             {val === 'cierres' && cierresPend.length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-black bg-amber-500 text-white rounded-full">
+              <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] font-black bg-amber-500 text-white rounded-full">
                 {cierresPend.length}
               </span>
             )}
@@ -272,38 +435,227 @@ export default function ContabilidadPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
-      ) : tab === 'qb' ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-7 h-7 animate-spin text-slate-300" />
+        </div>
+      ) : tab === 'resumen' ? (
 
-        /* ── QB TRANSACTIONS TAB ── */
-        <div className="space-y-4">
-          {/* Subtype filters */}
-          <div className="flex flex-wrap gap-2">
-            {([
-              ['all',      'Todos'],
-              ['online',   'Online'],
-              ['efectivo', 'Efectivo Sucursal'],
-              ['tarjeta',  'Tarjeta Sucursal'],
-              ['gasto',    'Gastos'],
-            ] as const).map(([val, label]) => (
-              <button key={val} onClick={() => setFilter(val)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  filter === val ? 'bg-[#0f2c5c] text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}>
-                {label}
-                {val !== 'all' && (
-                  <span className="ml-1.5 opacity-60">
-                    {transactions.filter(t => getTxSubtype(t) === val).length}
-                  </span>
-                )}
-              </button>
-            ))}
+        /* ── RESUMEN / P&L ── */
+        <div className="space-y-6">
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            {/* Bar chart: last 6 months */}
+            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5">
+              <p className="text-sm font-black text-slate-700 mb-4">Ingresos vs Gastos — últimos 6 meses</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={barData} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                    tickFormatter={v => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                  <Tooltip
+                    formatter={(v: unknown, name: unknown) => [`$${usd(Number(v))}`, name === 'ingresos' ? 'Ingresos' : name === 'gastos' ? 'Gastos' : 'Utilidad']}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
+                  />
+                  <Bar dataKey="ingresos" fill="#0a1e42" radius={[4, 4, 0, 0]} name="ingresos" />
+                  <Bar dataKey="gastos"   fill="#c01515" radius={[4, 4, 0, 0]} name="gastos" />
+                  <Bar dataKey="utilidad" fill="#c8a951" radius={[4, 4, 0, 0]} name="utilidad" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-4 mt-3 justify-center">
+                <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-sm bg-[#0a1e42] inline-block" />Ingresos</span>
+                <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-sm bg-[#c01515] inline-block" />Gastos</span>
+                <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-sm bg-[#c8a951] inline-block" />Utilidad</span>
+              </div>
+            </div>
+
+            {/* Pie chart: expenses by category */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <p className="text-sm font-black text-slate-700 mb-2">Gastos por categoría</p>
+              {pieData.length === 0 ? (
+                <div className="flex items-center justify-center h-48 text-slate-300 text-sm">Sin gastos en el período</div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
+                        dataKey="value" nameKey="name" paddingAngle={2}>
+                        {pieData.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: unknown) => [`$${usd(Number(v))}`]}
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-1">
+                    {pieData.slice(0, 5).map((d, i) => (
+                      <div key={d.name} className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs text-slate-600 truncate">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          {d.name}
+                        </span>
+                        <span className="text-xs font-bold text-slate-700 ml-2">${usd(d.value)}</span>
+                      </div>
+                    ))}
+                    {pieData.length > 5 && (
+                      <p className="text-xs text-slate-400 text-center mt-1">+{pieData.length - 5} categorías más</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {/* P&L Table */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <p className="font-black text-slate-700 text-sm">Estado de Resultados — últimos 6 meses</p>
+              <button
+                onClick={() => downloadCsv(
+                  plTable.map(r => ({
+                    Mes: r.mes,
+                    Ingresos: r.ingresos.toFixed(2),
+                    Gastos: r.gastos.toFixed(2),
+                    Utilidad: r.utilidad.toFixed(2),
+                    'Margen %': r.margen.toFixed(1) + '%',
+                  })),
+                  'P&L_6meses.csv'
+                )}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Exportar CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Mes</th>
+                    <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Ingresos</th>
+                    <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Gastos QB</th>
+                    <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Utilidad</th>
+                    <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Margen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {plTable.map((row, i) => (
+                    <tr key={i} className={`hover:bg-slate-50 transition-colors ${row.mes === monthLabel(currentMonth()) ? 'bg-blue-50/40' : ''}`}>
+                      <td className="px-5 py-3 font-semibold text-slate-700 capitalize">{row.mes}</td>
+                      <td className="px-5 py-3 text-right font-bold text-emerald-700">${usd(row.ingresos)}</td>
+                      <td className="px-5 py-3 text-right font-bold text-red-600">${usd(row.gastos)}</td>
+                      <td className={`px-5 py-3 text-right font-black ${row.utilidad >= 0 ? 'text-teal-700' : 'text-orange-600'}`}>
+                        {row.utilidad >= 0 ? '+' : ''}${usd(row.utilidad)}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`inline-block px-2 py-0.5 rounded-lg text-xs font-black ${
+                          row.margen >= 20 ? 'bg-emerald-100 text-emerald-700'
+                          : row.margen >= 0 ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700'
+                        }`}>
+                          {row.margen.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-100 border-t-2 border-slate-200">
+                    <td className="px-5 py-3 font-black text-slate-700 text-xs uppercase tracking-wide">Total 6 meses</td>
+                    <td className="px-5 py-3 text-right font-black text-emerald-700">
+                      ${usd(plTable.reduce((s, r) => s + r.ingresos, 0))}
+                    </td>
+                    <td className="px-5 py-3 text-right font-black text-red-600">
+                      ${usd(plTable.reduce((s, r) => s + r.gastos, 0))}
+                    </td>
+                    <td className="px-5 py-3 text-right font-black text-teal-700">
+                      {(() => { const u = plTable.reduce((s, r) => s + r.utilidad, 0); return (u >= 0 ? '+' : '') + '$' + usd(u) })()}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {(() => {
+                        const ing = plTable.reduce((s, r) => s + r.ingresos, 0)
+                        const util = plTable.reduce((s, r) => s + r.utilidad, 0)
+                        const mgn = ing > 0 ? (util / ing) * 100 : 0
+                        return (
+                          <span className={`inline-block px-2 py-0.5 rounded-lg text-xs font-black ${mgn >= 20 ? 'bg-emerald-100 text-emerald-700' : mgn >= 0 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                            {mgn.toFixed(1)}%
+                          </span>
+                        )
+                      })()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Breakdown by income type */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { label: 'Ventas Online', value: online, count: txFiltered.filter(t => getTxSubtype(t) === 'online').length, color: 'purple', icon: Globe },
+              { label: 'Efectivo Sucursales', value: efectivo, count: txFiltered.filter(t => getTxSubtype(t) === 'efectivo').length, color: 'emerald', icon: Banknote },
+              { label: 'Tarjeta Sucursales', value: tarjeta, count: txFiltered.filter(t => getTxSubtype(t) === 'tarjeta').length, color: 'blue', icon: CreditCard },
+            ].map(({ label, value, count, color, icon: Icon }) => (
+              <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-2xl p-4`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className={`w-4 h-4 text-${color}-600`} />
+                  <p className={`text-${color}-700 text-xs font-bold uppercase tracking-wider`}>{label}</p>
+                </div>
+                <p className={`text-xl font-black text-${color}-700`}>${usd(value)}</p>
+                <p className={`text-${color}-400 text-xs mt-0.5`}>{count} operaciones</p>
+                {totalIngresos > 0 && (
+                  <div className="mt-2 bg-white/60 rounded-full h-1.5">
+                    <div
+                      className={`bg-${color}-500 h-1.5 rounded-full`}
+                      style={{ width: `${Math.round((value / totalIngresos) * 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+      ) : tab === 'qb' ? (
+
+        /* ── QB TRANSACTIONS ── */
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {([
+                ['all',      'Todos'],
+                ['online',   'Online'],
+                ['efectivo', 'Efectivo'],
+                ['tarjeta',  'Tarjeta'],
+                ['gasto',    'Gastos'],
+              ] as const).map(([val, label]) => (
+                <button key={val} onClick={() => setTxFilter(val)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    txFilter === val ? 'bg-[#0f2c5c] text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}>
+                  {label}
+                  {val !== 'all' && (
+                    <span className="ml-1.5 opacity-60">
+                      {txFiltered.filter(t => getTxSubtype(t) === val).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button onClick={exportQB}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
+              <Download className="w-3.5 h-3.5" /> Exportar CSV
+            </button>
+          </div>
+
+          {txDisplay.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No hay transacciones registradas</p>
+              <p className="text-sm">No hay transacciones en este período</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -320,18 +672,17 @@ export default function ContabilidadPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map(t => {
-                    const sub = getTxSubtype(t)
-                    const cfg = SUBTYPE_CONFIG[sub]
-                    const Icon = cfg.icon
-                    const suc = getSucursalCode(t)
-                    const isIncome = sub !== 'gasto'
+                  {txDisplay.map(t => {
+                    const sub    = getTxSubtype(t)
+                    const cfg    = SUBTYPE_CONFIG[sub]
+                    const Icon   = cfg.icon
+                    const suc    = getSucursalCode(t)
+                    const isInc  = sub !== 'gasto'
                     return (
                       <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${cfg.color}`}>
-                            <Icon className="w-3 h-3" />
-                            {cfg.label}
+                            <Icon className="w-3 h-3" />{cfg.label}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -347,13 +698,13 @@ export default function ContabilidadPage() {
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-slate-500">{t.doc_number ?? '—'}</td>
                         <td className="px-4 py-3 text-slate-600 max-w-xs truncate text-xs">{t.description ?? '—'}</td>
-                        <td className={`px-4 py-3 text-right font-black text-sm ${isIncome ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {isIncome ? '+' : '-'}${Number(t.amount).toFixed(2)}
+                        <td className={`px-4 py-3 text-right font-black text-sm ${isInc ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {isInc ? '+' : '-'}${Number(t.amount).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {t.qb_id
-                            ? <span title={`QB ID: ${t.qb_id}`}><CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /></span>
-                            : <span title="Sin confirmar en QB"><XCircle className="w-4 h-4 text-slate-300 mx-auto" /></span>
+                            ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                            : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />
                           }
                         </td>
                         <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
@@ -370,132 +721,145 @@ export default function ContabilidadPage() {
 
       ) : tab === 'cierres' ? (
 
-        /* ── CIERRES TAB ── */
+        /* ── CIERRES ── */
         <div className="space-y-3">
-          {cierres.length === 0 ? (
+          <div className="flex justify-end">
+            <button onClick={exportCierres}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
+              <Download className="w-3.5 h-3.5" /> Exportar CSV
+            </button>
+          </div>
+          {cierresFiltered.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No hay cierres de turno registrados</p>
+              <p className="text-sm">No hay cierres en este período</p>
             </div>
-          ) : (
-            cierres.map(c => {
-              const isFailed = !c.qb_synced
-              const msg = retryMsg?.id === c.id ? retryMsg : null
-              return (
-                <div
-                  key={c.id}
-                  className={`rounded-2xl border p-4 ${isFailed ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {c.sucursales && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                            <Building2 className="w-3 h-3" />{c.sucursales.code}
-                          </span>
-                        )}
-                        <span className="text-sm font-bold text-slate-800">{c.profiles?.full_name ?? c.profiles?.email ?? 'Cajero'}</span>
-                        <span className="text-slate-400 text-xs">{c.fecha}</span>
-                        {isFailed ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
-                            <XCircle className="w-3 h-3" />Sin sync QB
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3 h-3" />QB ✓
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
-                        <span><span className="font-semibold">Boletos:</span> {c.total_boletos}</span>
-                        <span><span className="font-semibold">Efectivo:</span> ${Number(c.total_efectivo).toFixed(2)}</span>
-                        <span><span className="font-semibold">Tarjeta:</span> ${Number(c.total_tarjeta).toFixed(2)}</span>
-                        <span><span className="font-semibold">Paquetes:</span> ${Number(c.total_paquetes).toFixed(2)}</span>
-                        <span className="font-black text-slate-800">Total: ${Number(c.total_general).toFixed(2)}</span>
-                      </div>
-                      {c.notas && <p className="mt-1 text-xs text-slate-500 italic">"{c.notas}"</p>}
-                      {msg && (
-                        <p className={`mt-2 text-xs font-semibold ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>
-                          {msg.ok ? '✓' : '✗'} {msg.text}
-                        </p>
+          ) : cierresFiltered.map(c => {
+            const isFailed = !c.qb_synced
+            const msg = retryMsg?.id === c.id ? retryMsg : null
+            return (
+              <div key={c.id} className={`rounded-2xl border p-4 ${isFailed ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {c.sucursales && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                          <Building2 className="w-3 h-3" />{c.sucursales.code}
+                        </span>
+                      )}
+                      <span className="text-sm font-bold text-slate-800">{c.profiles?.full_name ?? c.profiles?.email ?? 'Cajero'}</span>
+                      <span className="text-slate-400 text-xs">{c.fecha}</span>
+                      {isFailed ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
+                          <XCircle className="w-3 h-3" />Sin sync QB
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
+                          <CheckCircle2 className="w-3 h-3" />QB ✓
+                        </span>
                       )}
                     </div>
-                    {isFailed && (
-                      <button
-                        onClick={() => retryCierre(c.id)}
-                        disabled={retrying === c.id}
-                        className="shrink-0 inline-flex items-center gap-1.5 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-50 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
-                      >
-                        {retrying === c.id
-                          ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : <RotateCw className="w-3 h-3" />
-                        }
-                        {retrying === c.id ? 'Enviando...' : 'Reintentar QB'}
-                      </button>
+                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+                      <span><span className="font-semibold">Boletos:</span> {c.total_boletos}</span>
+                      <span><span className="font-semibold">Efectivo:</span> ${Number(c.total_efectivo).toFixed(2)}</span>
+                      <span><span className="font-semibold">Tarjeta:</span> ${Number(c.total_tarjeta).toFixed(2)}</span>
+                      <span><span className="font-semibold">Paquetes:</span> ${Number(c.total_paquetes).toFixed(2)}</span>
+                      <span className="font-black text-slate-800">Total: ${Number(c.total_general).toFixed(2)}</span>
+                    </div>
+                    {c.notas && <p className="mt-1 text-xs text-slate-500 italic">"{c.notas}"</p>}
+                    {msg && (
+                      <p className={`mt-2 text-xs font-semibold ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {msg.ok ? '✓' : '✗'} {msg.text}
+                      </p>
                     )}
                   </div>
+                  {isFailed && (
+                    <button onClick={() => retryCierre(c.id)} disabled={retrying === c.id}
+                      className="shrink-0 inline-flex items-center gap-1.5 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-50 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors">
+                      {retrying === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />}
+                      {retrying === c.id ? 'Enviando...' : 'Reintentar QB'}
+                    </button>
+                  )}
                 </div>
-              )
-            })
-          )}
+              </div>
+            )
+          })}
         </div>
 
       ) : (
 
-        /* ── GASTOS TAB ── */
-        gastos.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
-            <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No hay gastos registrados</p>
+        /* ── GASTOS ── */
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={exportGastos}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
+              <Download className="w-3.5 h-3.5" /> Exportar CSV
+            </button>
           </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Sucursal</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Descripción</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Empleado</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Pago</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Monto</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">QB</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {gastos.map(g => (
-                  <tr key={g.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{g.date}</td>
-                    <td className="px-4 py-3">
-                      {g.sucursales ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                          <Building2 className="w-3 h-3" />{g.sucursales.code}
-                        </span>
-                      ) : <span className="text-slate-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-700 text-xs">{g.category}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{g.description ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{g.profiles?.full_name ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      {g.payment_method === 'cash'
-                        ? <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Banknote className="w-3 h-3" /> Efectivo</span>
-                        : <span className="inline-flex items-center gap-1 text-xs text-slate-500"><CreditCard className="w-3 h-3" /> Tarjeta</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-right font-black text-red-600">${Number(g.amount).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      {g.qb_synced
-                        ? <span title={`QB: ${g.qb_purchase_id}`}><CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /></span>
-                        : <span title="No enviado a QB"><XCircle className="w-4 h-4 text-amber-400 mx-auto" /></span>
-                      }
-                    </td>
+          {gastosFiltered.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay gastos en este período</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Sucursal</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Descripción</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Empleado</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Pago</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Monto</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">QB</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {gastosFiltered.map(g => (
+                    <tr key={g.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{g.date}</td>
+                      <td className="px-4 py-3">
+                        {g.sucursales
+                          ? <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md"><Building2 className="w-3 h-3" />{g.sucursales.code}</span>
+                          : <span className="text-slate-300 text-xs">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-700 text-xs">{g.category}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{g.description ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{g.profiles?.full_name ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {g.payment_method === 'cash'
+                          ? <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Banknote className="w-3 h-3" /> Efectivo</span>
+                          : <span className="inline-flex items-center gap-1 text-xs text-slate-500"><CreditCard className="w-3 h-3" /> Tarjeta</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-right font-black text-red-600">${Number(g.amount).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {g.qb_synced
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                          : <XCircle className="w-4 h-4 text-amber-400 mx-auto" />
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-50 border-t border-slate-200">
+                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-slate-500">
+                      Total ({gastosFiltered.length} gastos)
+                    </td>
+                    <td className="px-4 py-3 text-right font-black text-red-700">
+                      ${usd(gastosFiltered.reduce((s, g) => s + Number(g.amount), 0))}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
