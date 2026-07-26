@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck, MessageCircle, TrendingUp } from 'lucide-react'
+import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Settings, UserCog, Package, BookOpen, Store, Route, UserCheck, MessageCircle, TrendingUp, Monitor } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
@@ -17,6 +17,7 @@ const NAV = [
   { href: '/admin/clientes',     icon: Users,           label: 'Clientes' },
   { href: '/admin/reportes',     icon: BarChart3,       label: 'Reportes' },
   { href: '/admin/analitica',    icon: TrendingUp,      label: 'Analítica' },
+  { href: '/admin/terminales',   icon: Monitor,         label: 'Terminales' },
   { href: '/admin/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
   { href: '/admin/personal',     icon: UserCog,         label: 'Personal' },
   { href: '/admin/paquetes',     icon: Package,         label: 'Paquetes' },

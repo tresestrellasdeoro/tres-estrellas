@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, Loader2, MessageCircle } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, MessageCircle, Clock } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
 
 const ALL_NAV = [
+  { href: '/personal/turno',         label: 'Mi turno',         icon: Clock,         perm: null },
   { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine,      perm: 'checkin' },
   { href: '/personal/venta',         label: 'Nueva venta',      icon: ShoppingCart,  perm: 'ventas' },
   { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList, perm: 'checkin' },
@@ -26,10 +27,18 @@ export function StaffLayoutClient({
 }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]           = useState(false)
+  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/staff/turno')
+      .then(r => r.json())
+      .then(d => setTurnoActivo(!!d.turno))
+      .catch(() => setTurnoActivo(null))
+  }, [pathname])
 
   const hasAll   = permisos.includes('all')
-  const navItems = ALL_NAV.filter(item => hasAll || permisos.includes(item.perm))
+  const navItems = ALL_NAV.filter(item => !item.perm || hasAll || permisos.includes(item.perm))
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -50,7 +59,10 @@ export function StaffLayoutClient({
                 active ? 'bg-[#c01515] text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'
               }`}>
               <item.icon className="w-4 h-4 shrink-0" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === '/personal/turno' && turnoActivo !== null && (
+                <span className={`w-2 h-2 rounded-full shrink-0 ${turnoActivo ? 'bg-green-400' : 'bg-amber-400'}`} />
+              )}
             </Link>
           )
         })

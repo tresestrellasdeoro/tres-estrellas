@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import {
   ShoppingCart, Plus, Minus, CheckCircle2, AlertCircle,
   Loader2, RotateCcw, Ticket, Clock, CreditCard, Banknote,
@@ -57,12 +58,17 @@ export default function VentaPage() {
   const squareRef = useRef<SquareCardHandle>(null)
 
   const [sucursalId, setSucursalId]   = useState<string | null>(null)
+  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null) // null = cargando
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => setSucursalId(d.sucursal_id ?? null))
       .catch(() => {})
+    fetch('/api/staff/turno')
+      .then(r => r.json())
+      .then(d => setTurnoActivo(!!d.turno))
+      .catch(() => setTurnoActivo(false))
   }, [])
 
   const [loading, setLoading]         = useState(false)
@@ -253,6 +259,29 @@ ${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
             </button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  /* ── Sin turno: bloqueado ── */
+  if (turnoActivo === false) {
+    return (
+      <div className="p-6 max-w-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-4">
+          <Clock className="w-10 h-10 text-amber-500" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Sin turno activo</h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Debes iniciar tu turno antes de realizar ventas.<br />
+          Ve a "Mi turno" para comenzar.
+        </p>
+        <Link
+          href="/personal/turno"
+          className="inline-flex items-center gap-2 bg-[#0a1e42] hover:bg-[#0f2c5c] text-white font-bold px-8 py-3.5 rounded-xl transition-colors text-sm"
+        >
+          <Clock className="w-4 h-4" />
+          Ir a Mi turno
+        </Link>
       </div>
     )
   }

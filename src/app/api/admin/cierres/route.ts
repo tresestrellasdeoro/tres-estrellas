@@ -57,15 +57,18 @@ export async function POST(req: NextRequest) {
 
   const svc = service()
 
-  // Prevent duplicate cierres for same sucursal+fecha
-  const { data: existing } = await svc
+  // Prevent duplicate cierres for same sucursal+fecha+user combination
+  // (multiple cajeros can close per branch per day — one cierre per cajero)
+  let dupeQuery = svc
     .from('cierres_turno')
     .select('id')
     .eq('sucursal_id', sucursal_id)
     .eq('fecha', fecha)
-    .maybeSingle()
+  if (user_id) dupeQuery = dupeQuery.eq('user_id', user_id) as any
+  const { data: existing } = await dupeQuery.maybeSingle()
   if (existing) {
-    return NextResponse.json({ error: `Ya existe un cierre para esta sucursal el ${fecha}` }, { status: 409 })
+    const who = user_id ? 'este cajero en esta sucursal' : 'esta sucursal'
+    return NextResponse.json({ error: `Ya existe un cierre para ${who} el ${fecha}` }, { status: 409 })
   }
 
   // Branches are in Pacific Time (UTC-7). Midnight local = 07:00 UTC.
