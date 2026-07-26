@@ -4,8 +4,14 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   ScanLine, Search, CheckCircle2, XCircle, User, CreditCard, Banknote,
   Loader2, RotateCcw, ArrowRight, ArrowLeft, Clock, Wifi,
-  ChevronDown, ChevronUp, CalendarDays, Mail, Hash,
+  ChevronDown, ChevronUp, CalendarDays, Mail, Hash, CalendarClock,
 } from 'lucide-react'
+
+const DEPARTURE_TIMES = [
+  '3:20 AM','4:30 AM','5:00 AM','6:00 AM','7:00 AM','7:30 AM','8:00 AM',
+  '9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM',
+  '4:00 PM','5:00 PM','6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM','11:00 PM',
+]
 
 interface Passenger {
   id: string
@@ -19,16 +25,20 @@ interface Passenger {
 }
 
 interface BookingResult {
-  id: string
-  booking_number: string
-  status: string
-  ticket_type: string
-  total_amount: number
-  payment_method: string
-  guest_email: string
-  created_at: string
-  return_date: string | null
-  passengers: Passenger[]
+  id:               string
+  booking_number:   string
+  status:           string
+  ticket_type:      string
+  total_amount:     number
+  payment_method:   string
+  guest_email:      string
+  created_at:       string
+  return_date:      string | null
+  departure_time:   string | null
+  origin_name:      string | null
+  destination_name: string | null
+  notes:            string | null
+  passengers:       Passenger[]
 }
 
 const AUTO_RESET_SECONDS = 8
@@ -49,6 +59,15 @@ export default function ValidarPage() {
   const [countdown, setCountdown]       = useState<number | null>(null)
   const inputRef                        = useRef<HTMLInputElement>(null)
   const countdownRef                    = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Reagendar modal ───────────────────────────────────────────────────
+  const [reagendarOpen, setReagendarOpen]   = useState(false)
+  const [reagendarLeg, setReagendarLeg]     = useState<'outbound' | 'return'>('outbound')
+  const [reagendarDate, setReagendarDate]   = useState('')
+  const [reagendarTime, setReagendarTime]   = useState('8:00 AM')
+  const [reagendarLoading, setReagendarLoading] = useState(false)
+  const [reagendarMsg, setReagendarMsg]     = useState('')
+  const [reagendarError, setReagendarError] = useState('')
 
   // ── Search mode ───────────────────────────────────────────────────────
   const [searchOpen, setSearchOpen]     = useState(false)
@@ -175,6 +194,55 @@ export default function ValidarPage() {
       setError('Error de conexión')
     } finally {
       setCheckingInLeg(null)
+    }
+  }
+
+  const openReagendar = (leg: 'outbound' | 'return') => {
+    setReagendarLeg(leg)
+    setReagendarDate('')
+    setReagendarTime('8:00 AM')
+    setReagendarMsg('')
+    setReagendarError('')
+    setReagendarOpen(true)
+    cancelCountdown()
+  }
+
+  const handleReagendar = async () => {
+    if (!result || !reagendarDate) return
+    setReagendarLoading(true)
+    setReagendarError('')
+    setReagendarMsg('')
+    try {
+      const body: Record<string, unknown> = {
+        booking_number:     result.booking_number,
+        leg:                reagendarLeg,
+        new_date:           reagendarDate,
+      }
+      if (reagendarLeg === 'outbound') body.new_departure_time = reagendarTime
+
+      const res  = await fetch('/api/staff/bookings/reagendar', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { setReagendarError(data.error || 'Error al reagendar'); return }
+
+      setReagendarMsg(data.msg)
+      // Actualizar result local con los nuevos valores
+      setResult(prev => {
+        if (!prev) return null
+        if (reagendarLeg === 'outbound') {
+          return { ...prev, departure_time: reagendarTime }
+        } else {
+          return { ...prev, return_date: reagendarDate }
+        }
+      })
+      setTimeout(() => setReagendarOpen(false), 2000)
+    } catch {
+      setReagendarError('Error de conexión')
+    } finally {
+      setReagendarLoading(false)
     }
   }
 
@@ -562,11 +630,130 @@ export default function ValidarPage() {
               )}
             </div>
 
-            <button onClick={handleReset}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 text-sm font-semibold transition-colors">
-              <RotateCcw className="w-4 h-4" />
-              Buscar otro boleto
-            </button>
+            {/* Botones de acción */}
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleReset}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 text-sm font-semibold transition-colors">
+                <RotateCcw className="w-4 h-4" />
+                Buscar otro boleto
+              </button>
+
+              {/* Reagendar ida — solo si no ha abordado */}
+              {result.status === 'confirmed' && !allOutboundDone && (
+                <button onClick={() => openReagendar('outbound')}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#c8a951] text-[#8a6d10] bg-amber-50 hover:bg-amber-100 text-sm font-semibold transition-colors">
+                  <CalendarClock className="w-4 h-4" />
+                  Reagendar ida
+                </button>
+              )}
+
+              {/* Reagendar regreso — solo si es round-trip y no ha regresado */}
+              {isRoundTrip && result.status === 'confirmed' && allOutboundDone && !allReturnDone && (
+                <button onClick={() => openReagendar('return')}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 text-sm font-semibold transition-colors">
+                  <CalendarClock className="w-4 h-4" />
+                  Reagendar regreso
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL REAGENDAR ──────────────────────────────────────────── */}
+      {reagendarOpen && result && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarClock className="w-5 h-5 text-[#c8a951]" />
+              <h3 className="font-black text-slate-800 text-lg">
+                Reagendar {reagendarLeg === 'outbound' ? 'ida' : 'regreso'}
+              </h3>
+            </div>
+
+            <p className="text-slate-500 text-sm mb-1">
+              <span className="font-mono font-bold text-[#0a1628]">{result.booking_number}</span>
+              {result.origin_name && result.destination_name &&
+                <> · {result.origin_name} → {result.destination_name}</>
+              }
+            </p>
+
+            {result.departure_time && reagendarLeg === 'outbound' && (
+              <p className="text-xs text-slate-400 mb-4">
+                Horario actual: <span className="font-bold">{result.departure_time}</span>
+              </p>
+            )}
+            {result.return_date && reagendarLeg === 'return' && (
+              <p className="text-xs text-slate-400 mb-4">
+                Fecha de regreso actual: <span className="font-bold">{result.return_date}</span>
+              </p>
+            )}
+
+            <div className="space-y-3 mb-4">
+              {/* Nueva fecha */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Nueva fecha
+                </label>
+                <input
+                  type="date"
+                  value={reagendarDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setReagendarDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a1e42]/40"
+                />
+              </div>
+
+              {/* Nueva hora — solo para outbound */}
+              {reagendarLeg === 'outbound' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                    Nuevo horario de salida
+                  </label>
+                  <select
+                    value={reagendarTime}
+                    onChange={e => setReagendarTime(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a1e42]/40"
+                  >
+                    {DEPARTURE_TIMES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {reagendarError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-700 text-xs font-semibold mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4 shrink-0" /> {reagendarError}
+              </div>
+            )}
+
+            {reagendarMsg && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-green-700 text-xs font-semibold mb-3 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" /> {reagendarMsg}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setReagendarOpen(false)}
+                disabled={reagendarLoading}
+                className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleReagendar}
+                disabled={reagendarLoading || !reagendarDate}
+                className="flex-1 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {reagendarLoading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
+                  : <><CalendarClock className="w-4 h-4" /> Confirmar</>
+                }
+              </button>
+            </div>
           </div>
         </div>
       )}
