@@ -42,11 +42,13 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // Pass role in app_metadata so the DB trigger picks it up directly on INSERT
   const { data: authData, error: authError } = await service.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: { full_name: name },
+    app_metadata:  { role },
   })
 
   if (authError || !authData.user) {
@@ -55,28 +57,16 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
-  // Upsert first (handles case where trigger hasn't fired yet)
-  await service.from('profiles').upsert({
-    id:           userId,
-    email,
-    full_name:    name,
-    role,
-    sucursal_id:  sucursal_id  ?? null,
-    departamento: departamento ?? null,
-    permisos:     permisos,
-  }, { onConflict: 'id' })
-
-  // Force-update the role after a brief wait in case the Supabase trigger
-  // fires after the upsert and resets role to 'customer'
-  await new Promise(r => setTimeout(r, 400))
+  // The trigger creates the profile with the role from app_metadata.
+  // This UPDATE also sets role explicitly as a safety net in case the trigger fallback fired.
   const { error: profileError } = await service
     .from('profiles')
-    .update({ role, sucursal_id: sucursal_id ?? null, departamento: departamento ?? null, permisos, full_name: name })
+    .update({ role, full_name: name, sucursal_id: sucursal_id ?? null, departamento: departamento ?? null, permisos })
     .eq('id', userId)
 
   if (profileError) {
     await service.auth.admin.deleteUser(userId)
-    return NextResponse.json({ error: `Error al asignar rol: ${profileError.message}` }, { status: 500 })
+    return NextResponse.json({ error: `Error al configurar perfil: ${profileError.message}` }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, user_id: userId }, { status: 201 })
