@@ -39,10 +39,19 @@ function LoginForm() {
       ])
 
       if (data?.user) {
-        // Get role via server API (bypasses RLS, guaranteed to read correct role)
-        const res = await fetch('/api/auth/me')
-        const json = await res.json()
-        const role = json?.role
+        // Primary: read role from app_metadata in the JWT (admin-controlled, tamper-proof)
+        // This is reliable because app_metadata is set server-side when creating staff.
+        // Fallback: fetch /api/auth/me for users created before app_metadata was used.
+        const appRole = (data.user.app_metadata as Record<string, string> | undefined)?.role ?? null
+        let role = appRole
+
+        if (!role) {
+          try {
+            const res = await fetch('/api/auth/me')
+            const json = await res.json()
+            role = json?.role ?? null
+          } catch {}
+        }
 
         if (role === 'cajero' || role === 'driver') {
           router.push('/personal/validar')
