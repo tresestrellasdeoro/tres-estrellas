@@ -32,13 +32,13 @@ export async function GET(req: NextRequest) {
 
   const { data: trip } = await service
     .from('trips')
-    .select('id')
+    .select('id, seats_available, seats_total')
     .eq('departure_date', date)
     .eq('departure_time', departureTimeDb)
     .eq('status', 'scheduled')
-    .maybeSingle()
+    .maybeSingle() as { data: { id: string; seats_available: number; seats_total: number } | null }
 
-  if (!trip?.id) return NextResponse.json({ seats: [] })
+  if (!trip?.id) return NextResponse.json({ seats: [], seats_available: null, seats_total: null })
 
   const { data } = await service
     .from('passengers')
@@ -51,5 +51,9 @@ export async function GET(req: NextRequest) {
     .map((r: any) => r.seat_number)
     .filter(Boolean) as string[]
 
-  return NextResponse.json({ seats })
+  return NextResponse.json({
+    seats,
+    seats_available: trip.seats_available,
+    seats_total:     trip.seats_total,
+  })
 }

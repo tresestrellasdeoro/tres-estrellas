@@ -165,10 +165,10 @@ export async function POST(req: NextRequest) {
       })()
     : null
 
-  // Find the specific trip matching date + departure time
+  // Find the specific trip matching date + departure time (include seats_available for capacity check)
   const { data: tripData } = departureTimeDb
-    ? await service.from('trips').select('id').eq('departure_date', date).eq('departure_time', departureTimeDb).eq('status', 'scheduled').maybeSingle()
-    : await service.from('trips').select('id').eq('departure_date', date).eq('status', 'scheduled').order('departure_time', { ascending: true }).limit(1).maybeSingle()
+    ? await service.from('trips').select('id, seats_available').eq('departure_date', date).eq('departure_time', departureTimeDb).eq('status', 'scheduled').maybeSingle()
+    : await service.from('trips').select('id, seats_available').eq('departure_date', date).eq('status', 'scheduled').order('departure_time', { ascending: true }).limit(1).maybeSingle()
 
   if (!tripData?.id) {
     if (squarePaymentId && squareClient) {
@@ -184,6 +184,29 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json({ error: 'No hay viajes programados para la fecha seleccionada. Por favor elige otra fecha.' }, { status: 404 })
+  }
+
+  // ── Capacity check ────────────────────────────────────────────────────────
+  const passengerCount  = passengers.length
+  const seatsAvailable  = (tripData as any).seats_available ?? 0
+  if (seatsAvailable < passengerCount) {
+    if (squarePaymentId && squareClient) {
+      try {
+        await squareClient.refunds.refundPayment({
+          paymentId:      squarePaymentId,
+          amountMoney:    { amount: BigInt(Math.round(serverTotal * 100)), currency: 'USD' },
+          idempotencyKey: crypto.randomUUID(),
+          reason:         'Trip fully booked — automatic refund',
+        })
+      } catch (refundErr: any) {
+        console.error('Refund failed (capacity):', refundErr)
+      }
+    }
+    return NextResponse.json({
+      error: seatsAvailable === 0
+        ? 'Este bus ya no tiene lugares disponibles. Por favor elige otro horario.'
+        : `Solo quedan ${seatsAvailable} lugar${seatsAvailable === 1 ? '' : 'es'} en este bus. Reduce el número de pasajeros o elige otro horario.`,
+    }, { status: 409 })
   }
 
   // Create booking
@@ -318,6 +341,14 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: 'Error al registrar los pasajeros' }, { status: 500 })
   }
+
+  // Decrement seats_available now that passengers are confirmed.
+  // The DB CHECK (seats_available >= 0) acts as the final guard against race conditions.
+  await service
+    .from('trips')
+    .update({ seats_available: seatsAvailable - passengerCount })
+    .eq('id', tripData.id)
+    .gte('seats_available', passengerCount)
 
   // Credit loyalty points to authenticated non-staff users
   const pointsEarned = (booking as any).points_earned ?? Math.floor(serverTotal)

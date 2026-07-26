@@ -66,7 +66,8 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [bookingQr, setBookingQr]     = useState('')
   const [bookingError, setBookingError] = useState('')
   const [squareReady, setSquareReady] = useState(false)
-  const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
+  const [occupiedSeats, setOccupiedSeats]   = useState<string[]>([])
+  const [seatsAvailable, setSeatsAvailable] = useState<number | null>(null)
 
   const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
     setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -437,6 +438,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 if (res.ok) {
                   const d = await res.json()
                   setOccupiedSeats(d.seats ?? [])
+                  setSeatsAvailable(d.seats_available ?? null)
                 }
               } catch {}
             }}
@@ -451,10 +453,25 @@ export function BookingFlow({ tripId }: { tripId: string }) {
       {/* ── STEP 1: Seat selection ── */}
       {step === 1 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <h2 className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2">
-            <Armchair className="w-5 h-5 text-[#c01515]" />
-            Selecciona tus asientos
-          </h2>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+              <Armchair className="w-5 h-5 text-[#c01515]" />
+              Selecciona tus asientos
+            </h2>
+            {seatsAvailable !== null && (
+              <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
+                seatsAvailable === 0
+                  ? 'bg-red-100 text-red-700'
+                  : seatsAvailable <= 5
+                  ? 'bg-orange-100 text-orange-700'
+                  : seatsAvailable <= 15
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-slate-100 text-slate-500'
+              }`}>
+                {seatsAvailable === 0 ? '¡Sin lugares!' : `${seatsAvailable} lugares disponibles`}
+              </span>
+            )}
+          </div>
           <p className="text-slate-400 text-sm mb-6">
             Bus de 14 filas × 4 columnas (A B | C D). Haz click en el asiento que quieras.
           </p>
