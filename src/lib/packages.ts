@@ -1,5 +1,5 @@
 export type PackageSize = 'sobre' | 'pequeno' | 'mediano' | 'grande' | 'extra_grande'
-export type PackageStatus = 'label_created' | 'received' | 'in_transit' | 'arrived' | 'delivered' | 'returned'
+export type PackageStatus = 'label_created' | 'received' | 'in_transit' | 'arrived' | 'delivered' | 'returned' | 'cancelled'
 
 export const PACKAGE_SIZES: Record<PackageSize, { label: string; desc: string; maxLbs: number; price: number; dims: string }> = {
   sobre:        { label: 'Sobre',        desc: 'Documentos, cartas, artículos ligeros', maxLbs: 1,  price: 10, dims: 'Hasta 1 lb' },
@@ -16,6 +16,7 @@ export const STATUS_META: Record<PackageStatus, { label: string; color: string; 
   arrived:       { label: 'Llegó a destino',       color: 'text-purple-700',  bg: 'bg-purple-100',  step: 3 },
   delivered:     { label: 'Entregado',             color: 'text-emerald-700', bg: 'bg-emerald-100', step: 4 },
   returned:      { label: 'Devuelto',              color: 'text-red-700',     bg: 'bg-red-100',     step: 5 },
+  cancelled:     { label: 'Cancelado',             color: 'text-red-700',     bg: 'bg-red-100',     step: -1 },
 }
 
 export function generateTrackingNumber(): string {

@@ -164,6 +164,7 @@ export async function POST(req: NextRequest) {
       .eq('id', turno.id)
 
     // Sync a QuickBooks
+    let qbSynced = false
     try {
       const { getValidTokens, logQBTransaction } = await import('@/lib/quickbooks/client')
       const tokens = await getValidTokens()
@@ -197,7 +198,6 @@ export async function POST(req: NextRequest) {
           Accept:         'application/json',
         }
         const QB_URL = `https://quickbooks.api.intuit.com/v3/company/${tokens.realm_id}/salesreceipt`
-        // Use turno ID short suffix to keep doc numbers unique per cajero per day
         const turnoSuffix = turno.id.slice(0, 6).toUpperCase()
 
         if (total_efectivo + total_paquetes > 0) {
@@ -248,14 +248,22 @@ export async function POST(req: NextRequest) {
         }
 
         await svc().from('cierres_turno').update({ qb_synced: true }).eq('id', cierre.id)
+        qbSynced = true
+      } else if (!tokens) {
+        // No QB tokens — skip but flag as pending
+        console.warn('QB turno sync: no valid tokens, cierre queued as pending')
+      } else {
+        // total_general = 0, nothing to sync
+        qbSynced = true
       }
     } catch (qbErr: any) {
-      console.error('QB turno sync skipped:', qbErr.message)
+      console.error('QB turno sync failed:', qbErr.message)
     }
 
     return NextResponse.json({
       ok: true,
       cierre_id: cierre.id,
+      qb_synced: qbSynced,
       totales: { total_boletos, total_efectivo, total_tarjeta, total_paquetes, total_general },
     })
   }

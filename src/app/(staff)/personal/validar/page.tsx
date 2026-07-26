@@ -5,6 +5,7 @@ import {
   ScanLine, Search, CheckCircle2, XCircle, User, CreditCard, Banknote,
   Loader2, RotateCcw, ArrowRight, ArrowLeft, Clock, Wifi,
   ChevronDown, ChevronUp, CalendarDays, Mail, Hash, CalendarClock,
+  Ban, AlertTriangle, Luggage, Plus,
 } from 'lucide-react'
 
 const DEPARTURE_TIMES = [
@@ -30,11 +31,13 @@ interface BookingResult {
   status:           string
   ticket_type:      string
   total_amount:     number
+  luggage_price:    number
+  luggage_label:    string | null
   payment_method:   string
   guest_email:      string
   created_at:       string
   return_date:      string | null
-  departure_date:   string | null  // fecha real del trip, ej "2026-07-20"
+  departure_date:   string | null
   departure_time:   string | null
   origin_name:      string | null
   destination_name: string | null
@@ -69,6 +72,22 @@ export default function ValidarPage() {
   const [reagendarLoading, setReagendarLoading] = useState(false)
   const [reagendarMsg, setReagendarMsg]     = useState('')
   const [reagendarError, setReagendarError] = useState('')
+
+  // ── Cancelar modal ────────────────────────────────────────────────────
+  const [cancelOpen,    setCancelOpen]    = useState(false)
+  const [cancelRazon,   setCancelRazon]   = useState('')
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelMsg,     setCancelMsg]     = useState('')
+  const [cancelError,   setCancelError]   = useState('')
+
+  // ── Equipaje extra inline ─────────────────────────────────────────────
+  const [extraOpen,     setExtraOpen]     = useState(false)
+  const [extraLabel,    setExtraLabel]    = useState('1 maleta extra')
+  const [extraPrice,    setExtraPrice]    = useState('')
+  const [extraPayment,  setExtraPayment]  = useState<'cash' | 'card'>('cash')
+  const [extraLoading,  setExtraLoading]  = useState(false)
+  const [extraMsg,      setExtraMsg]      = useState('')
+  const [extraError,    setExtraError]    = useState('')
 
   // ── Search mode ───────────────────────────────────────────────────────
   const [searchOpen, setSearchOpen]     = useState(false)
@@ -247,6 +266,41 @@ export default function ValidarPage() {
     }
   }
 
+  const handleCobrarEquipaje = async () => {
+    if (!result || !extraLabel.trim() || !extraPrice) return
+    const price = parseFloat(extraPrice)
+    if (isNaN(price) || price <= 0) return
+    setExtraLoading(true)
+    setExtraError('')
+    setExtraMsg('')
+    try {
+      const res  = await fetch('/api/staff/bookings/equipaje-extra', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          booking_number: result.booking_number,
+          luggage_label:  extraLabel.trim(),
+          extra_price:    price,
+          payment_method: extraPayment,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setExtraError(data.error || 'Error al cobrar'); return }
+      setExtraMsg(data.message)
+      setResult(prev => prev ? {
+        ...prev,
+        luggage_price: data.luggage_price,
+        luggage_label: data.luggage_label,
+        total_amount:  data.total_amount,
+      } : null)
+      setTimeout(() => { setExtraOpen(false); setExtraPrice('') }, 3000)
+    } catch {
+      setExtraError('Error de conexión')
+    } finally {
+      setExtraLoading(false)
+    }
+  }
+
   const handleReset = () => {
     cancelCountdown()
     setResult(null)
@@ -254,6 +308,37 @@ export default function ValidarPage() {
     setError('')
     setSearchResults([])
     refocusInput()
+  }
+
+  const openCancelar = () => {
+    setCancelRazon('')
+    setCancelMsg('')
+    setCancelError('')
+    setCancelOpen(true)
+    cancelCountdown()
+  }
+
+  const handleCancelar = async () => {
+    if (!result) return
+    setCancelLoading(true)
+    setCancelError('')
+    setCancelMsg('')
+    try {
+      const res  = await fetch('/api/staff/bookings/cancelar', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ booking_number: result.booking_number, razon: cancelRazon || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCancelError(data.error || 'Error al cancelar'); return }
+      setCancelMsg(data.message)
+      setResult(prev => prev ? { ...prev, status: data.status } : null)
+      setTimeout(() => setCancelOpen(false), 3000)
+    } catch {
+      setCancelError('Error de conexión')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   // ── Derived state ─────────────────────────────────────────────────────
@@ -693,7 +778,103 @@ export default function ValidarPage() {
                   <p className="font-semibold text-slate-700 text-xs truncate">{result.guest_email}</p>
                 </div>
               )}
+
+              {/* Equipaje */}
+              <div className="bg-slate-50 rounded-xl p-3 col-span-2">
+                <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                  <Luggage className="w-3 h-3" /> Equipaje
+                </p>
+                <p className="font-semibold text-slate-700 text-sm">
+                  {result.luggage_label || 'Sin equipaje adicional'}
+                  {result.luggage_price > 0 && (
+                    <span className="ml-2 text-slate-500 font-normal text-xs">+${result.luggage_price}</span>
+                  )}
+                </p>
+              </div>
             </div>
+
+            {/* Cobrar equipaje extra */}
+            {result.status === 'confirmed' && (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => { setExtraOpen(o => !o); setExtraMsg(''); setExtraError('') }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-sm font-bold text-slate-600"
+                >
+                  <span className="flex items-center gap-2">
+                    <Luggage className="w-4 h-4 text-slate-400" />
+                    Cobrar equipaje extra
+                  </span>
+                  <Plus className={`w-4 h-4 text-slate-400 transition-transform ${extraOpen ? 'rotate-45' : ''}`} />
+                </button>
+
+                {extraOpen && (
+                  <div className="px-4 pb-4 pt-3 border-t border-slate-100 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Descripción</label>
+                        <input
+                          value={extraLabel}
+                          onChange={e => setExtraLabel(e.target.value)}
+                          placeholder="Ej: 1 maleta extra"
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-[#c01515] focus:ring-1 focus:ring-[#c01515]/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Precio</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                          <input
+                            type="number" min="1" step="0.01"
+                            value={extraPrice}
+                            onChange={e => setExtraPrice(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full pl-6 pr-3 py-2 rounded-lg border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#c01515] focus:ring-1 focus:ring-[#c01515]/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['cash', 'card'] as const).map(m => (
+                        <button key={m} onClick={() => setExtraPayment(m)}
+                          className={`flex items-center gap-2 p-2.5 rounded-lg border-2 text-xs font-bold transition-all ${
+                            extraPayment === m ? 'border-[#c01515] bg-[#c01515]/5 text-[#c01515]' : 'border-slate-200 text-slate-500'
+                          }`}>
+                          {m === 'cash' ? <Banknote className="w-3.5 h-3.5" /> : <CreditCard className="w-3.5 h-3.5" />}
+                          {m === 'cash' ? 'Efectivo' : 'Tarjeta'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {extraPayment === 'card' && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 text-xs">
+                        Para cobrar con tarjeta usa la terminal física Square — ingresa el monto ${ extraPrice || '0'} directamente en el dispositivo.
+                      </div>
+                    )}
+
+                    {extraError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-red-700 text-xs font-semibold flex items-center gap-2">
+                        <XCircle className="w-3.5 h-3.5 shrink-0" /> {extraError}
+                      </div>
+                    )}
+                    {extraMsg && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-green-700 text-xs font-semibold flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {extraMsg}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleCobrarEquipaje}
+                      disabled={extraLoading || !extraLabel.trim() || !extraPrice || parseFloat(extraPrice) <= 0 || !!extraMsg}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#0f2c5c] hover:bg-[#0a1e42] disabled:opacity-40 text-white font-bold text-sm transition-colors"
+                    >
+                      {extraLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Luggage className="w-4 h-4" />}
+                      {extraLoading ? 'Cobrando...' : `Cobrar $${extraPrice || '0'} equipaje`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Botones de acción */}
             <div className="flex flex-wrap gap-2">
@@ -720,10 +901,102 @@ export default function ValidarPage() {
                   Reagendar regreso
                 </button>
               )}
+
+              {/* Cancelar boleto — solo si sigue activo */}
+              {result.status === 'confirmed' && (
+                <button onClick={openCancelar}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 text-sm font-semibold transition-colors">
+                  <Ban className="w-4 h-4" />
+                  Cancelar boleto
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+      {/* ── MODAL CANCELAR ───────────────────────────────────────────── */}
+      {cancelOpen && result && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+              </div>
+              <h3 className="font-black text-slate-800 text-lg">Cancelar boleto</h3>
+            </div>
+
+            <p className="text-slate-500 text-sm mb-1">
+              <span className="font-mono font-bold text-[#0a1628]">{result.booking_number}</span>
+              {result.origin_name && result.destination_name &&
+                <> · {result.origin_name} → {result.destination_name}</>
+              }
+            </p>
+            <p className="text-slate-500 text-xs mb-4">
+              {result.passengers.map(p => p.full_name).join(', ')}
+            </p>
+
+            {/* Aviso de reembolso */}
+            {result.payment_method === 'card' ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-xs">
+                <p className="font-bold text-blue-800">💳 Pago con tarjeta — se emitirá reembolso automático</p>
+                <p className="text-blue-700 mt-0.5">Square procesará el reembolso de <strong>${result.total_amount}</strong> a la tarjeta original (3–5 días hábiles).</p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs">
+                <p className="font-bold text-amber-800">💵 Pago en efectivo — reembolso manual</p>
+                <p className="text-amber-700 mt-0.5">Deberás devolver <strong>${result.total_amount}</strong> en efectivo al cliente en este momento.</p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                Motivo de cancelación (opcional)
+              </label>
+              <textarea
+                value={cancelRazon}
+                onChange={e => setCancelRazon(e.target.value)}
+                placeholder="Ej: Cliente no se presentó, error en reservación..."
+                rows={2}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-300"
+              />
+            </div>
+
+            {cancelError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-700 text-xs font-semibold mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4 shrink-0" /> {cancelError}
+              </div>
+            )}
+
+            {cancelMsg && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-green-700 text-xs font-semibold mb-3 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" /> {cancelMsg}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancelOpen(false)}
+                disabled={cancelLoading}
+                className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+              >
+                Volver
+              </button>
+              <button
+                onClick={handleCancelar}
+                disabled={cancelLoading || !!cancelMsg}
+                className="flex-1 bg-[#c01515] hover:bg-[#a01010] disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {cancelLoading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelando...</>
+                  : <><Ban className="w-4 h-4" /> Confirmar cancelación</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL REAGENDAR ──────────────────────────────────────────── */}
       {reagendarOpen && result && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">

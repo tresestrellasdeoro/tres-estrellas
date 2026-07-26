@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, Play, Square, Banknote, CreditCard, Package, Ticket, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
+import { Clock, Play, Square, Banknote, CreditCard, Package, Ticket, CheckCircle2, AlertCircle, AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
 
 interface Turno {
   id:             string
@@ -35,7 +35,8 @@ export default function TurnoPage() {
   const [success,  setSuccess]  = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [notas,    setNotas]    = useState('')
-  const [tick,     setTick]     = useState(0)
+  const [tick,      setTick]      = useState(0)
+  const [qbWarning, setQbWarning] = useState(false)
   const [cajeroNombre, setCajeroNombre] = useState('')
 
   const fetchTurno = useCallback(async () => {
@@ -93,7 +94,8 @@ export default function TurnoPage() {
       const d = await r.json()
       if (!r.ok) { setError(d.error || 'Error al cerrar turno'); return }
       setShowConfirm(false)
-      setSuccess('Turno cerrado y reporte enviado a QuickBooks correctamente.')
+      setQbWarning(d.qb_synced === false)
+      setSuccess('Turno cerrado correctamente.')
       await fetchTurno()
       setNotas('')
     } catch {
@@ -135,6 +137,19 @@ export default function TurnoPage() {
         <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
           <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
           <p className="text-green-700 text-sm">{success}</p>
+        </div>
+      )}
+
+      {qbWarning && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl p-4 mb-4">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-900 font-bold text-sm">Reporte pendiente en QuickBooks</p>
+            <p className="text-amber-800 text-xs mt-1">
+              El turno fue cerrado correctamente, pero el envío a QuickBooks no pudo completarse.
+              El administrador verá este cierre como pendiente y podrá reintentarlo desde Contabilidad.
+            </p>
+          </div>
         </div>
       )}
 

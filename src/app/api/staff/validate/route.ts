@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const service = getService()
   const { data, error } = await service
     .from('bookings')
-    .select('id, booking_number, status, ticket_type, total_amount, payment_method, guest_email, created_at, return_date, departure_time, origin_name, destination_name, notes, trips(departure_date), passengers(id, full_name, passenger_type, price, checked_in, checked_in_at, return_checked_in, return_checked_in_at)')
+    .select('id, booking_number, status, ticket_type, total_amount, luggage_price, luggage_label, payment_method, guest_email, square_payment_id, created_at, return_date, departure_time, origin_name, destination_name, notes, trips(departure_date), passengers(id, full_name, passenger_type, price, checked_in, checked_in_at, return_checked_in, return_checked_in_at)')
     .eq('booking_number', booking)
     .maybeSingle() as { data: any; error: any }
 

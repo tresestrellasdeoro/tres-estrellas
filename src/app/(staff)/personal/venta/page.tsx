@@ -5,13 +5,15 @@ import Link from 'next/link'
 import {
   ShoppingCart, Plus, Minus, CheckCircle2, AlertCircle,
   Loader2, RotateCcw, Ticket, Clock, CreditCard, Banknote,
-  ArrowRight, Printer,
+  ArrowRight, Printer, Luggage,
 } from 'lucide-react'
 import { SquareCard, type SquareCardHandle } from '@/components/public/square-card'
 import {
   ALL_STOPS, getPrice,
   type StopCode,
 } from '@/lib/data/bus-config'
+
+interface LuggageOpt { id: string; label: string; description: string; price: number; icon: string }
 
 // Stops available as origin (boarding)
 const ORIGINS: StopCode[]      = ['LA', 'HP', 'SYS', 'OTY', 'TIJ']
@@ -58,7 +60,11 @@ export default function VentaPage() {
   const squareRef = useRef<SquareCardHandle>(null)
 
   const [sucursalId, setSucursalId]   = useState<string | null>(null)
-  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null) // null = cargando
+  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null)
+
+  const NONE_LUGGAGE: LuggageOpt = { id: 'none', label: 'Sin equipaje adicional', description: 'Solo equipaje de mano (incluido)', price: 0, icon: '🎒' }
+  const [luggageOptions, setLuggageOptions] = useState<LuggageOpt[]>([NONE_LUGGAGE])
+  const [luggage, setLuggage] = useState<LuggageOpt>(NONE_LUGGAGE)
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -69,6 +75,10 @@ export default function VentaPage() {
       .then(r => r.json())
       .then(d => setTurnoActivo(!!d.turno))
       .catch(() => setTurnoActivo(false))
+    fetch('/api/luggage-types')
+      .then(r => r.json())
+      .then(d => { if (d.options?.length > 0) setLuggageOptions(d.options) })
+      .catch(() => {})
   }, [])
 
   const [loading, setLoading]         = useState(false)
@@ -88,7 +98,9 @@ export default function VentaPage() {
     return basePrice(p.passenger_type)
   }
 
-  const total = passengers.reduce((sum, p) => sum + passengerPrice(p), 0)
+  const passTotal    = passengers.reduce((sum, p) => sum + passengerPrice(p), 0)
+  const luggageTotal = luggage.price * passengers.length
+  const total        = passTotal + luggageTotal
 
   const addPassenger = () => {
     if (passengers.length >= 8) return
@@ -127,6 +139,8 @@ export default function VentaPage() {
         body: JSON.stringify({
           ticket_type:        ticketType,
           total_amount:       total,
+          luggage_price:      luggageTotal,
+          luggage_label:      luggage.price > 0 ? luggage.label : undefined,
           guest_email:        email || undefined,
           payment_method:     paymentMethod,
           source_id,
@@ -174,6 +188,7 @@ export default function VentaPage() {
     setError('')
     setPaymentMethod('cash')
     setSquareReady(false)
+    setLuggage(NONE_LUGGAGE)
   }
 
   /* ── SUCCESS SCREEN ── */
@@ -494,6 +509,44 @@ ${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
           </div>
         </div>
 
+        {/* Equipaje */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <Luggage className="w-3.5 h-3.5" /> Equipaje
+          </p>
+          <p className="text-slate-400 text-xs mb-3">El equipaje de mano siempre es gratuito. Agrega maletas si el pasajero necesita.</p>
+          <div className="space-y-2">
+            {luggageOptions.map(opt => {
+              const selected = luggage.id === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setLuggage(opt)}
+                  className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                    selected
+                      ? 'border-[#0f2c5c] bg-[#0f2c5c]/5'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-lg shrink-0">{opt.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold text-sm ${selected ? 'text-[#0f2c5c]' : 'text-slate-700'}`}>{opt.label}</p>
+                    <p className="text-slate-400 text-xs truncate">{opt.description}</p>
+                  </div>
+                  <span className={`font-black text-sm shrink-0 ${opt.price > 0 ? (selected ? 'text-[#0f2c5c]' : 'text-slate-600') : 'text-slate-400'}`}>
+                    {opt.price > 0 ? `+$${opt.price}/pax` : 'Gratis'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {luggage.price > 0 && (
+            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-blue-700 text-xs font-semibold">
+              +${luggage.price} × {passengers.length} pasajero{passengers.length !== 1 ? 's' : ''} = <strong>${luggageTotal}</strong> de equipaje
+            </div>
+          )}
+        </div>
+
         {/* Email (optional) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
@@ -554,6 +607,11 @@ ${success.qr ? `<img src="${success.qr}" alt="QR"/>` : ''}
               {ALL_STOPS[origin]?.name} → {ALL_STOPS[destination]?.name} ·{' '}
               {paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
             </p>
+            {luggage.price > 0 && (
+              <p className="text-white/60 text-xs mt-0.5 flex items-center gap-1">
+                <Luggage className="w-3 h-3" /> Equipaje ({luggage.label}) +${luggageTotal}
+              </p>
+            )}
           </div>
           <Ticket className="w-10 h-10 text-white/20" />
         </div>

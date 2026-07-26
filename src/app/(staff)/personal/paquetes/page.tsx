@@ -4,10 +4,18 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Package, ScanLine, CheckCircle2, AlertCircle, Plus, Printer,
   CreditCard, Banknote, Loader2, Search, Clock, ChevronRight, X, Wifi,
+  Ban, History, MapPin, AlertTriangle,
 } from 'lucide-react'
 import { STATUS_META, PACKAGE_SIZES, type PackageStatus, type PackageSize } from '@/lib/packages'
 import { NewPackageModal } from '@/components/packages/new-package-modal'
 import { SquareCard, type SquareCardHandle } from '@/components/public/square-card'
+
+interface PackageEvent {
+  status:     string
+  location:   string | null
+  notes:      string | null
+  created_at: string
+}
 
 const SCAN_STATUSES: { value: PackageStatus; label: string; desc: string; color: string }[] = [
   { value: 'received',   label: 'Recibido en terminal', desc: 'El paquete ingresó a la terminal de origen',  color: 'bg-blue-50 border-blue-300 text-blue-700' },
@@ -72,6 +80,18 @@ export default function StaffPaquetesPage() {
 
   const [showNew, setShowNew]       = useState(false)
 
+  // Cancel
+  const [cancelOpen,    setCancelOpen]    = useState(false)
+  const [cancelRazon,   setCancelRazon]   = useState('')
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelMsg,     setCancelMsg]     = useState('')
+  const [cancelError,   setCancelError]   = useState('')
+
+  // Events timeline
+  const [events,        setEvents]        = useState<PackageEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [showEvents,    setShowEvents]    = useState(false)
+
   // ── Fetch list ────────────────────────────────────────────────────────
   const fetchPackages = useCallback(async (q = '') => {
     q ? setSearching(true) : setListLoading(true)
@@ -128,6 +148,13 @@ export default function StaffPaquetesPage() {
     setPayMode(null)
     setPayError('')
     setPaySuccess('')
+    setCancelOpen(false)
+    setCancelMsg('')
+    setCancelError('')
+    setEvents([])
+    setShowEvents(false)
+    // Auto-fetch events
+    fetchEvents(pkg.tracking_number)
   }
 
   const clearSelected = () => {
@@ -137,6 +164,53 @@ export default function StaffPaquetesPage() {
     setPayMode(null)
     setPayError('')
     setPaySuccess('')
+    setEvents([])
+    setShowEvents(false)
+  }
+
+  // ── Fetch event timeline ──────────────────────────────────────────────
+  const fetchEvents = async (tracking: string) => {
+    setEventsLoading(true)
+    try {
+      const res  = await fetch(`/api/packages/track?n=${encodeURIComponent(tracking)}`)
+      const data = await res.json()
+      setEvents(data.events ?? [])
+    } catch { /* silently ignore */ }
+    finally { setEventsLoading(false) }
+  }
+
+  // ── Cancel package ────────────────────────────────────────────────────
+  const openCancel = () => {
+    setCancelRazon('')
+    setCancelMsg('')
+    setCancelError('')
+    setCancelOpen(true)
+  }
+
+  const handleCancel = async () => {
+    if (!selected) return
+    setCancelLoading(true)
+    setCancelError('')
+    setCancelMsg('')
+    try {
+      const res  = await fetch('/api/packages/cancel', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id: selected.id, razon: cancelRazon || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCancelError(data.error || 'Error al cancelar'); return }
+      setCancelMsg(data.message)
+      const updated = { ...selected, status: 'cancelled' as PackageStatus, payment_status: data.payment_status }
+      setSelected(updated)
+      setPackages(prev => prev.map(p => p.id === selected.id ? updated : p))
+      fetchEvents(selected.tracking_number)
+      setTimeout(() => setCancelOpen(false), 3500)
+    } catch {
+      setCancelError('Error de conexión')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   // ── Status update ─────────────────────────────────────────────────────
@@ -543,6 +617,151 @@ export default function StaffPaquetesPage() {
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-colors">
                 <Printer className="w-4 h-4" /> Imprimir etiqueta
               </button>
+
+              {/* ── HISTORIAL DE EVENTOS ── */}
+              <div>
+                <button
+                  onClick={() => setShowEvents(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <History className="w-4 h-4" />
+                    Historial del envío
+                    {events.length > 0 && (
+                      <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-bold">
+                        {events.length}
+                      </span>
+                    )}
+                  </span>
+                  {eventsLoading
+                    ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                    : <span className="text-slate-400 text-xs">{showEvents ? '▲' : '▼'}</span>
+                  }
+                </button>
+
+                {showEvents && (
+                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
+                    {events.length === 0 ? (
+                      <p className="text-slate-400 text-sm text-center py-6">Sin eventos registrados</p>
+                    ) : (
+                      <ol className="divide-y divide-slate-100">
+                        {events.map((ev, i) => {
+                          const meta = STATUS_META[ev.status as PackageStatus] ?? { label: ev.status, color: 'text-slate-600', bg: 'bg-slate-100' }
+                          return (
+                            <li key={i} className="px-4 py-3 flex items-start gap-3">
+                              <span className={`mt-0.5 inline-block w-2 h-2 rounded-full shrink-0 ${meta.bg.replace('bg-', 'bg-').replace('-100', '-400')}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`text-xs font-bold ${meta.color}`}>{meta.label}</span>
+                                  {ev.location && (
+                                    <span className="text-xs text-slate-500 flex items-center gap-0.5">
+                                      <MapPin className="w-3 h-3" />{ev.location}
+                                    </span>
+                                  )}
+                                </div>
+                                {ev.notes && <p className="text-xs text-slate-500 mt-0.5 italic">"{ev.notes}"</p>}
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  {new Date(ev.created_at).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── CANCELAR ENVÍO ── */}
+              {!['delivered', 'returned', 'cancelled'].includes(selected.status) && (
+                <div>
+                  {!cancelOpen ? (
+                    <button
+                      onClick={openCancel}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition-colors"
+                    >
+                      <Ban className="w-4 h-4" /> Cancelar envío
+                    </button>
+                  ) : (
+                    <div className="border-2 border-red-200 bg-red-50 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                        <p className="font-black text-red-700 text-sm">Cancelar envío</p>
+                      </div>
+
+                      {/* Aviso de reembolso */}
+                      {selected.payment_status === 'paid' && selected.payment_method === 'card' && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs">
+                          <p className="font-bold text-blue-800">💳 Reembolso automático</p>
+                          <p className="text-blue-700 mt-0.5">Se emitirá un reembolso de <strong>${Number(selected.price).toFixed(2)}</strong> a la tarjeta original (3–5 días hábiles).</p>
+                        </div>
+                      )}
+                      {selected.payment_status === 'paid' && selected.payment_method === 'cash' && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
+                          <p className="font-bold text-amber-800">💵 Reembolso en efectivo</p>
+                          <p className="text-amber-700 mt-0.5">Devuelve <strong>${Number(selected.price).toFixed(2)}</strong> en efectivo al remitente en este momento.</p>
+                        </div>
+                      )}
+                      {selected.payment_status === 'pending' && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+                          <p className="text-slate-600">Sin cargo previo — no hay nada que reembolsar.</p>
+                        </div>
+                      )}
+                      {['in_transit', 'arrived'].includes(selected.status) && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs">
+                          <p className="font-bold text-orange-800">⚠️ Paquete en ruta</p>
+                          <p className="text-orange-700 mt-0.5">El paquete ya salió. Coordina con la terminal de destino para recuperarlo.</p>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                          Motivo (opcional)
+                        </label>
+                        <textarea
+                          value={cancelRazon}
+                          onChange={e => setCancelRazon(e.target.value)}
+                          placeholder="Ej: Error en dirección, cliente solicitó cancelación..."
+                          rows={2}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-300 bg-white"
+                        />
+                      </div>
+
+                      {cancelError && (
+                        <div className="flex items-center gap-2 text-xs text-red-700 bg-white border border-red-200 rounded-xl px-3 py-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" /> {cancelError}
+                        </div>
+                      )}
+                      {cancelMsg && (
+                        <div className="flex items-center gap-2 text-xs text-emerald-700 bg-white border border-emerald-200 rounded-xl px-3 py-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" /> {cancelMsg}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setCancelOpen(false)}
+                          disabled={cancelLoading}
+                          className="flex-1 border border-slate-200 text-slate-600 hover:bg-white font-semibold py-2 rounded-xl text-sm transition-colors"
+                        >
+                          Volver
+                        </button>
+                        <button
+                          onClick={handleCancel}
+                          disabled={cancelLoading || !!cancelMsg}
+                          className="flex-1 bg-[#c01515] hover:bg-[#a01010] disabled:opacity-40 text-white font-bold py-2 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                        >
+                          {cancelLoading
+                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cancelando...</>
+                            : <><Ban className="w-3.5 h-3.5" /> Confirmar</>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button onClick={clearSelected}
                 className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-slate-400 hover:text-slate-600 text-xs font-semibold transition-colors">

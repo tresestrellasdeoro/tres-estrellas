@@ -34,6 +34,7 @@ const BookingSchema = z.object({
   departure_time:        z.string(),
   return_date:           z.string().optional(),
   luggage_price:         z.number().min(0).default(0),
+  luggage_label:         z.string().optional(),
   passengers: z.array(z.object({
     full_name:      z.string().min(2),
     passenger_type: z.enum(['adult', 'child', 'senior']),
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     ticket_type, total_amount, guest_email, payment_method, source_id,
     origin_name, destination_name, boarding_stop_code, destination_stop_code,
     boarding_stop_name, date, departure_time, return_date, passengers,
-    sucursal_id, luggage_price,
+    sucursal_id, luggage_price, luggage_label,
   } = parsed.data
 
   const service = createServiceClient(
@@ -110,11 +111,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate luggage price is a known multiple
+    // Validate luggage price is a known multiple (check static + DB options)
     if (luggage_price > 0) {
-      const paxCount    = passengers.length
-      const validTotals = LUGGAGE_OPTIONS.map(o => o.price * paxCount)
-      if (!validTotals.includes(luggage_price)) {
+      const paxCount        = passengers.length
+      const staticTotals    = LUGGAGE_OPTIONS.map(o => o.price * paxCount)
+      let dbTotals: number[] = []
+      try {
+        const { data: dbLuggage } = await service.from('luggage_types').select('extra_fee').eq('is_active', true)
+        dbTotals = (dbLuggage ?? []).map((lt: any) => Math.round(Number(lt.extra_fee) * paxCount))
+      } catch {}
+      const validTotals = [...new Set([...staticTotals, ...dbTotals])]
+      if (!validTotals.includes(Math.round(luggage_price))) {
         return NextResponse.json({ error: 'Precio de equipaje no válido' }, { status: 422 })
       }
     }
@@ -226,6 +233,8 @@ export async function POST(req: NextRequest) {
   if (customerId)     bookingInsert.customer_id      = customerId
   if (sucursal_id)    bookingInsert.sucursal_id      = sucursal_id
   if (soldByUserId)   bookingInsert.sold_by_user_id  = soldByUserId
+  if (luggage_price > 0) bookingInsert.luggage_price = luggage_price
+  if (luggage_label && luggage_price > 0) bookingInsert.luggage_label = luggage_label
 
   const { data: booking, error: bookingError } = await service
     .from('bookings')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   User, Armchair, CreditCard, CheckCircle2, ChevronLeft, Bus,
@@ -55,8 +55,21 @@ export function BookingFlow({ tripId }: { tripId: string }) {
     Array.from({ length: passCount }, () => ({ name: '', type: 'adult' }))
   )
   const [boardingStop, setBoardingStop] = useState<StopCode>(origin)
+  const [luggageOptions, setLuggageOptions] = useState<LuggageOption[]>(LUGGAGE_OPTIONS)
   const [luggage, setLuggage]           = useState<LuggageOption>(LUGGAGE_OPTIONS[0])
   const [selectedSeats, setSelectedSeats] = useState<Record<number, SeatId>>({})
+
+  useEffect(() => {
+    fetch('/api/luggage-types')
+      .then(r => r.json())
+      .then(d => {
+        if (d.options?.length > 0) {
+          setLuggageOptions(d.options)
+          setLuggage(d.options[0])
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const [returnDate, setReturnDate]  = useState('')
   const [email, setEmail]           = useState('')
@@ -108,6 +121,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           ticket_type:           tripType,
           total_amount:          grandTotal,
           luggage_price:         luggageTotal,
+          luggage_label:         luggage.price > 0 ? luggage.label : undefined,
           guest_email:           email,
           payment_method:        paymentMethod,
           source_id:             sourceId,
@@ -345,7 +359,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
             </h2>
             <p className="text-slate-400 text-sm mb-4">El equipaje de mano siempre es gratuito. Agrega maletas si necesitas.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {LUGGAGE_OPTIONS.map(opt => {
+              {luggageOptions.map(opt => {
                 const selected = luggage.id === opt.id
                 return (
                   <button

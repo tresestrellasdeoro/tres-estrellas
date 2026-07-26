@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const sucursalId = searchParams.get('sucursal_id')
   const fecha      = searchParams.get('fecha')
+  const qbSynced   = searchParams.get('qb_synced')
   const limit      = parseInt(searchParams.get('limit') ?? '50')
 
   let query = service()
@@ -29,8 +30,9 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (sucursalId) query = query.eq('sucursal_id', sucursalId) as any
-  if (fecha)      query = query.eq('fecha', fecha) as any
+  if (sucursalId)     query = query.eq('sucursal_id', sucursalId) as any
+  if (fecha)          query = query.eq('fecha', fecha) as any
+  if (qbSynced !== null) query = query.eq('qb_synced', qbSynced === 'true') as any
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

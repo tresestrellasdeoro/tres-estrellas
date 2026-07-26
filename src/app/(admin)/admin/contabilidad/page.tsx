@@ -5,6 +5,7 @@ import {
   BookOpen, TrendingUp, TrendingDown, Loader2, CheckCircle2,
   RefreshCw, XCircle, Banknote, CreditCard, Building2,
   Globe, Wallet, Scale, ArrowUpRight, ArrowDownRight,
+  AlertTriangle, RotateCw,
 } from 'lucide-react'
 
 interface QBTransaction {
@@ -32,7 +33,22 @@ interface Gasto {
   sucursales:     { name: string; code: string } | null
 }
 
-type Tab = 'qb' | 'gastos'
+interface Cierre {
+  id:             string
+  created_at:     string
+  fecha:          string
+  total_boletos:  number
+  total_efectivo: number
+  total_tarjeta:  number
+  total_paquetes: number
+  total_general:  number
+  qb_synced:      boolean
+  notas:          string | null
+  sucursales:     { name: string; code: string } | null
+  profiles:       { full_name: string; email: string } | null
+}
+
+type Tab = 'qb' | 'gastos' | 'cierres'
 type TxFilter = 'all' | 'online' | 'efectivo' | 'tarjeta' | 'gasto'
 
 function getTxSubtype(t: QBTransaction): 'online' | 'efectivo' | 'tarjeta' | 'gasto' {
@@ -59,22 +75,49 @@ export default function ContabilidadPage() {
   const [tab,          setTab]          = useState<Tab>('qb')
   const [transactions, setTransactions] = useState<QBTransaction[]>([])
   const [gastos,       setGastos]       = useState<Gasto[]>([])
+  const [cierres,      setCierres]      = useState<Cierre[]>([])
   const [loading,      setLoading]      = useState(true)
   const [filter,       setFilter]       = useState<TxFilter>('all')
+  const [retrying,     setRetrying]     = useState<string | null>(null)
+  const [retryMsg,     setRetryMsg]     = useState<{ id: string; ok: boolean; text: string } | null>(null)
 
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const [qbRes, gastosRes] = await Promise.all([
+      const [qbRes, gastosRes, cierresRes] = await Promise.all([
         fetch('/api/admin/qb-transactions?limit=500'),
         fetch('/api/staff/gastos?limit=500'),
+        fetch('/api/admin/cierres?limit=200'),
       ])
-      const qbData     = await qbRes.json()
-      const gastosData = await gastosRes.json()
+      const qbData      = await qbRes.json()
+      const gastosData  = await gastosRes.json()
+      const cierresData = await cierresRes.json()
       setTransactions(qbData.transactions ?? [])
       setGastos(gastosData.gastos ?? [])
+      setCierres(cierresData.cierres ?? [])
     } catch {}
     finally { setLoading(false) }
+  }
+
+  const retryCierre = async (cierreId: string) => {
+    setRetrying(cierreId)
+    setRetryMsg(null)
+    try {
+      const r = await fetch('/api/admin/cierres/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ cierre_id: cierreId }),
+      })
+      const d = await r.json()
+      setRetryMsg({ id: cierreId, ok: r.ok && d.ok, text: d.message ?? d.error ?? 'Error desconocido' })
+      if (r.ok && d.ok) {
+        setCierres(prev => prev.map(c => c.id === cierreId ? { ...c, qb_synced: true } : c))
+      }
+    } catch {
+      setRetryMsg({ id: cierreId, ok: false, text: 'No se pudo conectar al servidor.' })
+    } finally {
+      setRetrying(null)
+    }
   }
 
   useEffect(() => { fetchAll() }, [])
@@ -87,6 +130,7 @@ export default function ContabilidadPage() {
   const totalIngresos = online + efectivo + tarjeta
   const balance       = totalIngresos - gastosQB
   const gastosPend    = gastos.filter(g => !g.qb_synced).reduce((s, g) => s + Number(g.amount), 0)
+  const cierresPend   = cierres.filter(c => !c.qb_synced)
 
   const filtered = filter === 'all'
     ? transactions
@@ -153,6 +197,25 @@ export default function ContabilidadPage() {
         </div>
       </div>
 
+      {/* Alert: cierres sin QB */}
+      {cierresPend.length > 0 && (
+        <div
+          className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl p-4 cursor-pointer hover:bg-amber-100 transition-colors"
+          onClick={() => setTab('cierres')}
+        >
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-amber-900 text-sm">
+              {cierresPend.length} {cierresPend.length === 1 ? 'cierre pendiente' : 'cierres pendientes'} en QuickBooks
+            </p>
+            <p className="text-amber-800 text-xs mt-0.5">
+              {cierresPend.map(c => `${c.sucursales?.code ?? '?'} (${c.fecha})`).join(' · ')}
+            </p>
+          </div>
+          <span className="text-amber-700 text-xs font-bold whitespace-nowrap">Ver cierres →</span>
+        </div>
+      )}
+
       {/* Row 2: expenses + balance */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
@@ -187,14 +250,23 @@ export default function ContabilidadPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200">
-        {([['qb', 'Registro QuickBooks'], ['gastos', 'Todos los gastos']] as const).map(([val, label]) => (
+        {([
+          ['qb',      'Registro QuickBooks'],
+          ['gastos',  'Todos los gastos'],
+          ['cierres', 'Cierres de turno'],
+        ] as const).map(([val, label]) => (
           <button key={val} onClick={() => setTab(val)}
-            className={`px-5 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px ${
+            className={`relative px-5 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px ${
               tab === val
                 ? 'border-[#c01515] text-[#c01515]'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}>
             {label}
+            {val === 'cierres' && cierresPend.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-black bg-amber-500 text-white rounded-full">
+                {cierresPend.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -293,6 +365,78 @@ export default function ContabilidadPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+
+      ) : tab === 'cierres' ? (
+
+        /* ── CIERRES TAB ── */
+        <div className="space-y-3">
+          {cierres.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay cierres de turno registrados</p>
+            </div>
+          ) : (
+            cierres.map(c => {
+              const isFailed = !c.qb_synced
+              const msg = retryMsg?.id === c.id ? retryMsg : null
+              return (
+                <div
+                  key={c.id}
+                  className={`rounded-2xl border p-4 ${isFailed ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {c.sucursales && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                            <Building2 className="w-3 h-3" />{c.sucursales.code}
+                          </span>
+                        )}
+                        <span className="text-sm font-bold text-slate-800">{c.profiles?.full_name ?? c.profiles?.email ?? 'Cajero'}</span>
+                        <span className="text-slate-400 text-xs">{c.fecha}</span>
+                        {isFailed ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
+                            <XCircle className="w-3 h-3" />Sin sync QB
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
+                            <CheckCircle2 className="w-3 h-3" />QB ✓
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+                        <span><span className="font-semibold">Boletos:</span> {c.total_boletos}</span>
+                        <span><span className="font-semibold">Efectivo:</span> ${Number(c.total_efectivo).toFixed(2)}</span>
+                        <span><span className="font-semibold">Tarjeta:</span> ${Number(c.total_tarjeta).toFixed(2)}</span>
+                        <span><span className="font-semibold">Paquetes:</span> ${Number(c.total_paquetes).toFixed(2)}</span>
+                        <span className="font-black text-slate-800">Total: ${Number(c.total_general).toFixed(2)}</span>
+                      </div>
+                      {c.notas && <p className="mt-1 text-xs text-slate-500 italic">"{c.notas}"</p>}
+                      {msg && (
+                        <p className={`mt-2 text-xs font-semibold ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {msg.ok ? '✓' : '✗'} {msg.text}
+                        </p>
+                      )}
+                    </div>
+                    {isFailed && (
+                      <button
+                        onClick={() => retryCierre(c.id)}
+                        disabled={retrying === c.id}
+                        className="shrink-0 inline-flex items-center gap-1.5 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-50 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        {retrying === c.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <RotateCw className="w-3 h-3" />
+                        }
+                        {retrying === c.id ? 'Enviando...' : 'Reintentar QB'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
 
