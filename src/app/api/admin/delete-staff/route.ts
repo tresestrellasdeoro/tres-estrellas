@@ -28,18 +28,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No se puede eliminar una cuenta de administrador' }, { status: 403 })
   }
 
-  // Nullify FK references before deleting so cascades don't block
+  // Nullify ALL FK references before deleting
   await Promise.all([
     svc.from('bookings').update({ customer_id: null }).eq('customer_id', user_id),
+    svc.from('bookings').update({ sold_by_user_id: null }).eq('sold_by_user_id', user_id),
+    svc.from('loyalty_transactions').update({ customer_id: null }).eq('customer_id', user_id),
+    svc.from('packages').update({ customer_id: null }).eq('customer_id', user_id),
+    svc.from('packages').update({ paid_by: null }).eq('paid_by', user_id),
     svc.from('gastos').update({ created_by: null }).eq('created_by', user_id),
     svc.from('support_tickets').update({ created_by: null }).eq('created_by', user_id),
     svc.from('support_tickets').update({ assigned_to: null }).eq('assigned_to', user_id),
     svc.from('support_messages').update({ sender_id: null }).eq('sender_id', user_id),
     svc.from('trips').update({ driver_id: null }).eq('driver_id', user_id),
+    svc.from('cierres_turno').update({ cajero_id: null }).eq('cajero_id', user_id),
   ])
 
   // Delete profile row first, then auth user
-  await svc.from('profiles').delete().eq('id', user_id)
+  const { error: profileErr } = await svc.from('profiles').delete().eq('id', user_id)
+  if (profileErr) return NextResponse.json({ error: `Error borrando perfil: ${profileErr.message}` }, { status: 500 })
 
   const { error } = await svc.auth.admin.deleteUser(user_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
