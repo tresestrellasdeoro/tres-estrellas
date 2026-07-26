@@ -119,6 +119,13 @@ export async function POST(req: NextRequest) {
   let qbError: string | null = null
   try {
     const { createPurchase, logQBTransaction } = await import('@/lib/quickbooks/client')
+    // Check for category-level QB account mapping
+    const { data: catMapping } = await db
+      .from('qb_category_mappings')
+      .select('qb_account_id')
+      .eq('category', category)
+      .maybeSingle() as { data: { qb_account_id: string } | null }
+
     const result = await createPurchase({
       amount,
       category,
@@ -129,7 +136,9 @@ export async function POST(req: NextRequest) {
       sucursalCode,
       docNumber,
       paymentAccountId: payment_method === 'cash' ? qbCashAccountId : null,
-      expenseAccountId: qbExpenseAccountId,
+      expenseAccountId: catMapping?.qb_account_id ?? qbExpenseAccountId,
+      vendor:           vendor ?? null,
+      receiptNumber:    receipt_number ?? null,
     })
     qbPurchaseId = result.Purchase.Id
 

@@ -118,16 +118,61 @@ export interface SalesReceiptParams {
 }
 
 export interface PurchaseParams {
-  amount:           number
-  category:         string
-  description:      string
-  date:             string
-  paymentMethod:    'cash' | 'card'
-  sucursalName?:    string | null
-  sucursalCode?:    string | null
-  docNumber?:       string
+  amount:            number
+  category:          string
+  description:       string
+  date:              string
+  paymentMethod:     'cash' | 'card'
+  sucursalName?:     string | null
+  sucursalCode?:     string | null
+  docNumber?:        string
   paymentAccountId?: string | null
   expenseAccountId?: string | null
+  vendor?:           string | null
+  receiptNumber?:    string | null
+}
+
+// ── Vendor lookup / create ────────────────────────────────────────────────────
+
+export async function findOrCreateVendor(name: string, tokens: { access_token: string; realm_id: string }): Promise<string | null> {
+  try {
+    const safe  = name.replace(/'/g, "\\'").slice(0, 100)
+    const query = encodeURIComponent(`SELECT Id, DisplayName FROM Vendor WHERE DisplayName = '${safe}' MAXRESULTS 1`)
+    const res   = await fetch(`${QB_API_BASE}/${tokens.realm_id}/query?query=${query}&minorversion=65`, {
+      headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: 'application/json' },
+    })
+    if (res.ok) {
+      const d = await res.json()
+      const existing = d?.QueryResponse?.Vendor?.[0]
+      if (existing?.Id) return existing.Id
+    }
+
+    // Not found — create it
+    const createRes = await fetch(`${QB_API_BASE}/${tokens.realm_id}/vendor?minorversion=65`, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body:    JSON.stringify({ DisplayName: name.slice(0, 100) }),
+    })
+    if (!createRes.ok) return null
+    const created = await createRes.json()
+    return created?.Vendor?.Id ?? null
+  } catch {
+    return null
+  }
+}
+
+// ── Fetch expense accounts from QB ────────────────────────────────────────────
+
+export async function fetchExpenseAccounts(): Promise<{ id: string; name: string; subType: string }[]> {
+  const tokens = await getValidTokens()
+  if (!tokens) return []
+  const query = encodeURIComponent(`SELECT Id, Name, AccountSubType FROM Account WHERE AccountType = 'Expense' AND Active = true MAXRESULTS 200`)
+  const res   = await fetch(`${QB_API_BASE}/${tokens.realm_id}/query?query=${query}&minorversion=65`, {
+    headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: 'application/json' },
+  })
+  if (!res.ok) return []
+  const d = await res.json()
+  return (d?.QueryResponse?.Account ?? []).map((a: any) => ({ id: a.Id, name: a.Name, subType: a.AccountSubType ?? '' }))
 }
 
 export async function createPurchase(params: PurchaseParams) {
@@ -144,7 +189,7 @@ export async function createPurchase(params: PurchaseParams) {
   const branchTag  = params.sucursalCode ? `[${params.sucursalCode}]` : ''
   const lineDesc   = [branchTag, params.category, params.description].filter(Boolean).join(' — ')
 
-  const body = {
+  const body: Record<string, unknown> = {
     PaymentType:  params.paymentMethod === 'card' ? 'CreditCard' : 'Cash',
     AccountRef:   { value: paymentAccountId },
     TxnDate:      params.date,
@@ -152,7 +197,9 @@ export async function createPurchase(params: PurchaseParams) {
     PrivateNote:  [
       `Sucursal: ${params.sucursalName ?? 'Sin sucursal'}`,
       `Categoría: ${params.category}`,
+      `Proveedor: ${params.vendor || '—'}`,
       `Descripción: ${params.description || '—'}`,
+      `No. Recibo: ${params.receiptNumber || '—'}`,
       `Pago: ${params.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}`,
     ].join('\n'),
     Line: [{
@@ -164,6 +211,12 @@ export async function createPurchase(params: PurchaseParams) {
         BillableStatus: 'NotBillable',
       },
     }],
+  }
+
+  // Link to vendor in QB if provided
+  if (params.vendor) {
+    const vendorId = await findOrCreateVendor(params.vendor, tokens)
+    if (vendorId) body.EntityRef = { value: vendorId, type: 'Vendor' }
   }
 
   const res = await fetch(`${QB_API_BASE}/${tokens.realm_id}/purchase`, {
