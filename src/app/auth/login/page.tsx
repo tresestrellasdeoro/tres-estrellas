@@ -39,19 +39,16 @@ function LoginForm() {
       ])
 
       if (data?.user) {
-        // Primary: read role from app_metadata in the JWT (admin-controlled, tamper-proof)
-        // This is reliable because app_metadata is set server-side when creating staff.
-        // Fallback: fetch /api/auth/me for users created before app_metadata was used.
-        const appRole = (data.user.app_metadata as Record<string, string> | undefined)?.role ?? null
-        let role = appRole
+        // Read profile with the SAME browser client that holds the session in memory.
+        // This is reliable: no cookie timing issues, no server-side session problems.
+        // The session from signInWithPassword is immediately available in this client.
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle()
 
-        if (!role) {
-          try {
-            const res = await fetch('/api/auth/me')
-            const json = await res.json()
-            role = json?.role ?? null
-          } catch {}
-        }
+        const role = (profile as { role: string } | null)?.role ?? null
 
         if (role === 'cajero' || role === 'driver') {
           router.push('/personal/validar')
