@@ -39,16 +39,16 @@ function LoginForm() {
       ])
 
       if (data?.user) {
-        // Read profile with the SAME browser client that holds the session in memory.
-        // This is reliable: no cookie timing issues, no server-side session problems.
-        // The session from signInWithPassword is immediately available in this client.
-        const { data: profile } = await supabase
+        const { data: profile, error: profileErr } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', data.user.id)
           .maybeSingle()
 
         const role = (profile as { role: string } | null)?.role ?? null
+
+        // DEBUG — remove after diagnosis
+        console.log('[LOGIN DEBUG]', { userId: data.user.id, profile, role, profileErr })
 
         if (role === 'cajero' || role === 'driver') {
           router.push('/personal/validar')
