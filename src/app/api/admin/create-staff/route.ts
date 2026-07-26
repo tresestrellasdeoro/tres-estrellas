@@ -55,21 +55,28 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
+  // Upsert first (handles case where trigger hasn't fired yet)
+  await service.from('profiles').upsert({
+    id:           userId,
+    email,
+    full_name:    name,
+    role,
+    sucursal_id:  sucursal_id  ?? null,
+    departamento: departamento ?? null,
+    permisos:     permisos,
+  }, { onConflict: 'id' })
+
+  // Force-update the role after a brief wait in case the Supabase trigger
+  // fires after the upsert and resets role to 'customer'
+  await new Promise(r => setTimeout(r, 400))
   const { error: profileError } = await service
     .from('profiles')
-    .upsert({
-      id:           userId,
-      email,
-      full_name:    name,
-      role,
-      sucursal_id:  sucursal_id  ?? null,
-      departamento: departamento ?? null,
-      permisos:     permisos,
-    }, { onConflict: 'id' })
+    .update({ role, sucursal_id: sucursal_id ?? null, departamento: departamento ?? null, permisos, full_name: name })
+    .eq('id', userId)
 
   if (profileError) {
     await service.auth.admin.deleteUser(userId)
-    return NextResponse.json({ error: `Error al crear perfil: ${profileError.message}` }, { status: 500 })
+    return NextResponse.json({ error: `Error al asignar rol: ${profileError.message}` }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, user_id: userId }, { status: 201 })
