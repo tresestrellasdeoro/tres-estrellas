@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   User, Armchair, CreditCard, CheckCircle2, ChevronLeft, Bus,
-  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Banknote, Download, CalendarDays,
+  MapPin, Clock, Star, ArrowRight, Luggage, Package, AlertCircle, Download, CalendarDays,
 } from 'lucide-react'
 import { generateTicketPdf } from '@/lib/pdf/ticket-pdf'
 import { Button } from '@/components/ui/button'
@@ -60,7 +60,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
 
   const [returnDate, setReturnDate]  = useState('')
   const [email, setEmail]           = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>(SQUARE_ENABLED ? 'card' : 'cash')
+  const [paymentMethod] = useState<'card'>('card')
   const [loading, setLoading]         = useState(false)
   const [bookingRef, setBookingRef]   = useState('')
   const [bookingQr, setBookingQr]     = useState('')
@@ -87,7 +87,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const canStep0 = passengers.every(p => p.name.trim().length >= 2) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
     && (tripType !== 'round_trip' || returnDate !== '')
   const canStep1 = Object.keys(selectedSeats).length === passCount
-  const canStep2 = paymentMethod === 'cash' || squareReady
+  const canStep2 = squareReady
 
   const handlePay = async () => {
     setLoading(true)
@@ -493,51 +493,9 @@ export function BookingFlow({ tripId }: { tripId: string }) {
           </h2>
           <p className="text-slate-400 text-sm mb-5">Elige cómo deseas pagar tu boleto.</p>
 
-          {/* Payment method selector */}
-          <div className={`grid gap-3 mb-6 ${SQUARE_ENABLED ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {SQUARE_ENABLED && (
-            <button
-              onClick={() => setPaymentMethod('card')}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                paymentMethod === 'card'
-                  ? 'border-[#c01515] bg-red-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${paymentMethod === 'card' ? 'bg-[#c01515]' : 'bg-slate-100'}`}>
-                  <CreditCard className={`w-4 h-4 ${paymentMethod === 'card' ? 'text-white' : 'text-slate-400'}`} />
-                </div>
-                <div>
-                  <p className={`font-bold text-sm ${paymentMethod === 'card' ? 'text-[#c01515]' : 'text-slate-700'}`}>Tarjeta</p>
-                  <p className="text-slate-400 text-xs">Débito o crédito</p>
-                </div>
-              </div>
-            </button>
-            )}
-            <button
-              onClick={() => setPaymentMethod('cash')}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                paymentMethod === 'cash'
-                  ? 'border-[#c01515] bg-red-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${paymentMethod === 'cash' ? 'bg-[#c01515]' : 'bg-slate-100'}`}>
-                  <Banknote className={`w-4 h-4 ${paymentMethod === 'cash' ? 'text-white' : 'text-slate-400'}`} />
-                </div>
-                <div>
-                  <p className={`font-bold text-sm ${paymentMethod === 'cash' ? 'text-[#c01515]' : 'text-slate-700'}`}>Efectivo</p>
-                  <p className="text-slate-400 text-xs">Paga en ventanilla</p>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Square card form */}
-          {SQUARE_ENABLED && paymentMethod === 'card' && (
-            <div>
+          {/* Card form — única opción de pago online */}
+          {SQUARE_ENABLED ? (
+            <div className="mb-4">
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
                 Datos de tarjeta
               </Label>
@@ -546,16 +504,13 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 🔒 Formulario cifrado por Square — tus datos nunca tocan nuestros servidores
               </p>
             </div>
-          )}
-
-          {/* Cash info */}
-          {paymentMethod === 'cash' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-              <Banknote className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          ) : (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 flex gap-3">
+              <CreditCard className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-amber-800 text-sm">Pago en ventanilla</p>
-                <p className="text-amber-700 text-xs mt-1 leading-relaxed">
-                  Tu reservación quedará confirmada y recibirás tu boleto por correo. Deberás presentarlo y pagar <span className="font-black">${grandTotal} USD</span> en la terminal antes de abordar.
+                <p className="font-bold text-slate-700 text-sm">Pago con tarjeta</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Para comprar en efectivo, acércate a cualquiera de nuestras agencias.
                 </p>
               </div>
             </div>
@@ -612,9 +567,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                   </svg>
                   Procesando...
                 </span>
-              ) : paymentMethod === 'cash'
-                  ? <>Confirmar reservación <CheckCircle2 className="w-4 h-4 ml-2" /></>
-                  : <>Pagar ${grandTotal} <CheckCircle2 className="w-4 h-4 ml-2" /></>
+              ) : <>Pagar ${grandTotal} <CheckCircle2 className="w-4 h-4 ml-2" /></>
               }
             </Button>
           </div>
@@ -702,15 +655,8 @@ export function BookingFlow({ tripId }: { tripId: string }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Método de pago</span>
-              <span className={`font-bold text-sm ${paymentMethod === 'cash' ? 'text-amber-600' : 'text-slate-700'}`}>
-                {paymentMethod === 'cash' ? '💵 Efectivo en ventanilla' : '💳 Tarjeta'}
-              </span>
+              <span className="font-bold text-slate-700">💳 Tarjeta</span>
             </div>
-            {paymentMethod === 'cash' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-1">
-                <p className="text-amber-700 text-xs font-semibold">Recuerda pagar en la terminal antes de abordar.</p>
-              </div>
-            )}
             <div className="flex justify-between text-sm">
               <span className="text-slate-500 flex items-center gap-1">
                 <Star className="w-3.5 h-3.5 text-[#c8a951]" /> Puntos ganados
