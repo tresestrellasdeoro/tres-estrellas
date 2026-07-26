@@ -34,6 +34,7 @@ interface BookingResult {
   guest_email:      string
   created_at:       string
   return_date:      string | null
+  departure_date:   string | null  // fecha real del trip, ej "2026-07-20"
   departure_time:   string | null
   origin_name:      string | null
   destination_name: string | null
@@ -260,9 +261,31 @@ export default function ValidarPage() {
   const allReturnDone   = result?.passengers.every(p => p.return_checked_in)
   const isRoundTrip     = result?.ticket_type === 'round_trip'
 
+  // Compara fecha local sin hora para no fallar por zona horaria
+  const todayStr = () => new Date().toISOString().split('T')[0]
+
+  const outboundExpired = !!(
+    result &&
+    result.status === 'confirmed' &&
+    !allOutboundDone &&
+    result.departure_date &&
+    result.departure_date < todayStr()
+  )
+
+  const returnExpired = !!(
+    result &&
+    isRoundTrip &&
+    result.status === 'confirmed' &&
+    allOutboundDone &&
+    !allReturnDone &&
+    result.return_date &&
+    result.return_date < todayStr()
+  )
+
   const statusColor = () => {
     if (!result) return 'bg-slate-400'
     if (result.status === 'used') return 'bg-emerald-500'
+    if (outboundExpired || returnExpired) return 'bg-orange-500'
     if (result.status === 'confirmed') {
       if (isRoundTrip && allOutboundDone && !allReturnDone) return 'bg-blue-600'
       return 'bg-[#0f2c5c]'
@@ -273,6 +296,8 @@ export default function ValidarPage() {
   const statusLabel = () => {
     if (!result) return ''
     if (result.status === 'used') return 'VIAJE COMPLETADO'
+    if (outboundExpired) return 'BUS YA SALIÓ — REAGENDAR'
+    if (returnExpired)   return 'FECHA DE REGRESO VENCIDA — REAGENDAR'
     if (result.status === 'confirmed') {
       if (isRoundTrip && allOutboundDone && !allReturnDone) return 'REGRESO PENDIENTE'
       return 'BOLETO VÁLIDO'
@@ -477,6 +502,46 @@ export default function ValidarPage() {
 
           <div className="p-5 space-y-5">
 
+            {/* Boleto vencido — banner de advertencia */}
+            {(outboundExpired || returnExpired) && (
+              <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl shrink-0">⚠️</span>
+                  <div className="flex-1">
+                    <p className="font-black text-orange-800 text-sm">
+                      {outboundExpired
+                        ? `El bus del ${result!.departure_date} a las ${result!.departure_time ?? '—'} ya salió`
+                        : `La fecha de regreso ${result!.return_date} ya pasó`
+                      }
+                    </p>
+                    <p className="text-orange-700 text-xs mt-1">
+                      El boleto sigue siendo válido — puedes reagendarlo al siguiente bus disponible sin costo adicional.
+                    </p>
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      {outboundExpired && (
+                        <button
+                          onClick={() => openReagendar('outbound')}
+                          className="inline-flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          Reagendar ida ahora
+                        </button>
+                      )}
+                      {returnExpired && (
+                        <button
+                          onClick={() => openReagendar('return')}
+                          className="inline-flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          Reagendar regreso ahora
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Countdown */}
             {countdown !== null && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
@@ -533,7 +598,7 @@ export default function ValidarPage() {
                     </div>
                     {allOutboundDone
                       ? <span className="text-emerald-600 text-xs font-black flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Registrado</span>
-                      : result.status === 'confirmed' && (
+                      : result.status === 'confirmed' && !outboundExpired && (
                         <button onClick={() => handleCheckIn('outbound')} disabled={checkingInLeg !== null}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-lg disabled:opacity-50 flex items-center gap-1.5">
                           {checkingInLeg === 'outbound' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -568,7 +633,7 @@ export default function ValidarPage() {
                     </div>
                     {allReturnDone
                       ? <span className="text-blue-600 text-xs font-black flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Registrado</span>
-                      : allOutboundDone && result.status === 'confirmed' && (
+                      : allOutboundDone && result.status === 'confirmed' && !returnExpired && (
                         <button onClick={() => handleCheckIn('return')} disabled={checkingInLeg !== null}
                           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-lg disabled:opacity-50 flex items-center gap-1.5">
                           {checkingInLeg === 'return' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -582,7 +647,7 @@ export default function ValidarPage() {
             )}
 
             {/* One-way check-in */}
-            {!isRoundTrip && !allOutboundDone && result.status === 'confirmed' && (
+            {!isRoundTrip && !allOutboundDone && result.status === 'confirmed' && !outboundExpired && (
               <>
                 {result.payment_method === 'cash' && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -598,7 +663,7 @@ export default function ValidarPage() {
               </>
             )}
 
-            {isRoundTrip && !allOutboundDone && result.payment_method === 'cash' && result.status === 'confirmed' && (
+            {isRoundTrip && !allOutboundDone && result.payment_method === 'cash' && result.status === 'confirmed' && !outboundExpired && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <p className="text-amber-800 text-xs font-bold">⚠️ Pago en efectivo pendiente</p>
                 <p className="text-amber-700 text-xs mt-0.5">Cobra ${result.total_amount} antes de confirmar el abordaje de ida.</p>
