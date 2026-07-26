@@ -17,7 +17,7 @@ const NAV = [
   { href: '/admin/clientes',     icon: Users,           label: 'Clientes' },
   { href: '/admin/reportes',     icon: BarChart3,       label: 'Reportes' },
   { href: '/admin/analitica',    icon: TrendingUp,      label: 'Analítica' },
-  { href: '/admin/terminales',   icon: Monitor,         label: 'Terminales' },
+  { href: '/admin/terminales',   icon: Monitor,         label: 'Puntos de Venta' },
   { href: '/admin/contabilidad', icon: BookOpen,        label: 'Contabilidad' },
   { href: '/admin/personal',     icon: UserCog,         label: 'Personal' },
   { href: '/admin/paquetes',     icon: Package,         label: 'Paquetes' },

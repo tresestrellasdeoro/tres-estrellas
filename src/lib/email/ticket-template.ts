@@ -6,6 +6,7 @@ interface TicketEmailData {
   date: string
   departureTime: string
   boardingStop: string
+  boardingAddress?: string | null
   total: number
   qrDataUrl: string
   tripType: string
@@ -120,6 +121,27 @@ export function ticketEmailHtml(d: TicketEmailData): string {
             </table>
           </td>
         </tr>
+
+        <!-- Boarding address -->
+        ${d.boardingAddress ? `
+        <tr>
+          <td style="padding:0 40px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:0;overflow:hidden;">
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid #bbf7d0;">
+                  <p style="margin:0;color:#065f46;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">📍 Punto de abordaje</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:14px 16px;">
+                  <p style="margin:0;color:#111827;font-size:15px;font-weight:800;">${esc(d.boardingStop)}</p>
+                  <p style="margin:4px 0 0;color:#374151;font-size:13px;">${esc(d.boardingAddress)}</p>
+                  <p style="margin:8px 0 0;color:#6b7280;font-size:11px;">Preséntate 15 minutos antes de la salida con este boleto.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : ''}
 
         <!-- Total -->
         <tr>

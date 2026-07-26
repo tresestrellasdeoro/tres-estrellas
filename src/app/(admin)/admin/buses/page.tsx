@@ -34,6 +34,7 @@ interface StopRow {
   city: string
   state: string
   terminal_name: string | null
+  address: string | null
   sort_order: number
   is_active: boolean
 }
@@ -361,7 +362,7 @@ function ParadasTab() {
   const [open, setOpen]       = useState(false)
   const [editing, setEditing] = useState<StopRow | null>(null)
   const [saving, setSaving]   = useState(false)
-  const [form, setForm] = useState({ code: '', name: '', city: '', state: '', terminal_name: '', sort_order: 0 })
+  const [form, setForm] = useState({ code: '', name: '', city: '', state: '', terminal_name: '', address: '', sort_order: 0 })
 
   const load = useCallback(() => {
     setLoading(true)
@@ -375,19 +376,19 @@ function ParadasTab() {
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ code: '', name: '', city: '', state: '', terminal_name: '', sort_order: stops.length * 10 })
+    setForm({ code: '', name: '', city: '', state: '', terminal_name: '', address: '', sort_order: stops.length * 10 })
     setOpen(true)
   }
 
   const openEdit = (s: StopRow) => {
     setEditing(s)
-    setForm({ code: s.code, name: s.name, city: s.city, state: s.state, terminal_name: s.terminal_name ?? '', sort_order: s.sort_order })
+    setForm({ code: s.code, name: s.name, city: s.city, state: s.state, terminal_name: s.terminal_name ?? '', address: s.address ?? '', sort_order: s.sort_order })
     setOpen(true)
   }
 
   const save = async () => {
     setSaving(true)
-    const body = { ...form, code: form.code.toUpperCase(), terminal_name: form.terminal_name || null }
+    const body = { ...form, code: form.code.toUpperCase(), terminal_name: form.terminal_name || null, address: form.address || null }
     if (editing) {
       await fetch('/api/admin/stops', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, ...body }) })
     } else {
@@ -429,6 +430,7 @@ function ParadasTab() {
               <div className="min-w-0">
                 <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
                 <p className="text-slate-400 text-xs">{s.city}, {s.state}{s.terminal_name ? ` · ${s.terminal_name}` : ''}</p>
+                {s.address && <p className="text-slate-400 text-xs truncate">📍 {s.address}</p>}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -490,6 +492,13 @@ function ParadasTab() {
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Terminal (opcional)</Label>
               <Input value={form.terminal_name} onChange={e => setForm(p => ({ ...p, terminal_name: e.target.value }))}
                 placeholder="Terminal Central" className="mt-1.5 rounded-xl border-slate-200" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Dirección <span className="font-normal normal-case text-slate-400">(aparece en el boleto del cliente)</span>
+              </Label>
+              <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                placeholder="614 E. 7th San Pedro St, Los Angeles, CA" className="mt-1.5 rounded-xl border-slate-200" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)} className="rounded-xl">Cancelar</Button>

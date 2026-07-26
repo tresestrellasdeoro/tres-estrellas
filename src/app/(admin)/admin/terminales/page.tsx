@@ -36,7 +36,7 @@ function today() {
   return new Date().toISOString().split('T')[0]
 }
 
-export default function TerminalesPage() {
+export default function PuntosDeVentaPage() {
   const [turnos,    setTurnos]    = useState<Turno[]>([])
   const [loading,   setLoading]   = useState(true)
   const [fecha,     setFecha]     = useState(today())
@@ -85,7 +85,7 @@ export default function TerminalesPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Monitor className="w-6 h-6 text-[#c8a951]" />
-            Terminales
+            Puntos de Venta
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">Estado en tiempo real de todos los cajeros</p>
         </div>

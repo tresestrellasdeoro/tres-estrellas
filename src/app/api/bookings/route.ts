@@ -279,16 +279,17 @@ export async function POST(req: NextRequest) {
   const stopCode = boarding_stop_code || 'LA'
   let { data: stopData } = await service
     .from('stops')
-    .select('id')
+    .select('id, address')
     .eq('code', stopCode)
     .maybeSingle()
 
   if (!stopData) {
-    const { data: anyStop } = await service.from('stops').select('id').limit(1).maybeSingle()
+    const { data: anyStop } = await service.from('stops').select('id, address').limit(1).maybeSingle()
     stopData = anyStop
   }
 
   const terminalId = stopData?.id
+  const boardingAddress = (stopData as any)?.address ?? null
   if (!terminalId) {
     return NextResponse.json({ error: 'No hay terminales configuradas en el sistema' }, { status: 500 })
   }
@@ -437,6 +438,7 @@ export async function POST(req: NextRequest) {
         origin:          origin_name,
         destination:     destination_name,
         boardingStop:    boarding_stop_name,
+        boardingAddress,
         date,
         departureTime:   departure_time,
         total:           serverTotal,
