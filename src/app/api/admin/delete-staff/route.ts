@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     svc.from('loyalty_transactions').update({ customer_id: null }).eq('customer_id', user_id),
     svc.from('packages').update({ customer_id: null }).eq('customer_id', user_id),
     svc.from('packages').update({ paid_by: null }).eq('paid_by', user_id),
+    svc.from('package_events').update({ created_by: null }).eq('created_by', user_id),
     svc.from('gastos').update({ created_by: null }).eq('created_by', user_id),
     svc.from('support_tickets').update({ created_by: null }).eq('created_by', user_id),
     svc.from('support_tickets').update({ assigned_to: null }).eq('assigned_to', user_id),
