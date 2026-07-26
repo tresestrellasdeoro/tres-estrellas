@@ -18,6 +18,9 @@ const GastoSchema = z.object({
   date:           z.string(),
   payment_method: z.enum(['cash', 'card']).default('cash'),
   sucursal_id:    z.string().uuid().optional().nullable(),
+  vendor:         z.string().optional().nullable(),
+  receipt_number: z.string().optional().nullable(),
+  receipt_url:    z.string().url().optional().nullable(),
 })
 
 // GET — list gastos (filtered by sucursal/date for staff, all for admin)
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
   const parsed = GastoSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { amount, category, description, date, payment_method, sucursal_id } = parsed.data
+  const { amount, category, description, date, payment_method, sucursal_id, vendor, receipt_number, receipt_url } = parsed.data
   const db = svc()
 
   // Get sucursal info + QB account map for this category
@@ -102,6 +105,9 @@ export async function POST(req: NextRequest) {
       description:    description ?? null,
       date,
       payment_method,
+      vendor:         vendor ?? null,
+      receipt_number: receipt_number ?? null,
+      receipt_url:    receipt_url ?? null,
     })
     .select('id')
     .single()

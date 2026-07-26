@@ -10,6 +10,7 @@ import {
   RefreshCw, XCircle, Banknote, CreditCard, Building2,
   Globe, Scale, AlertTriangle, RotateCw,
   ChevronLeft, ChevronRight, Download, BarChart2, Wallet,
+  Target, Edit3, Save, ExternalLink, Image,
 } from 'lucide-react'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
@@ -35,9 +36,33 @@ interface Gasto {
   payment_method: 'cash' | 'card'
   qb_synced:      boolean
   qb_purchase_id: string | null
+  vendor:         string | null
+  receipt_number: string | null
+  receipt_url:    string | null
   profiles:       { full_name: string } | null
   sucursales:     { name: string; code: string } | null
 }
+
+interface Presupuesto {
+  category: string
+  monto:    number
+}
+
+const CATEGORIAS_GASTO = [
+  'Combustible / Gasolina',
+  'Mantenimiento y Reparaciones',
+  'Salarios y Nómina',
+  'Arrendamiento / Renta',
+  'Seguros',
+  'Servicios (agua, luz, internet, teléfono)',
+  'Suministros de Oficina',
+  'Comida / Viáticos',
+  'Publicidad y Marketing',
+  'Impuestos y Cuotas',
+  'Limpieza',
+  'Equipo y Herramientas',
+  'Otro',
+]
 
 interface Cierre {
   id:             string
@@ -131,32 +156,67 @@ const SUBTYPE_CONFIG = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ContabilidadPage() {
-  const [tab,          setTab]          = useState<Tab>('resumen')
-  const [transactions, setTransactions] = useState<QBTransaction[]>([])
-  const [gastos,       setGastos]       = useState<Gasto[]>([])
-  const [cierres,      setCierres]      = useState<Cierre[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [txFilter,     setTxFilter]     = useState<TxFilter>('all')
-  const [retrying,     setRetrying]     = useState<string | null>(null)
-  const [retryMsg,     setRetryMsg]     = useState<{ id: string; ok: boolean; text: string } | null>(null)
-  const [mes,          setMes]          = useState<string | 'all'>(currentMonth())
+  const [tab,           setTab]           = useState<Tab>('resumen')
+  const [transactions,  setTransactions]  = useState<QBTransaction[]>([])
+  const [gastos,        setGastos]        = useState<Gasto[]>([])
+  const [cierres,       setCierres]       = useState<Cierre[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [txFilter,      setTxFilter]      = useState<TxFilter>('all')
+  const [retrying,      setRetrying]      = useState<string | null>(null)
+  const [retryMsg,      setRetryMsg]      = useState<{ id: string; ok: boolean; text: string } | null>(null)
+  const [mes,           setMes]           = useState<string | 'all'>(currentMonth())
+  const [presupuestos,  setPresupuestos]  = useState<Presupuesto[]>([])
+  const [editBudget,    setEditBudget]    = useState(false)
+  const [budgetDraft,   setBudgetDraft]   = useState<Record<string, string>>({})
+  const [savingBudget,  setSavingBudget]  = useState(false)
 
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const [qbRes, gastosRes, cierresRes] = await Promise.all([
+      const mesFetch = typeof mes === 'string' && mes !== 'all' ? mes : currentMonth()
+      const [qbRes, gastosRes, cierresRes, presupRes] = await Promise.all([
         fetch('/api/admin/qb-transactions?limit=1000'),
         fetch('/api/staff/gastos?limit=1000'),
         fetch('/api/admin/cierres?limit=500'),
+        fetch(`/api/admin/presupuestos?mes=${mesFetch}`),
       ])
       const qbData      = await qbRes.json()
       const gastosData  = await gastosRes.json()
       const cierresData = await cierresRes.json()
+      const presupData  = await presupRes.json()
       setTransactions(qbData.transactions ?? [])
       setGastos(gastosData.gastos ?? [])
       setCierres(cierresData.cierres ?? [])
+      setPresupuestos(presupData.presupuestos ?? [])
     } catch {}
     finally { setLoading(false) }
+  }
+
+  const fetchPresupuestos = async (m: string) => {
+    try {
+      const r = await fetch(`/api/admin/presupuestos?mes=${m}`)
+      const d = await r.json()
+      setPresupuestos(d.presupuestos ?? [])
+    } catch {}
+  }
+
+  const saveBudget = async () => {
+    if (mes === 'all') return
+    setSavingBudget(true)
+    const budgets = CATEGORIAS_GASTO.map(cat => ({
+      category: cat,
+      monto: parseFloat(budgetDraft[cat] ?? '0') || 0,
+    })).filter(b => b.monto > 0)
+    try {
+      await fetch('/api/admin/presupuestos', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ mes, sucursal_id: null, budgets }),
+      })
+      await fetchPresupuestos(mes as string)
+      setEditBudget(false)
+    } catch {}
+    finally { setSavingBudget(false) }
   }
 
   const retryCierre = async (cierreId: string) => {
@@ -177,6 +237,10 @@ export default function ContabilidadPage() {
   }
 
   useEffect(() => { fetchAll() }, [])
+
+  useEffect(() => {
+    if (mes !== 'all') fetchPresupuestos(mes as string)
+  }, [mes])
 
   // ── Filtered data by period ──────────────────────────────────────────────
 
@@ -618,6 +682,131 @@ export default function ContabilidadPage() {
               </div>
             ))}
           </div>
+
+          {/* Presupuesto vs Real */}
+          {mes !== 'all' && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#c8a951]" />
+                  <p className="font-black text-slate-700 text-sm">Presupuesto vs Real — {monthLabel(mes as string)}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const draft: Record<string, string> = {}
+                    presupuestos.forEach(p => { draft[p.category] = String(p.monto) })
+                    setBudgetDraft(draft)
+                    setEditBudget(true)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Editar presupuesto
+                </button>
+              </div>
+
+              {editBudget ? (
+                <div className="p-5 space-y-3">
+                  <p className="text-xs text-slate-500 mb-3">Ingresa el presupuesto mensual para cada categoría (deja en 0 si no aplica)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {CATEGORIAS_GASTO.map(cat => (
+                      <div key={cat} className="flex items-center gap-2">
+                        <label className="text-xs text-slate-600 flex-1 min-w-0 truncate">{cat}</label>
+                        <div className="relative shrink-0">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={budgetDraft[cat] ?? ''}
+                            onChange={e => setBudgetDraft(prev => ({ ...prev, [cat]: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-28 pl-5 pr-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-[#c8a951] bg-slate-50 font-mono"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={saveBudget} disabled={savingBudget}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0a1e42] hover:bg-[#0f2c5c] text-white text-xs font-bold transition-colors disabled:opacity-50">
+                      {savingBudget ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Guardar
+                    </button>
+                    <button onClick={() => setEditBudget(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : presupuestos.length === 0 ? (
+                <div className="px-5 py-8 text-center text-slate-400">
+                  <Target className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No hay presupuesto definido para este mes</p>
+                  <button
+                    onClick={() => { setBudgetDraft({}); setEditBudget(true) }}
+                    className="mt-2 text-xs text-[#0a1e42] underline font-semibold"
+                  >
+                    Definir presupuesto
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría</th>
+                        <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Presupuesto</th>
+                        <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Real</th>
+                        <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Variación</th>
+                        <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Uso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {presupuestos.filter(p => p.monto > 0).map(p => {
+                        const real   = gastosFiltered.filter(g => g.category === p.category).reduce((s, g) => s + Number(g.amount), 0)
+                        const vari   = real - p.monto
+                        const pct    = p.monto > 0 ? Math.min((real / p.monto) * 100, 100) : 0
+                        const over   = real > p.monto
+                        return (
+                          <tr key={p.category} className="hover:bg-slate-50">
+                            <td className="px-5 py-3 text-slate-700 text-xs font-semibold">{p.category}</td>
+                            <td className="px-5 py-3 text-right text-xs text-slate-500">${usd(p.monto)}</td>
+                            <td className={`px-5 py-3 text-right text-xs font-bold ${over ? 'text-red-600' : 'text-slate-700'}`}>${usd(real)}</td>
+                            <td className={`px-5 py-3 text-right text-xs font-black ${over ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {over ? '+' : ''}{usd(vari)}
+                            </td>
+                            <td className="px-5 py-3 min-w-[120px]">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                                  <div
+                                    className={`h-1.5 rounded-full ${over ? 'bg-red-500' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className={`text-[10px] font-bold shrink-0 ${over ? 'text-red-500' : 'text-slate-400'}`}>
+                                  {Math.round((real / p.monto) * 100)}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 border-t-2 border-slate-200">
+                        <td className="px-5 py-3 text-xs font-black text-slate-600 uppercase tracking-wide">Total</td>
+                        <td className="px-5 py-3 text-right text-xs font-black text-slate-600">
+                          ${usd(presupuestos.reduce((s, p) => s + p.monto, 0))}
+                        </td>
+                        <td className="px-5 py-3 text-right text-xs font-black text-red-600">
+                          ${usd(gastosFiltered.reduce((s, g) => s + Number(g.amount), 0))}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
       ) : tab === 'qb' ? (
@@ -809,10 +998,11 @@ export default function ContabilidadPage() {
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Sucursal</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Proveedor</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Descripción</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Empleado</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Pago</th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Monto</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Recibo</th>
                     <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">QB</th>
                   </tr>
                 </thead>
@@ -826,9 +1016,17 @@ export default function ContabilidadPage() {
                           : <span className="text-slate-300 text-xs">—</span>
                         }
                       </td>
-                      <td className="px-4 py-3 font-semibold text-slate-700 text-xs">{g.category}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{g.description ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">{g.profiles?.full_name ?? '—'}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-700 text-xs max-w-[120px] truncate">{g.category}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {g.vendor
+                          ? <span className="font-semibold text-slate-700">{g.vendor}</span>
+                          : <span className="text-slate-300">—</span>
+                        }
+                        {g.receipt_number && (
+                          <span className="ml-1 font-mono text-[10px] text-slate-400">#{g.receipt_number}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{g.description ?? '—'}</td>
                       <td className="px-4 py-3">
                         {g.payment_method === 'cash'
                           ? <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Banknote className="w-3 h-3" /> Efectivo</span>
@@ -836,6 +1034,15 @@ export default function ContabilidadPage() {
                         }
                       </td>
                       <td className="px-4 py-3 text-right font-black text-red-600">${Number(g.amount).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {g.receipt_url ? (
+                          <a href={g.receipt_url} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors mx-auto"
+                            title="Ver comprobante">
+                            <Image className="w-3.5 h-3.5 text-slate-500" />
+                          </a>
+                        ) : <span className="text-slate-200">—</span>}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         {g.qb_synced
                           ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
@@ -847,7 +1054,7 @@ export default function ContabilidadPage() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-50 border-t border-slate-200">
-                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-slate-500">
+                    <td colSpan={8} className="px-4 py-3 text-xs font-bold text-slate-500">
                       Total ({gastosFiltered.length} gastos)
                     </td>
                     <td className="px-4 py-3 text-right font-black text-red-700">
