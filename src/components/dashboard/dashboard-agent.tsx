@@ -202,7 +202,7 @@ export function DashboardAgent() {
       <button
         onClick={() => setOpen(o => !o)}
         aria-label="Asistente IA TEOBOT"
-        className="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-[#0a1e42] to-[#1a3a6e] hover:from-[#0f2c5c] hover:to-[#1a3a6e] text-white shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 border border-white/10"
+        className="fixed bottom-20 right-5 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-[#0a1e42] to-[#1a3a6e] hover:from-[#0f2c5c] hover:to-[#1a3a6e] text-white shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 border border-white/10"
       >
         {open
           ? <X className="w-5 h-5" />
@@ -218,7 +218,7 @@ export function DashboardAgent() {
       {/* Panel */}
       {open && (
         <div
-          className="fixed bottom-20 right-5 z-50 w-[340px] sm:w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+          className="fixed bottom-[8.5rem] right-5 z-50 w-[340px] sm:w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
           style={{ maxHeight: 'calc(100vh - 100px)', height: 580 }}
         >
           {/* Header */}
