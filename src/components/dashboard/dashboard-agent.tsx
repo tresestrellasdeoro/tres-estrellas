@@ -97,12 +97,13 @@ export function DashboardAgent() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
 
-  // Fetch user profile once
+  // Fetch user profile once — fall back to generic admin so button always renders
   useEffect(() => {
+    const fallback: UserProfile = { name: 'Administrador', role: 'super_admin', email: '', sucursal: null }
     fetch('/api/dashboard-agent/me')
-      .then(r => r.ok ? r.json() : null)
-      .then((p: UserProfile | null) => {
-        if (!p) return
+      .then(r => r.json().catch(() => null).then(d => (r.ok && d ? d : fallback)))
+      .catch(() => fallback)
+      .then((p: UserProfile) => {
         setProfile(p)
         setMessages([{
           id:           0,
@@ -112,7 +113,6 @@ export function DashboardAgent() {
           links:        [],
         }])
       })
-      .catch(() => {})
   }, [])
 
   useEffect(() => {
