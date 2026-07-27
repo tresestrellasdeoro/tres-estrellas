@@ -259,7 +259,14 @@ export async function POST(req: NextRequest) {
     }
 
     const apiKey = process.env.GROQ_DASHBOARD_KEY
-    if (!apiKey) return NextResponse.json({ error: 'API key no configurada' }, { status: 500 })
+    if (!apiKey) {
+      return NextResponse.json({
+        answer:       'El agente IA está en mantenimiento. Para ayuda, usa el botón **Reportar** o navega manualmente al dashboard.',
+        quickReplies: ['Ir al Dashboard', 'Reportar problema'],
+        links:        [{ label: 'Dashboard', href: '/admin/dashboard' }],
+        openSupport:  false,
+      })
+    }
 
     const res = await fetch(GROQ_API, {
       method: 'POST',
@@ -282,7 +289,12 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const err = await res.text()
       console.error('Groq dashboard error:', err)
-      return NextResponse.json({ error: 'Error con IA' }, { status: 502 })
+      return NextResponse.json({
+        answer:       'Tuve un problema al conectarme con el agente IA. Intenta de nuevo en un momento.',
+        quickReplies: [],
+        links:        [],
+        openSupport:  false,
+      })
     }
 
     const data    = await res.json()
