@@ -7,6 +7,7 @@ import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
+import { DashboardAgent } from '@/components/dashboard/dashboard-agent'
 
 const ALL_NAV = [
   { href: '/personal/turno',         label: 'Mi turno',         icon: Clock,         perm: null },
@@ -141,6 +142,7 @@ export function StaffLayoutClient({
         {children}
       </main>
 
+      <DashboardAgent />
       <SupportWidget />
     </div>
   )

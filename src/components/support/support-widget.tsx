@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, X, Send, Plus, ChevronLeft, AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 
-// Exposed so other components can trigger a refresh
-export const supportWidgetBus = { refresh: () => {} }
+// Exposed so other components can trigger actions on this widget
+export const supportWidgetBus = {
+  refresh:        () => {},
+  openNewTicket:  () => {},
+}
 
 const CATEGORIES = [
   { value: 'ventas',        label: 'Ventas / Boletos' },
@@ -67,6 +70,19 @@ export function SupportWidget() {
   const [form, setForm] = useState({
     subject: '', category: 'sistema', priority: 'media', description: '',
   })
+
+  // Register external triggers
+  useEffect(() => {
+    supportWidgetBus.refresh = fetchTickets
+    supportWidgetBus.openNewTicket = () => {
+      setOpen(true)
+      setView('new')
+    }
+    return () => {
+      supportWidgetBus.refresh       = () => {}
+      supportWidgetBus.openNewTicket = () => {}
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load badge count on mount and every 60s
   useEffect(() => {

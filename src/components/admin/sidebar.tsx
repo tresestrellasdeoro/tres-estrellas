@@ -6,6 +6,7 @@ import { Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X, Se
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
+import { DashboardAgent } from '@/components/dashboard/dashboard-agent'
 
 const NAV = [
   { href: '/admin/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
@@ -98,6 +99,7 @@ export function AdminSidebar() {
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-[#0a1628] flex-col border-r border-white/5">
         <SidebarContent />
       </div>
+      <DashboardAgent />
       <SupportWidget />
     </>
   )
