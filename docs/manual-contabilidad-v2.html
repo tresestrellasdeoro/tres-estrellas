@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manual de Contabilidad — Tres Estrellas de Oro</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 13px;
+    color: #1e293b;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ── Cover page ── */
+  .cover {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a1e42 0%, #0f2c5c 60%, #1a3a6e 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 40px;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 400px; height: 400px;
+    background: rgba(200,169,81,0.12);
+    border-radius: 50%;
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -100px; left: -100px;
+    width: 500px; height: 500px;
+    background: rgba(192,21,21,0.08);
+    border-radius: 50%;
+  }
+  .cover-logo {
+    font-size: 56px;
+    margin-bottom: 24px;
+  }
+  .cover-brand {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: #c8a951;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.15;
+    margin-bottom: 16px;
+  }
+  .cover h1 span { color: #c8a951; }
+  .cover-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.65);
+    max-width: 500px;
+    margin: 0 auto 40px;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: rgba(200,169,81,0.2);
+    border: 1px solid rgba(200,169,81,0.5);
+    color: #c8a951;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 8px 24px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    margin-bottom: 60px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item {
+    text-align: center;
+  }
+  .cover-meta-item .label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .cover-meta-item .value {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+  }
+
+  /* ── Page structure ── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 56px 60px;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ── Section headers ── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #c01515;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: 26px;
+    font-weight: 900;
+    color: #0a1e42;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+  .page-intro {
+    font-size: 13.5px;
+    color: #64748b;
+    margin-bottom: 32px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 20px;
+  }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0a1e42;
+    margin: 28px 0 10px;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+    margin: 18px 0 8px;
+  }
+  p { margin-bottom: 10px; color: #374151; }
+
+  /* ── TOC ── */
+  .toc { margin-top: 24px; }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    transition: background 0.1s;
+  }
+  .toc-item:nth-child(odd) { background: #f8fafc; }
+  .toc-num {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: #0a1e42;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .toc-text { flex: 1; font-weight: 600; color: #1e293b; font-size: 13.5px; }
+  .toc-dots { flex: 1; border-bottom: 2px dotted #cbd5e1; margin: 0 8px; }
+  .toc-page { font-weight: 700; color: #94a3b8; font-size: 12px; }
+
+  /* ── Tabs diagram ── */
+  .tabs-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+  }
+  .tab-pill {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 2px solid;
+  }
+  .tab-pill.active { background: #0a1e42; border-color: #0a1e42; color: #fff; }
+  .tab-pill.t1 { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+  .tab-pill.t2 { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+  .tab-pill.t3 { background: #f0fdf4; border-color: #bbf7d0; color: #065f46; }
+  .tab-pill.t4 { background: #fdf4ff; border-color: #e9d5ff; color: #6b21a8; }
+  .tab-pill.t5 { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+
+  /* ── Feature cards ── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .feature-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .feature-card.red { background: #fff5f5; border-color: #fecaca; }
+  .feature-card.green { background: #f0fdf4; border-color: #bbf7d0; }
+  .feature-card.blue { background: #eff6ff; border-color: #bfdbfe; }
+  .feature-card.gold { background: #fffbeb; border-color: #fde68a; }
+  .feature-card.purple { background: #fdf4ff; border-color: #e9d5ff; }
+  .feature-card-icon { font-size: 22px; margin-bottom: 8px; }
+  .feature-card h4 { margin: 0 0 6px; font-size: 13px; }
+  .feature-card p { font-size: 12px; margin: 0; color: #475569; }
+
+  /* ── KPI cards ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .kpi {
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+  }
+  .kpi.green { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .kpi.red   { background: #fff5f5; border: 1px solid #fecaca; }
+  .kpi.teal  { background: #f0fdfa; border: 1px solid #99f6e4; }
+  .kpi.slate { background: #f8fafc; border: 1px solid #e2e8f0; }
+  .kpi .kpi-icon { font-size: 20px; margin-bottom: 4px; }
+  .kpi .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 4px; }
+  .kpi .kpi-value { font-size: 20px; font-weight: 900; color: #0a1e42; }
+  .kpi .kpi-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+
+  /* ── Step list ── */
+  .steps { margin: 16px 0; }
+  .step {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #c01515;
+    color: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-body strong { display: block; font-size: 13px; color: #0a1e42; margin-bottom: 2px; }
+  .step-body span { font-size: 12px; color: #64748b; }
+
+  /* ── Alert / info box ── */
+  .info-box {
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .info-box.blue { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .info-box.amber { background: #fffbeb; border: 1px solid #fde68a; }
+  .info-box.green { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .info-box.red { background: #fff5f5; border: 1px solid #fecaca; }
+  .info-box-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .info-box-text { font-size: 12.5px; color: #334155; }
+  .info-box-text strong { display: block; font-weight: 700; margin-bottom: 3px; }
+
+  /* ── Table ── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12px;
+  }
+  .data-table th {
+    background: #0a1e42;
+    color: #fff;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  .data-table th:first-child { border-radius: 10px 0 0 0; }
+  .data-table th:last-child { border-radius: 0 10px 0 0; }
+  .data-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+    color: #374151;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:nth-child(even) td { background: #f8fafc; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge.green { background: #dcfce7; color: #065f46; }
+  .badge.red { background: #fee2e2; color: #991b1b; }
+  .badge.blue { background: #dbeafe; color: #1e40af; }
+  .badge.amber { background: #fef3c7; color: #92400e; }
+  .badge.purple { background: #f3e8ff; color: #6b21a8; }
+  .badge.slate { background: #f1f5f9; color: #475569; }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    justify-content: center;
+  }
+  .flow-node {
+    background: #0a1e42;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .flow-node.gold { background: #c8a951; }
+  .flow-node.red { background: #c01515; }
+  .flow-node.green { background: #16a34a; }
+  .flow-node.gray { background: #64748b; }
+  .flow-arrow { font-size: 18px; color: #cbd5e1; }
+
+  /* ── Divider ── */
+  .divider {
+    border: none;
+    border-top: 2px solid #f1f5f9;
+    margin: 28px 0;
+  }
+
+  /* ── Full-width highlight ── */
+  .highlight-section {
+    background: linear-gradient(135deg, #0a1e42, #1a3a6e);
+    color: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin: 24px 0;
+  }
+  .highlight-section h3 { color: #c8a951; margin-top: 0; }
+  .highlight-section p { color: rgba(255,255,255,0.75); font-size: 12.5px; }
+  .highlight-section ul { color: rgba(255,255,255,0.75); font-size: 12.5px; padding-left: 18px; }
+  .highlight-section li { margin-bottom: 5px; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 2px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .footer strong { color: #0a1e42; }
+
+  /* ── Print ── */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  @media print {
+    body { font-size: 12px; }
+    .cover { min-height: 100vh; }
+    .page { padding: 40px 48px; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     PORTADA
+══════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">🚌</div>
+  <div class="cover-brand">Tres Estrellas de Oro Inc.</div>
+  <h1>Sistema de <span>Contabilidad</span><br>Profesional</h1>
+  <p class="cover-sub">Manual completo del módulo de contabilidad integrado con QuickBooks Online — versión actualizada con filtros por sucursal y reportes por cajero.</p>
+  <div class="cover-badge">Versión 2.0 — Julio 2026</div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <div class="label">Módulo</div>
+      <div class="value">Contabilidad</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="label">Audiencia</div>
+      <div class="value">Administradores</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="label">Niveles</div>
+      <div class="value">3 niveles + filtros</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="label">Integración</div>
+      <div class="value">QuickBooks Online</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     ÍNDICE
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Contenido</div>
+  <h2>Tabla de Contenido</h2>
+  <p class="page-intro">Este manual cubre la totalidad del módulo de contabilidad: desde los reportes financieros básicos hasta la integración automática con QuickBooks Online.</p>
+
+  <div class="toc">
+    <div class="toc-item">
+      <div class="toc-num">1</div>
+      <div class="toc-text">¿Qué es el módulo de contabilidad?</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 3</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">2</div>
+      <div class="toc-text">Pestañas y navegación</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 4</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">3</div>
+      <div class="toc-text">Filtros: período y sucursal (NUEVO)</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 5</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">4</div>
+      <div class="toc-text">Nivel 1 — Resumen P&L y gráficas</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 6</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">5</div>
+      <div class="toc-text">Nivel 2 — Gastos, proveedores y presupuesto</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 8</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">6</div>
+      <div class="toc-text">Cierres de turno y reporte por cajero (NUEVO)</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 10</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">7</div>
+      <div class="toc-text">Nivel 3 — QuickBooks Online: sincronización</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 12</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">8</div>
+      <div class="toc-text">Conciliación QB y reintentos</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 14</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">9</div>
+      <div class="toc-text">Exportación CSV</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 15</div>
+    </div>
+    <div class="toc-item">
+      <div class="toc-num">10</div>
+      <div class="toc-text">Roles y permisos</div>
+      <div class="toc-dots"></div>
+      <div class="toc-page">Pág. 16</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     1. ¿QUÉ ES?
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 1</div>
+  <h2>¿Qué es el módulo de contabilidad?</h2>
+  <p class="page-intro">Una plataforma financiera completa integrada en el panel administrativo, que consolida ingresos, gastos, cierres de turno y los sincroniza automáticamente con QuickBooks Online.</p>
+
+  <div class="highlight-section">
+    <h3>Propósito del módulo</h3>
+    <p>El módulo de contabilidad centraliza toda la información financiera de Tres Estrellas de Oro en un solo lugar, eliminando la captura manual en QuickBooks y reduciendo errores contables.</p>
+    <ul>
+      <li>Ver el Estado de Resultados (P&L) en tiempo real por mes o período histórico</li>
+      <li>Registrar gastos operativos con comprobante fotográfico y datos del proveedor</li>
+      <li>Controlar presupuestos mensuales por categoría</li>
+      <li>Sincronizar ventas y gastos automáticamente a QuickBooks Online</li>
+      <li>Filtrar toda la información por sucursal o por período</li>
+      <li>Ver el desempeño individual de cada cajero por cierres de turno</li>
+    </ul>
+  </div>
+
+  <h3>Arquitectura del sistema</h3>
+
+  <div class="flow">
+    <div class="flow-node">Ventas Online</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node red">Cierres de Turno</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node gold">Módulo<br>Contabilidad</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node green">QuickBooks<br>Online</div>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card blue">
+      <div class="feature-card-icon">📊</div>
+      <h4>Nivel 1 — P&L y Gráficas</h4>
+      <p>Estado de resultados mensual, gráfica de barras (últimos 6 meses) y pastel de gastos por categoría.</p>
+    </div>
+    <div class="feature-card gold">
+      <div class="feature-card-icon">🧾</div>
+      <h4>Nivel 2 — Gastos y Presupuesto</h4>
+      <p>Registro de gastos con proveedor, no. de recibo, foto de comprobante y control de presupuesto vs real.</p>
+    </div>
+    <div class="feature-card green">
+      <div class="feature-card-icon">🔗</div>
+      <h4>Nivel 3 — QuickBooks</h4>
+      <p>Sincronización automática de ventas (SalesReceipt) y gastos (Purchase) con mapeo de cuentas contables.</p>
+    </div>
+    <div class="feature-card purple">
+      <div class="feature-card-icon">🏪</div>
+      <h4>Filtros por Sucursal (NUEVO)</h4>
+      <p>Toda la contabilidad se puede ver filtrada por sucursal específica, aislando sus datos financieros.</p>
+    </div>
+  </div>
+
+  <div class="info-box blue">
+    <div class="info-box-icon">ℹ️</div>
+    <div class="info-box-text">
+      <strong>¿Quién puede acceder?</strong>
+      Solo los usuarios con rol de <strong>Administrador</strong> tienen acceso al módulo de contabilidad. Los cajeros y personal de sucursal solo pueden registrar gastos desde su panel personal, no ver los reportes.
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     2. PESTAÑAS
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 2</div>
+  <h2>Pestañas y Navegación</h2>
+  <p class="page-intro">El módulo está organizado en 5 pestañas. Cada una muestra la información filtrada por el período y la sucursal seleccionados.</p>
+
+  <div class="tabs-row">
+    <div class="tab-pill t1">📊 Resumen P&L</div>
+    <div class="tab-pill t2">📚 Registro QB</div>
+    <div class="tab-pill t3">📉 Gastos</div>
+    <div class="tab-pill t4">💵 Cierres de Turno</div>
+    <div class="tab-pill t5">🛡️ Conciliación QB</div>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Pestaña</th>
+        <th>¿Qué muestra?</th>
+        <th>Acciones disponibles</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>📊 Resumen P&L</strong></td>
+        <td>Estado de Resultados, gráfica de barras (últimos 6 meses), pastel de gastos por categoría, desglose por tipo de ingreso y presupuesto vs real</td>
+        <td>Editar presupuesto mensual, exportar CSV del P&L</td>
+      </tr>
+      <tr>
+        <td><strong>📚 Registro QB</strong></td>
+        <td>Todas las transacciones enviadas a QuickBooks (ventas y gastos), con tipo, sucursal, documento QB y monto</td>
+        <td>Filtrar por tipo (online, efectivo, tarjeta, gasto), exportar CSV</td>
+      </tr>
+      <tr>
+        <td><strong>📉 Gastos</strong></td>
+        <td>Todos los gastos operativos registrados: categoría, proveedor, no. de recibo, foto comprobante, estado QB</td>
+        <td>Ver comprobante (abre imagen), exportar CSV</td>
+      </tr>
+      <tr>
+        <td><strong>💵 Cierres de Turno</strong></td>
+        <td>Resumen por cajero (NUEVO) y detalle de cada cierre: boletos, efectivo, tarjeta, paquetes, total</td>
+        <td>Reintentar sync QB de cierres fallidos, exportar CSV</td>
+      </tr>
+      <tr>
+        <td><strong>🛡️ Conciliación QB</strong></td>
+        <td>Gastos y cierres pendientes de sincronización con QB, con estado de cada intento</td>
+        <td>Reintentar individual o reintentar todos los gastos pendientes</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box amber">
+    <div class="info-box-icon">⚠️</div>
+    <div class="info-box-text">
+      <strong>Indicador rojo en Conciliación QB</strong>
+      Si aparece un número rojo sobre la pestaña "Conciliación QB", indica cuántos registros (gastos + cierres) están pendientes de sincronizar con QuickBooks. Es importante atenderlos lo antes posible.
+    </div>
+  </div>
+
+  <h3>Tarjetas KPI — siempre visibles</h3>
+  <p>En la parte superior, 4 tarjetas resumen la situación del período/sucursal seleccionados:</p>
+
+  <div class="kpi-row">
+    <div class="kpi green">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-label">Ingresos</div>
+      <div class="kpi-value">$35.00</div>
+      <div class="kpi-sub">ventas del período</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-label">Gastos QB</div>
+      <div class="kpi-value">$0.00</div>
+      <div class="kpi-sub">gastos sincronizados</div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-icon">⚖️</div>
+      <div class="kpi-label">Utilidad</div>
+      <div class="kpi-value">+$35</div>
+      <div class="kpi-sub">ingresos − gastos</div>
+    </div>
+    <div class="kpi slate">
+      <div class="kpi-icon">💼</div>
+      <div class="kpi-label">Margen</div>
+      <div class="kpi-value">100%</div>
+      <div class="kpi-sub">margen de utilidad</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     3. FILTROS (NUEVO)
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 3 — NUEVO</div>
+  <h2>Filtros: Período y Sucursal</h2>
+  <p class="page-intro">Los dos filtros en la parte superior de la página controlan qué datos se muestran en todas las pestañas simultáneamente.</p>
+
+  <h3>Filtro de Período</h3>
+  <p>Permite navegar mes a mes o ver el historial completo:</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">◀</div>
+      <div class="step-body">
+        <strong>Flecha izquierda</strong>
+        <span>Retrocede un mes. Útil para comparar meses anteriores.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">▶</div>
+      <div class="step-body">
+        <strong>Flecha derecha</strong>
+        <span>Avanza un mes. No puede superar el mes actual.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">H</div>
+      <div class="step-body">
+        <strong>Botón "Histórico"</strong>
+        <span>Muestra todos los datos sin límite de fecha. Útil para ver el total acumulado.</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Filtro de Sucursal <span style="background:#dcfce7;color:#065f46;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:6px;">NUEVO</span></h3>
+  <p>Aparece junto al filtro de período. Permite aislar la contabilidad de una sucursal específica:</p>
+
+  <div class="feature-grid">
+    <div class="feature-card green">
+      <div class="feature-card-icon">🏪</div>
+      <h4>Todas las sucursales</h4>
+      <p>Opción predeterminada. Muestra la contabilidad consolidada de toda la empresa.</p>
+    </div>
+    <div class="feature-card blue">
+      <div class="feature-card-icon">🔍</div>
+      <h4>Sucursal específica</h4>
+      <p>Filtra ingresos QB, gastos, cierres de turno y KPIs solo de esa sucursal.</p>
+    </div>
+  </div>
+
+  <div class="info-box green">
+    <div class="info-box-icon">✅</div>
+    <div class="info-box-text">
+      <strong>¿Qué se filtra al seleccionar una sucursal?</strong>
+      Al seleccionar una sucursal específica, <em>todos</em> los datos cambian simultáneamente: las tarjetas KPI, las gráficas, la tabla P&L, los gastos, los cierres de turno, el reporte por cajero y el registro QB. Todo queda filtrado solo para esa sucursal.
+    </div>
+  </div>
+
+  <h3>Combinación de filtros</h3>
+  <p>Los dos filtros trabajan juntos. Puedes ver, por ejemplo:</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Período</th>
+        <th>Sucursal</th>
+        <th>Resultado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Julio 2026</td>
+        <td>Todas</td>
+        <td>Total empresa en julio</td>
+      </tr>
+      <tr>
+        <td>Julio 2026</td>
+        <td>SUC-01</td>
+        <td>Solo la sucursal SUC-01 en julio</td>
+      </tr>
+      <tr>
+        <td>Histórico</td>
+        <td>SUC-02</td>
+        <td>Todo el historial de la sucursal SUC-02</td>
+      </tr>
+      <tr>
+        <td>Histórico</td>
+        <td>Todas</td>
+        <td>Toda la empresa, sin límite de tiempo</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box amber">
+    <div class="info-box-icon">⚠️</div>
+    <div class="info-box-text">
+      <strong>Importante: las gráficas de 6 meses no cambian con el filtro de sucursal</strong>
+      La gráfica "Ingresos vs Gastos — últimos 6 meses" y la tabla Estado de Resultados muestran datos consolidados de empresa. Para ver el P&L por sucursal usa las tarjetas KPI y las pestañas de Gastos/Cierres filtradas.
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     4. NIVEL 1 — P&L
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 4 — Nivel 1</div>
+  <h2>Resumen P&L y Gráficas</h2>
+  <p class="page-intro">La pestaña "Resumen P&L" es el corazón del módulo. Muestra el Estado de Resultados, gráficas interactivas y presupuesto mensual.</p>
+
+  <h3>Gráfica de barras — Últimos 6 meses</h3>
+  <p>Muestra tres barras por mes: <strong>Ingresos</strong> (azul oscuro), <strong>Gastos</strong> (rojo) y <strong>Utilidad</strong> (dorado). Permite identificar tendencias rápidamente.</p>
+
+  <div class="feature-grid">
+    <div class="feature-card blue">
+      <div class="feature-card-icon">🔵</div>
+      <h4>Ingresos (azul)</h4>
+      <p>Suma de todas las ventas: online, efectivo en sucursal y tarjeta en sucursal.</p>
+    </div>
+    <div class="feature-card red">
+      <div class="feature-card-icon">🔴</div>
+      <h4>Gastos (rojo)</h4>
+      <p>Solo los gastos ya sincronizados con QuickBooks Online (tipo "Purchase").</p>
+    </div>
+  </div>
+
+  <h3>Gráfica de pastel — Gastos por categoría</h3>
+  <p>Muestra la distribución de gastos por categoría en el período seleccionado. Útil para identificar qué categoría consume más presupuesto. Muestra hasta 5 categorías y agrupa el resto.</p>
+
+  <h3>Estado de Resultados — Tabla P&L</h3>
+  <p>Tabla con los últimos 6 meses, mostrando: Ingresos, Gastos QB, Utilidad y Margen de utilidad (%). La fila del mes actual aparece resaltada en azul claro.</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Columna</th>
+        <th>Descripción</th>
+        <th>Color</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ingresos</strong></td>
+        <td>Total de ventas (online + sucursal efectivo + sucursal tarjeta)</td>
+        <td><span class="badge green">Verde</span></td>
+      </tr>
+      <tr>
+        <td><strong>Gastos QB</strong></td>
+        <td>Gastos operativos sincronizados a QuickBooks</td>
+        <td><span class="badge red">Rojo</span></td>
+      </tr>
+      <tr>
+        <td><strong>Utilidad</strong></td>
+        <td>Ingresos menos Gastos QB. Positivo = ganancia, negativo = pérdida</td>
+        <td><span class="badge green">Verde / Naranja</span></td>
+      </tr>
+      <tr>
+        <td><strong>Margen %</strong></td>
+        <td>Utilidad ÷ Ingresos × 100. Verde ≥20%, amarillo ≥0%, rojo negativo</td>
+        <td><span class="badge blue">Badge de color</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Desglose por tipo de ingreso</h3>
+  <p>Tres tarjetas muestran el desglose de los ingresos del período con una barra de proporción:</p>
+
+  <div class="feature-grid">
+    <div class="feature-card purple">
+      <div class="feature-card-icon">🌐</div>
+      <h4>Ventas Online</h4>
+      <p>Boletos vendidos a través de la plataforma web (pago con tarjeta por internet).</p>
+    </div>
+    <div class="feature-card green">
+      <div class="feature-card-icon">💵</div>
+      <h4>Efectivo Sucursales</h4>
+      <p>Boletos pagados en efectivo en cualquier punto de venta.</p>
+    </div>
+  </div>
+
+  <h3>Presupuesto vs Real</h3>
+  <p>Visible cuando se selecciona un mes específico (no en modo Histórico). Compara el presupuesto definido para cada categoría contra el gasto real del mes.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Haz clic en "Editar presupuesto"</strong>
+        <span>Abre el formulario para ingresar el presupuesto mensual por categoría.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Ingresa los montos por categoría</strong>
+        <span>Solo las categorías con monto mayor a $0 aparecerán en la tabla comparativa.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Guarda y revisa la tabla</strong>
+        <span>La barra de progreso se vuelve roja si el gasto real supera el presupuesto.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box amber">
+    <div class="info-box-icon">💡</div>
+    <div class="info-box-text">
+      <strong>Tip: El presupuesto es por mes</strong>
+      Cada mes tiene su propio presupuesto. Si cambias el mes, el presupuesto mostrado corresponde a ese mes. Los presupuestos se guardan por sucursal y mes.
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     5. NIVEL 2 — GASTOS
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 5 — Nivel 2</div>
+  <h2>Gastos, Proveedores y Presupuesto</h2>
+  <p class="page-intro">El sistema de gastos permite registrar cada gasto operativo con todos los detalles contables: proveedor, número de recibo y foto del comprobante.</p>
+
+  <h3>¿Quién registra los gastos?</h3>
+  <p>Los gastos los registran los cajeros y empleados desde su panel personal (<strong>Personal → Gastos</strong>). El administrador los ve consolidados en la pestaña "Gastos" de Contabilidad.</p>
+
+  <h3>Las 13 categorías de gasto</h3>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <p style="margin:0;font-size:12px;">
+        <strong>1.</strong> Combustible / Gasolina<br>
+        <strong>2.</strong> Mantenimiento y Reparaciones<br>
+        <strong>3.</strong> Salarios y Nómina<br>
+        <strong>4.</strong> Arrendamiento / Renta<br>
+        <strong>5.</strong> Seguros<br>
+        <strong>6.</strong> Servicios (agua, luz, internet, teléfono)<br>
+        <strong>7.</strong> Suministros de Oficina
+      </p>
+    </div>
+    <div class="feature-card">
+      <p style="margin:0;font-size:12px;">
+        <strong>8.</strong> Comida / Viáticos<br>
+        <strong>9.</strong> Publicidad y Marketing<br>
+        <strong>10.</strong> Impuestos y Cuotas<br>
+        <strong>11.</strong> Limpieza<br>
+        <strong>12.</strong> Equipo y Herramientas<br>
+        <strong>13.</strong> Otro
+      </p>
+    </div>
+  </div>
+
+  <h3>Campos del formulario de gasto (panel del empleado)</h3>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Campo</th>
+        <th>Descripción</th>
+        <th>Obligatorio</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Monto</strong></td>
+        <td>Cantidad en dólares del gasto</td>
+        <td><span class="badge red">Sí</span></td>
+      </tr>
+      <tr>
+        <td><strong>Categoría</strong></td>
+        <td>Una de las 13 categorías predefinidas</td>
+        <td><span class="badge red">Sí</span></td>
+      </tr>
+      <tr>
+        <td><strong>Fecha</strong></td>
+        <td>Fecha del gasto (por defecto hoy)</td>
+        <td><span class="badge red">Sí</span></td>
+      </tr>
+      <tr>
+        <td><strong>Método de pago</strong></td>
+        <td>Efectivo o Tarjeta</td>
+        <td><span class="badge red">Sí</span></td>
+      </tr>
+      <tr>
+        <td><strong>Proveedor</strong></td>
+        <td>Nombre del negocio o persona que cobró (se crea automáticamente en QB)</td>
+        <td><span class="badge slate">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>No. de Recibo</strong></td>
+        <td>Número del comprobante fiscal o factura</td>
+        <td><span class="badge slate">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Foto del recibo</strong></td>
+        <td>Imagen del comprobante (se sube automáticamente al almacenamiento)</td>
+        <td><span class="badge slate">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Descripción</strong></td>
+        <td>Notas adicionales sobre el gasto</td>
+        <td><span class="badge slate">No</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Vista del administrador — Pestaña Gastos</h3>
+  <p>La tabla de gastos muestra todos los gastos del período/sucursal seleccionados:</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-card-icon">🏪</div>
+      <h4>Columna Sucursal</h4>
+      <p>Código de la sucursal donde se registró el gasto.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">🏭</div>
+      <h4>Columna Proveedor</h4>
+      <p>Nombre del proveedor y número de recibo debajo.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">🖼️</div>
+      <h4>Icono de Recibo</h4>
+      <p>Clic para abrir la foto del comprobante en una nueva ventana.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">✅</div>
+      <h4>Estado QB</h4>
+      <p>Palomita verde = sincronizado con QB. X amarilla = pendiente.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     6. CIERRES Y REPORTE POR CAJERO
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 6 — NUEVO</div>
+  <h2>Cierres de Turno y Reporte por Cajero</h2>
+  <p class="page-intro">La pestaña "Cierres de turno" ahora incluye un reporte agrupado por cajero, permitiendo evaluar el desempeño de cada empleado en el período seleccionado.</p>
+
+  <h3>¿Qué es un cierre de turno?</h3>
+  <p>Al finalizar su turno, cada cajero registra un "cierre" con el resumen de lo recaudado: boletos vendidos, efectivo, cobros con tarjeta y paquetes enviados. Este cierre se sincroniza automáticamente con QuickBooks como un Sales Receipt.</p>
+
+  <h3>Reporte por Cajero <span style="background:#dcfce7;color:#065f46;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:6px;">NUEVO</span></h3>
+  <p>Aparece en la parte superior de la pestaña Cierres, antes del detalle individual. Agrupa todos los cierres del período/sucursal seleccionados por empleado:</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Columna</th>
+        <th>Descripción</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Cajero</strong></td>
+        <td>Nombre completo del empleado (o email si no tiene nombre registrado)</td>
+      </tr>
+      <tr>
+        <td><strong>Sucursal</strong></td>
+        <td>Código(s) de sucursal donde hizo turnos (puede ser más de una)</td>
+      </tr>
+      <tr>
+        <td><strong>Turnos</strong></td>
+        <td>Número de cierres de turno realizados en el período</td>
+      </tr>
+      <tr>
+        <td><strong>Boletos</strong></td>
+        <td>Total de boletos vendidos por ese cajero en el período</td>
+      </tr>
+      <tr>
+        <td><strong>Efectivo</strong></td>
+        <td>Total recaudado en efectivo (suma de todos sus cierres)</td>
+      </tr>
+      <tr>
+        <td><strong>Tarjeta</strong></td>
+        <td>Total recaudado con terminal de tarjeta</td>
+      </tr>
+      <tr>
+        <td><strong>Paquetes</strong></td>
+        <td>Total de paquetería cobrada</td>
+      </tr>
+      <tr>
+        <td><strong>Total</strong></td>
+        <td>Gran total del cajero (efectivo + tarjeta + paquetes). Ordenado de mayor a menor.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box blue">
+    <div class="info-box-icon">💡</div>
+    <div class="info-box-text">
+      <strong>Cómo usar el reporte por cajero</strong>
+      Combina el filtro de período + sucursal para ver, por ejemplo, cuánto recaudó cada cajero en una sucursal específica durante el mes de julio. La tabla se ordena automáticamente del cajero con mayor recaudación al menor.
+    </div>
+  </div>
+
+  <h3>Detalle individual de cierres</h3>
+  <p>Debajo del reporte por cajero, se muestra el detalle de cada cierre individual:</p>
+
+  <div class="feature-grid">
+    <div class="feature-card green">
+      <div class="feature-card-icon">✅</div>
+      <h4>Fondo blanco — QB Sincronizado</h4>
+      <p>El cierre ya fue enviado a QuickBooks Online como Sales Receipt. Todo en orden.</p>
+    </div>
+    <div class="feature-card gold">
+      <div class="feature-card-icon">⚠️</div>
+      <h4>Fondo amarillo — Sin sync QB</h4>
+      <p>El cierre no se pudo sincronizar con QB. Aparece el botón "Reintentar QB".</p>
+    </div>
+  </div>
+
+  <h3>Campos del cierre individual</h3>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-card-icon">👤</div>
+      <h4>Cajero y Sucursal</h4>
+      <p>Nombre del empleado que hizo el cierre y código de sucursal.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">📅</div>
+      <h4>Fecha</h4>
+      <p>Fecha en que se realizó el cierre de turno.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">🎫</div>
+      <h4>Boletos y montos</h4>
+      <p>Total de boletos vendidos, efectivo, tarjeta, paquetes y total general.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">📝</div>
+      <h4>Notas</h4>
+      <p>Observaciones que el cajero agregó al hacer el cierre.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     7. NIVEL 3 — QUICKBOOKS
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 7 — Nivel 3</div>
+  <h2>QuickBooks Online: Sincronización Automática</h2>
+  <p class="page-intro">El sistema envía automáticamente ventas y gastos a QuickBooks Online sin intervención manual. Cada tipo de transacción tiene su propio flujo de sincronización.</p>
+
+  <h3>¿Qué se sincroniza con QB?</h3>
+
+  <div class="feature-grid">
+    <div class="feature-card blue">
+      <div class="feature-card-icon">📥</div>
+      <h4>Cierres de turno → Sales Receipt</h4>
+      <p>Cada cierre de turno genera un Sales Receipt en QB con el monto total, la sucursal, el cajero y el método de pago.</p>
+    </div>
+    <div class="feature-card red">
+      <div class="feature-card-icon">📤</div>
+      <h4>Gastos → Purchase</h4>
+      <p>Cada gasto operativo genera un Purchase en QB con categoría, proveedor (vendor), cuenta contable y comprobante.</p>
+    </div>
+  </div>
+
+  <h3>Flujo de sincronización de un gasto</h3>
+
+  <div class="flow">
+    <div class="flow-node gray">Cajero registra<br>gasto</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">Buscar proveedor<br>en QB</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node gold">Crear proveedor<br>si no existe</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node green">Crear Purchase<br>en QB</div>
+  </div>
+
+  <h3>Cuentas contables QB por categoría</h3>
+  <p>Cada categoría de gasto puede mapearse a una cuenta específica del catálogo contable de QuickBooks. Sin mapeo, usa la cuenta de gasto predeterminada.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Clic en "Mapeo QB" (botón superior derecho)</strong>
+        <span>Abre el modal de configuración de cuentas contables.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Asigna una cuenta QB a cada categoría</strong>
+        <span>El sistema carga automáticamente las cuentas de tipo "Expense" de tu QuickBooks.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Guarda el mapeo</strong>
+        <span>Los próximos gastos de esa categoría usarán la cuenta asignada. Los pasados no se modifican.</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Gestión automática de proveedores (Vendors)</h3>
+  <p>Cuando un gasto tiene un proveedor registrado, el sistema:</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Situación</th>
+        <th>Acción automática</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>El proveedor ya existe en QB</td>
+        <td>Se vincula el Purchase al vendor existente (sin duplicar)</td>
+      </tr>
+      <tr>
+        <td>El proveedor es nuevo</td>
+        <td>Se crea automáticamente el vendor en QB y se vincula</td>
+      </tr>
+      <tr>
+        <td>No se ingresó proveedor</td>
+        <td>El Purchase se crea sin EntityRef (sin vendor ligado)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Pestaña "Registro QB"</h3>
+  <p>Muestra el historial de todas las transacciones enviadas a QB con filtros por tipo:</p>
+
+  <div class="feature-grid">
+    <div class="feature-card purple">
+      <div class="feature-card-icon">🌐</div>
+      <h4>Online</h4>
+      <p>Ventas realizadas en el sitio web con pago digital.</p>
+    </div>
+    <div class="feature-card green">
+      <div class="feature-card-icon">💵</div>
+      <h4>Efectivo</h4>
+      <p>Ventas en sucursal pagadas en efectivo.</p>
+    </div>
+    <div class="feature-card blue">
+      <div class="feature-card-icon">💳</div>
+      <h4>Tarjeta</h4>
+      <p>Ventas en sucursal pagadas con terminal.</p>
+    </div>
+    <div class="feature-card red">
+      <div class="feature-card-icon">📉</div>
+      <h4>Gasto</h4>
+      <p>Compras y gastos operativos enviados como Purchase.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     8. CONCILIACIÓN
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 8</div>
+  <h2>Conciliación QB y Reintentos</h2>
+  <p class="page-intro">La pestaña "Conciliación QB" centraliza todo lo que está pendiente de sincronizar con QuickBooks, con herramientas para resolver los errores.</p>
+
+  <h3>Resumen de sincronización</h3>
+  <p>4 tarjetas muestran el estado general:</p>
+
+  <div class="kpi-row">
+    <div class="kpi red">
+      <div class="kpi-label">Gastos pendientes QB</div>
+      <div class="kpi-value">—</div>
+      <div class="kpi-sub">sin sincronizar</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Gastos sincronizados</div>
+      <div class="kpi-value">—</div>
+      <div class="kpi-sub">en QB</div>
+    </div>
+    <div class="kpi slate">
+      <div class="kpi-label">Cierres pendientes</div>
+      <div class="kpi-value">—</div>
+      <div class="kpi-sub">sin Sales Receipt</div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-label">Cierres sincronizados</div>
+      <div class="kpi-value">—</div>
+      <div class="kpi-sub">en QB</div>
+    </div>
+  </div>
+
+  <h3>Causas comunes de error en sincronización</h3>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Causa</th>
+        <th>Solución</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Token de QB expirado</td>
+        <td>Ir a Configuración → QuickBooks y reconectar la cuenta</td>
+      </tr>
+      <tr>
+        <td>Cuenta QB no configurada (cuenta de gasto o caja)</td>
+        <td>Verificar IDs en la configuración de la sucursal</td>
+      </tr>
+      <tr>
+        <td>Error temporal de conexión con QB</td>
+        <td>Usar el botón "Reintentar QB" — suele resolverse solo</td>
+      </tr>
+      <tr>
+        <td>Proveedor con nombre inválido (caracteres especiales)</td>
+        <td>Editar el gasto y simplificar el nombre del proveedor</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Cómo reintentar la sincronización</h3>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Botón "Reintentar QB" (individual)</strong>
+        <span>Aparece en cada gasto o cierre pendiente. Reintenta solo ese registro.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Botón "Reintentar todos" (gastos)</strong>
+        <span>Reintenta todos los gastos pendientes en secuencia. Útil después de reconectar QB.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Verificar resultado</strong>
+        <span>Después del reintento aparece un mensaje de éxito (verde) o error (rojo) junto al registro.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box red">
+    <div class="info-box-icon">⚠️</div>
+    <div class="info-box-text">
+      <strong>Alerta automática de cierres pendientes</strong>
+      En la parte superior de la página de Contabilidad aparece automáticamente una alerta amarilla indicando cuántos cierres están sin sincronizar con QB, con sus fechas y sucursales. Hacer clic en la alerta lleva directamente a la pestaña Cierres.
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     9. EXPORTACIÓN CSV
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 9</div>
+  <h2>Exportación de Datos a CSV</h2>
+  <p class="page-intro">Cada pestaña permite exportar los datos filtrados a un archivo CSV, compatible con Excel, Google Sheets y cualquier software contable.</p>
+
+  <h3>¿Qué se exporta?</h3>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Pestaña</th>
+        <th>Archivo generado</th>
+        <th>Columnas exportadas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Resumen P&L</strong></td>
+        <td>P&L_6meses.csv</td>
+        <td>Mes, Ingresos, Gastos, Utilidad, Margen%</td>
+      </tr>
+      <tr>
+        <td><strong>Registro QB</strong></td>
+        <td>QB_[periodo].csv</td>
+        <td>Fecha, Tipo, Sucursal, Documento, Descripción, Monto, QB_Sync</td>
+      </tr>
+      <tr>
+        <td><strong>Gastos</strong></td>
+        <td>Gastos_[periodo].csv</td>
+        <td>Fecha, Sucursal, Categoría, Descripción, Empleado, Pago, Monto, QB_Sync</td>
+      </tr>
+      <tr>
+        <td><strong>Cierres</strong></td>
+        <td>Cierres_[periodo].csv</td>
+        <td>Fecha, Sucursal, Cajero, Boletos, Efectivo, Tarjeta, Paquetes, Total, QB_Sync</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box blue">
+    <div class="info-box-icon">💡</div>
+    <div class="info-box-text">
+      <strong>El CSV respeta los filtros activos</strong>
+      El archivo exportado solo contiene los datos del período y sucursal seleccionados en ese momento. Si tienes filtrado "Sucursal MER — Julio 2026", el CSV contendrá solo esos registros.
+    </div>
+  </div>
+
+  <h3>Cómo usar en Excel o Google Sheets</h3>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Descarga el CSV desde el botón "Exportar CSV"</strong>
+        <span>El archivo se descarga automáticamente a tu carpeta de Descargas.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Abre en Excel: Datos → Desde texto/CSV</strong>
+        <span>Selecciona UTF-8 como codificación y coma (,) como delimitador.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>En Google Sheets: Archivo → Importar</strong>
+        <span>Detecta automáticamente el formato. Los montos estarán listos para fórmulas.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     10. ROLES Y PERMISOS
+══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-label">Sección 10</div>
+  <h2>Roles y Permisos</h2>
+  <p class="page-intro">El sistema de contabilidad tiene diferentes niveles de acceso dependiendo del rol del usuario.</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Funcionalidad</th>
+        <th>Administrador</th>
+        <th>Cajero / Personal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Ver Resumen P&L y gráficas</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Ver Registro QB</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Ver tabla de Gastos</td>
+        <td><span class="badge green">✓ Todos</span></td>
+        <td><span class="badge amber">Solo los propios</span></td>
+      </tr>
+      <tr>
+        <td>Registrar un gasto</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge green">✓ Sí</span></td>
+      </tr>
+      <tr>
+        <td>Ver Cierres de turno</td>
+        <td><span class="badge green">✓ Todos</span></td>
+        <td><span class="badge amber">Solo los propios</span></td>
+      </tr>
+      <tr>
+        <td>Hacer cierre de turno</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge green">✓ Sí</span></td>
+      </tr>
+      <tr>
+        <td>Ver reporte por cajero</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Filtrar por sucursal</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Reintentar sync QB</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Configurar mapeo de cuentas QB</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Editar presupuesto mensual</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+      <tr>
+        <td>Exportar CSV</td>
+        <td><span class="badge green">✓ Sí</span></td>
+        <td><span class="badge red">✗ No</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="divider" />
+
+  <h3>Resumen de lo nuevo en versión 2.0</h3>
+
+  <div class="feature-grid">
+    <div class="feature-card green">
+      <div class="feature-card-icon">🏪</div>
+      <h4>Filtro por sucursal</h4>
+      <p>Selector siempre visible junto al período. Filtra KPIs, gastos, cierres y QB simultáneamente.</p>
+    </div>
+    <div class="feature-card blue">
+      <div class="feature-card-icon">👥</div>
+      <h4>Reporte por cajero</h4>
+      <p>Tabla agrupada por empleado en Cierres: turnos, boletos, efectivo, tarjeta, paquetes y total.</p>
+    </div>
+  </div>
+
+  <div class="highlight-section">
+    <h3>Flujo completo del sistema</h3>
+    <ul>
+      <li><strong>El cajero vende boletos</strong> → se genera un registro de venta automáticamente</li>
+      <li><strong>El cajero cierra turno</strong> → se sincroniza como Sales Receipt en QuickBooks</li>
+      <li><strong>El cajero registra un gasto</strong> → se sincroniza como Purchase en QB con proveedor y cuenta contable</li>
+      <li><strong>El admin filtra por sucursal + mes</strong> → ve P&L, gastos y reporte de cajeros de esa sucursal</li>
+      <li><strong>El admin revisa Conciliación QB</strong> → reintenta los registros fallidos si los hay</li>
+      <li><strong>El admin exporta CSV</strong> → para auditoría, impuestos o análisis externo</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <strong>Tres Estrellas de Oro Inc.</strong>
+    <span>Manual de Contabilidad v2.0 — Julio 2026</span>
+  </div>
+</div>
+
+</body>
+</html>

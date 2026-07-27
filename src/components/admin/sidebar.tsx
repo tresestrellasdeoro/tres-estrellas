@@ -5,12 +5,11 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X,
   Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
-  MessageCircle, TrendingUp, Monitor, ChevronDown, Sparkles,
+  MessageCircle, TrendingUp, Monitor, ChevronDown,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
-import { DashboardAgent } from '@/components/dashboard/dashboard-agent'
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -177,29 +176,6 @@ export function AdminSidebar() {
 
       <div className="px-3 pb-2 border-t border-white/8 pt-3 space-y-1">
 
-        {/* TEOBOT AI Agent button */}
-        <Link
-          href="/admin/agente"
-          onClick={() => setMobileOpen(false)}
-          className={`w-full group relative flex items-center gap-3 px-3 py-2.5 rounded-xl overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] ${
-            pathname.startsWith('/admin/agente') ? 'ring-1 ring-[#c8a951]/40' : ''
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0f2c5c] via-[#1a1a5e] to-[#0f2c5c] opacity-90 group-hover:opacity-100 transition-opacity" />
-          <div className="absolute inset-0 rounded-xl border border-[#c8a951]/30 group-hover:border-[#c8a951]/60 transition-colors" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-          <div className="relative flex items-center gap-3 w-full">
-            <div className="w-7 h-7 rounded-lg bg-[#c8a951]/20 border border-[#c8a951]/40 flex items-center justify-center shrink-0">
-              <Sparkles className="w-3.5 h-3.5 text-[#c8a951] animate-pulse" />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-white text-xs font-black tracking-wide">TEOBOT</p>
-              <p className="text-[#c8a951]/60 text-[9px] font-semibold tracking-widest uppercase">Agente IA</p>
-            </div>
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-[#c8a951]/20 text-[#c8a951] border border-[#c8a951]/30 tracking-wider">AI</span>
-          </div>
-        </Link>
-
         <Link href="/admin/soporte" onClick={() => setMobileOpen(false)}
           className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
             pathname.startsWith('/admin/soporte')
@@ -229,7 +205,6 @@ export function AdminSidebar() {
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-[#0a1628] flex-col border-r border-white/5">
         <SidebarContent />
       </div>
-      <DashboardAgent />
       <SupportWidget />
     </>
   )
