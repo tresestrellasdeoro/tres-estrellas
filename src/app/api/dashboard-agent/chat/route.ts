@@ -73,13 +73,19 @@ async function fetchAdminStats() {
 
 function buildSystemPrompt(
   name: string, role: string, isAdm: boolean,
-  stats: any, sucursal: { name: string; code: string } | null, permisos: string[]
+  stats: any, sucursal: { name: string; code: string } | null, permisos: string[],
+  lastQuestion: string,
 ): string {
+
+  const questionHint = lastQuestion
+    ? `\nPREGUNTA ACTUAL QUE DEBES RESPONDER: "${lastQuestion}"\nResponde ESTA pregunta específica. No respondas con "¿En qué puedo ayudarte?"\n`
+    : ''
 
   if (isAdm) {
     const s = stats ?? {}
-    return `Eres TEOBOT, el asistente IA interno de Tres Estrellas de Oro Inc.
-Usuario activo: ${name} (${role === 'super_admin' ? 'Super Admin' : 'Admin'}) — acceso total al sistema.
+    return `Eres TEOBOT, experto asistente IA interno de Tres Estrellas de Oro Inc. (autobuses LA↔Tijuana).
+Usuario: ${name} | Rol: ${role === 'super_admin' ? 'Super Admin' : 'Admin'} | Acceso total.
+${questionHint}
 
 ━ DATOS REALES ${s.mes ? `DE ${s.mes.toUpperCase()}` : 'DEL MES'} ━
 Ingresos: $${s.ingresos ?? '0.00'} | Gastos: $${s.gastos ?? '0.00'} | Utilidad: $${s.utilidad ?? '0.00'}
@@ -137,9 +143,10 @@ Regla crítica: el campo "answer" debe contener la respuesta REAL a la pregunta 
   const canCheck = hasAll || permisos.includes('checkin')
   const canPaq   = hasAll || permisos.includes('paquetes')
 
-  return `Eres TEOBOT, el asistente IA interno de Tres Estrellas de Oro Inc.
+  return `Eres TEOBOT, experto asistente IA interno de Tres Estrellas de Oro Inc. (autobuses LA↔Tijuana).
 Usuario: ${name} | Rol: ${role === 'cajero' ? 'Cajero' : role} | Sucursal: ${sucursal ? sucursal.name : 'sin asignar'}
 Permisos: ${hasAll ? 'todos' : [canVenta && 'ventas', canCheck && 'checkin', canPaq && 'paquetes'].filter(Boolean).join(', ') || 'solo turno'}
+${questionHint}
 
 ━ SECCIONES DISPONIBLES ━
 /personal/turno — iniciar y cerrar turno de trabajo
@@ -212,9 +219,19 @@ export async function POST(req: NextRequest) {
     const isAdm = ['admin', 'super_admin', 'developer'].includes(userProfile.role)
 
     const stats   = isAdm ? await fetchAdminStats().catch(() => null) : null
+
+    // Last user question — injected into prompt so model can't ignore it
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
+
+    // Clean history: remove bot responses that are generic/useless to break loops
+    const BAD_PATTERNS = ['¿En qué puedo ayudarte?', '¿En qué te puedo', '¿En qué más puedo']
+    const cleanHistory = messages
+      .slice(-10)
+      .filter(m => !(m.role === 'assistant' && BAD_PATTERNS.some(p => m.content.includes(p))))
+
     const sysPrompt = buildSystemPrompt(
       userProfile.name, userProfile.role, isAdm,
-      stats as any, userProfile.sucursal, userProfile.permisos,
+      stats as any, userProfile.sucursal, userProfile.permisos, lastUserMsg,
     )
 
     const apiKey = process.env.GROQ_DASHBOARD_KEY
@@ -232,9 +249,9 @@ export async function POST(req: NextRequest) {
         model:       MODEL,
         messages: [
           { role: 'system', content: sysPrompt },
-          ...messages.slice(-12),
+          ...cleanHistory,
         ],
-        temperature: 0.6,
+        temperature: 0.7,
         max_tokens:  800,
       }),
     })
