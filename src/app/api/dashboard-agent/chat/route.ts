@@ -6,6 +6,13 @@ import { cookies } from 'next/headers'
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL    = 'llama-3.3-70b-versatile'
 
+function extractJSON(text: string): any {
+  // Extract the first {...} block from the model's text output
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) return null
+  try { return JSON.parse(match[0]) } catch { return null }
+}
+
 function svc() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -117,9 +124,11 @@ CONFIGURAR QB → /admin/sucursales → seleccionar sucursal → configurar cuen
 - Si no entiendes la pregunta, pide clarificación en una sola oración.
 - Responde siempre en español. Sin saludos largos. Sin frases de relleno.
 
-━ FORMATO OBLIGATORIO ━
-Responde ÚNICAMENTE con este JSON (sin texto extra):
-{"answer":"usa \\n para saltos de línea y **texto** para negrita","quickReplies":["sugerencia 1","sugerencia 2"],"links":[{"label":"Nombre","href":"/admin/ruta"}],"openSupport":false}`
+━ FORMATO DE RESPUESTA ━
+Responde SIEMPRE con un bloque JSON con esta estructura exacta:
+{"answer":"respuesta aquí, usa \\n para saltos y **texto** para negrita","quickReplies":["sugerencia breve 1","sugerencia breve 2"],"links":[{"label":"Ir a X","href":"/admin/ruta"}],"openSupport":false}
+
+Regla crítica: el campo "answer" debe contener la respuesta REAL a la pregunta del usuario, no frases genéricas como "¿En qué puedo ayudarte?" o "¿En qué te puedo asistir?". Si el usuario pregunta cómo hacer algo, explícalo. Si pregunta datos, dálos.`
   }
 
   // ── Staff ──────────────────────────────────────────────────────────────────
@@ -155,9 +164,11 @@ REPORTAR PROBLEMA → /personal/soporte → "Nueva incidencia" → describir el 
 - Si pide algo fuera de sus permisos, díselo claramente.
 - Responde en español. Sin relleno.
 
-━ FORMATO OBLIGATORIO ━
-Responde ÚNICAMENTE con este JSON:
-{"answer":"usa \\n para saltos y **texto** para negrita","quickReplies":["sugerencia 1","sugerencia 2"],"links":[{"label":"Nombre","href":"/personal/ruta"}],"openSupport":false}`
+━ FORMATO DE RESPUESTA ━
+Responde SIEMPRE con un bloque JSON:
+{"answer":"respuesta real aquí, usa \\n para saltos y **texto** para negrita","quickReplies":["sugerencia 1","sugerencia 2"],"links":[{"label":"Ir a X","href":"/personal/ruta"}],"openSupport":false}
+
+El campo "answer" debe responder la pregunta concretamente. Nunca uses "¿En qué puedo ayudarte?" como answer.`
 }
 
 
@@ -218,14 +229,13 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model:           MODEL,
+        model:       MODEL,
         messages: [
           { role: 'system', content: sysPrompt },
           ...messages.slice(-12),
         ],
-        response_format: { type: 'json_object' },
-        temperature:     0.5,
-        max_tokens:      700,
+        temperature: 0.6,
+        max_tokens:  800,
       }),
     })
 
@@ -238,12 +248,11 @@ export async function POST(req: NextRequest) {
     }
 
     const data   = await res.json()
-    const raw    = data.choices?.[0]?.message?.content ?? '{}'
-    let parsed: any = {}
-    try { parsed = JSON.parse(raw) } catch { parsed = { answer: raw } }
+    const raw    = data.choices?.[0]?.message?.content ?? ''
+    const parsed = extractJSON(raw) ?? { answer: raw || 'No pude generar una respuesta.' }
 
     return NextResponse.json({
-      answer:       parsed.answer       ?? 'No pude generar una respuesta.',
+      answer:       parsed.answer       ?? raw,
       quickReplies: parsed.quickReplies ?? [],
       links:        parsed.links        ?? [],
       openSupport:  parsed.openSupport  ?? false,
