@@ -8,6 +8,9 @@ import {
 import Link from 'next/link'
 import { supportWidgetBus } from '@/components/support/support-widget'
 
+// ── Bus (allows sidebar button to open the agent) ────────────────────────────
+export const agentBus = { open: () => {} }
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface UserProfile {
@@ -118,6 +121,11 @@ export function DashboardAgent() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  useEffect(() => {
+    agentBus.open = () => setOpen(true)
+    return () => { agentBus.open = () => {} }
+  }, [])
 
   useEffect(() => {
     if (open) {
