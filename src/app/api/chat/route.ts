@@ -128,7 +128,10 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: 'GROQ_API_KEY no configurada' }, { status: 500 })
+      return NextResponse.json({
+        answer: '¡Hola! Por el momento nuestro asistente IA está en mantenimiento.\n\nPuedes contactarnos directamente:\n📞 **(213) 624-5524** — Los Angeles\n📞 **(664) 208-8399** — Tijuana',
+        quickReplies: ['¿Cómo compro?', '¿Qué horarios tienen?', '¿Cuánto cuesta?'],
+      })
     }
 
     const res = await fetch(GROQ_API, {
@@ -141,7 +144,7 @@ export async function POST(req: NextRequest) {
         model:           MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          ...messages.slice(-12), // keep last 12 messages for context window
+          ...messages.slice(-12),
         ],
         response_format: { type: 'json_object' },
         temperature:     0.65,
@@ -152,7 +155,10 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const err = await res.text()
       console.error('Groq error:', err)
-      return NextResponse.json({ error: 'Error al conectar con IA' }, { status: 502 })
+      return NextResponse.json({
+        answer: 'Tuve un problema al conectarme. Por favor contáctanos:\n📞 **(213) 624-5524** — Los Angeles\n📞 **(664) 208-8399** — Tijuana',
+        quickReplies: ['¿Cómo compro?', '¿Qué horarios tienen?', 'Contacto'],
+      })
     }
 
     const data      = await res.json()
