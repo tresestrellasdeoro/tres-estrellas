@@ -57,12 +57,21 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
-  // The trigger creates the profile with the role from app_metadata.
-  // This UPDATE also sets role explicitly as a safety net in case the trigger fallback fired.
+  // Small delay to allow the DB trigger to create the profile row first.
+  // Then we upsert to guarantee the correct role regardless of trigger timing.
+  await new Promise(r => setTimeout(r, 300))
+
   const { error: profileError } = await service
     .from('profiles')
-    .update({ role, full_name: name, sucursal_id: sucursal_id ?? null, departamento: departamento ?? null, permisos })
-    .eq('id', userId)
+    .upsert({
+      id:           userId,
+      email,
+      role,
+      full_name:    name,
+      sucursal_id:  sucursal_id ?? null,
+      departamento: departamento ?? null,
+      permisos,
+    }, { onConflict: 'id' })
 
   if (profileError) {
     await service.auth.admin.deleteUser(userId)
