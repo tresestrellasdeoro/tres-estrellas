@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireStaff } from '@/lib/api-auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { z } from 'zod'
 
 function svc() {
@@ -12,7 +12,7 @@ function svc() {
 
 // GET /api/admin/presupuestos?mes=YYYY-MM&sucursal_id=...
 export async function GET(req: NextRequest) {
-  const deny = await requireStaff(req); if (deny) return deny
+  const deny = await requireAdmin(req); if (deny) return deny
   const { searchParams } = req.nextUrl
   const mes         = searchParams.get('mes')
   const sucursalId  = searchParams.get('sucursal_id')
@@ -37,7 +37,7 @@ const SaveSchema = z.object({
 
 // POST /api/admin/presupuestos — upsert all budgets for a month
 export async function POST(req: NextRequest) {
-  const deny = await requireStaff(req); if (deny) return deny
+  const deny = await requireAdmin(req); if (deny) return deny
   const body   = await req.json()
   const parsed = SaveSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })

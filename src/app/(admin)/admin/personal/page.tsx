@@ -49,7 +49,6 @@ export default async function PersonalPage() {
     service
       .from('sucursales')
       .select('id, name, code')
-      .eq('active', true)
       .order('name'),
   ])
 

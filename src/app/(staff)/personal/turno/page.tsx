@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, Play, Square, Banknote, CreditCard, Package, Ticket, CheckCircle2, AlertCircle, AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
+import { Clock, Play, Square, Banknote, CreditCard, Package, Ticket, CheckCircle2, AlertCircle, AlertTriangle, Loader2, RefreshCw, MapPin } from 'lucide-react'
+
+interface Sucursal {
+  id:   string
+  name: string
+  code: string
+}
 
 interface Turno {
   id:             string
@@ -38,6 +44,8 @@ export default function TurnoPage() {
   const [tick,      setTick]      = useState(0)
   const [qbWarning, setQbWarning] = useState(false)
   const [cajeroNombre, setCajeroNombre] = useState('')
+  const [sucursales,   setSucursales]   = useState<Sucursal[]>([])
+  const [selectedSuc,  setSelectedSuc]  = useState('')
 
   const fetchTurno = useCallback(async () => {
     try {
@@ -52,6 +60,13 @@ export default function TurnoPage() {
   useEffect(() => {
     fetchTurno()
     fetch('/api/auth/me').then(r => r.json()).then(d => setCajeroNombre(d.full_name ?? '')).catch(() => {})
+    fetch('/api/staff/sucursales')
+      .then(r => r.json())
+      .then(d => {
+        setSucursales(d.sucursales ?? [])
+        if (d.sucursales?.length === 1) setSelectedSuc(d.sucursales[0].id)
+      })
+      .catch(() => {})
   }, [fetchTurno])
 
   // Tick cada minuto para actualizar la duración del turno activo
@@ -68,7 +83,7 @@ export default function TurnoPage() {
       const r = await fetch('/api/staff/turno', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'iniciar' }),
+        body: JSON.stringify({ action: 'iniciar', sucursal_id: selectedSuc || undefined }),
       })
       const d = await r.json()
       if (!r.ok) { setError(d.error || 'Error al iniciar turno'); return }
@@ -155,23 +170,49 @@ export default function TurnoPage() {
 
       {/* Sin turno activo */}
       {!turno && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
-          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-10 h-10 text-slate-400" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-10 h-10 text-slate-400" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Sin turno activo</h2>
+            <p className="text-slate-500 text-sm">
+              Debes iniciar tu turno antes de realizar ventas.<br />
+              Se registrará tu hora de entrada y todas tus operaciones.
+            </p>
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Sin turno activo</h2>
-          <p className="text-slate-500 text-sm mb-6">
-            Debes iniciar tu turno antes de realizar ventas.<br />
-            Se registrará tu hora de entrada y todas tus operaciones.
-          </p>
+
+          {/* Selector de sucursal */}
+          {sucursales.length > 0 && (
+            <div className="mb-6">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                <MapPin className="w-3.5 h-3.5" />
+                Sucursal donde trabajas hoy
+              </label>
+              <select
+                value={selectedSuc}
+                onChange={e => setSelectedSuc(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-[#0a1e42]/40 focus:bg-white transition-colors"
+              >
+                <option value="">-- Selecciona sucursal --</option>
+                {sucursales.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             onClick={iniciarTurno}
-            disabled={loading}
-            className="inline-flex items-center gap-2 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-50 text-white font-bold px-8 py-3.5 rounded-xl transition-colors text-sm"
+            disabled={loading || (sucursales.length > 0 && !selectedSuc)}
+            className="w-full flex items-center justify-center gap-2 bg-[#0a1e42] hover:bg-[#0f2c5c] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-8 py-3.5 rounded-xl transition-colors text-sm"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             {loading ? 'Iniciando...' : 'Iniciar turno'}
           </button>
+          {sucursales.length > 0 && !selectedSuc && (
+            <p className="text-center text-slate-400 text-xs mt-2">Selecciona una sucursal para continuar</p>
+          )}
         </div>
       )}
 

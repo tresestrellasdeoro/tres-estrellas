@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const { action, notas } = body as { action: 'iniciar' | 'cerrar'; notas?: string }
+  const { action, notas, sucursal_id: bodySucursalId } = body as { action: 'iniciar' | 'cerrar'; notas?: string; sucursal_id?: string }
 
   if (action === 'iniciar') {
-    const sucursalId = auth.profile.sucursal_id
+    const sucursalId = bodySucursalId || auth.profile.sucursal_id
     if (!sucursalId) {
-      return NextResponse.json({ error: 'Tu usuario no tiene sucursal asignada. Contacta al administrador.' }, { status: 422 })
+      return NextResponse.json({ error: 'Selecciona una sucursal para iniciar el turno.' }, { status: 422 })
     }
 
     // Verificar que no haya turno activo ya

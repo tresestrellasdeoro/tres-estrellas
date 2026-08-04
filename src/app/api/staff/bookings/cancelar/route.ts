@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
       customer_id: booking.customer_id,
       booking_id:  booking.id,
       points:      -booking.points_earned,
-      type:        'earned',
+      type:        'reversed',
       description: `Cancelación desde ventanilla — ${booking_number}`,
     })
   }

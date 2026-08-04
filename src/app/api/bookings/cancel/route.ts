@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       customer_id: booking.customer_id,
       booking_id:  booking_id,
       points:      -booking.points_earned,
-      type:        'earned',
+      type:        'reversed',
       description: `Cancelación boleto ${booking.booking_number}`,
     })
     if (loyaltyInsert.error) console.error('loyalty_transactions reversal failed:', loyaltyInsert.error.message)

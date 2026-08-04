@@ -16,22 +16,10 @@ export function Navbar() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data }) => {
+    supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .maybeSingle() as { data: { role: string } | null }
-      const role = profile?.role
       setIsLoggedIn(true)
-      if (role === 'admin' || role === 'super_admin') {
-        setAccountHref('/admin/dashboard')
-      } else if (role === 'cajero' || role === 'driver') {
-        setAccountHref('/personal/validar')
-      } else {
-        setAccountHref('/dashboard')
-      }
+      setAccountHref('/auth/redirect')
     })
   }, [])
 
