@@ -63,15 +63,19 @@ export function Hero() {
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-20">
-      {/* Background slideshow */}
+      {/* Background slideshow — served via Vercel CDN cache (next/image with fill) */}
       <div className="absolute inset-0">
         {BG_IMAGES.map((src, i) => (
-          <img
+          <Image
             key={src}
             src={src}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000"
+            fill
+            className="object-cover object-center transition-opacity duration-1000"
             style={{ opacity: i === bgIndex ? 1 : 0 }}
+            priority={i === 0}
+            sizes="100vw"
+            quality={80}
           />
         ))}
         {/* Dark overlay */}

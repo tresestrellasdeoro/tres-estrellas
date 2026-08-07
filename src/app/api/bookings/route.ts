@@ -479,6 +479,7 @@ export async function GET(req: NextRequest) {
     .select('*, passengers(*)')
     .eq('customer_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(100)
 
   return NextResponse.json({ bookings })
 }

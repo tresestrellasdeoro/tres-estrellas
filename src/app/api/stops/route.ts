@@ -12,5 +12,7 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ stops: stops ?? [] })
+  const res = NextResponse.json({ stops: stops ?? [] })
+  res.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
+  return res
 }

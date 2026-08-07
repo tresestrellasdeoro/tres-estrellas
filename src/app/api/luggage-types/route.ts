@@ -38,7 +38,9 @@ export async function GET() {
       })),
     ]
 
-    return NextResponse.json({ options })
+    const res = NextResponse.json({ options })
+    res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800')
+    return res
   } catch {
     return NextResponse.json({ options: LUGGAGE_OPTIONS })
   }
