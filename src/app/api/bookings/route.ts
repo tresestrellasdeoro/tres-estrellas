@@ -79,15 +79,21 @@ export async function POST(req: NextRequest) {
   let customerId: string | null = null
   let soldByUserId: string | null = null
   let isStaff = false
+  let discountPct = 0
   if (user) {
     const { data: callerProfile } = await service
       .from('profiles')
-      .select('role')
+      .select('role, loyalty_tier')
       .eq('id', user.id)
-      .maybeSingle() as { data: { role: string } | null }
+      .maybeSingle() as { data: { role: string; loyalty_tier: string | null } | null }
     isStaff = ['cajero', 'admin', 'super_admin', 'developer'].includes(callerProfile?.role ?? '')
-    if (!isStaff) customerId = user.id
-    else soldByUserId = user.id
+    if (!isStaff) {
+      customerId = user.id
+      const TIER_DISCOUNTS: Record<string, number> = { bronze: 0.05, silver: 0.10, gold: 0.15, platinum: 0.20 }
+      discountPct = TIER_DISCOUNTS[callerProfile?.loyalty_tier ?? ''] ?? 0
+    } else {
+      soldByUserId = user.id
+    }
   }
 
   // ── Server-side price validation (non-staff only) ──────────────────────────
@@ -127,8 +133,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Server-calculated total (overrides client value for payment and DB record)
-  const serverTotal = passengers.reduce((sum, p) => sum + p.price, 0) + luggage_price
+  // Server-calculated total — apply loyalty discount for authenticated customers
+  const baseTotal   = passengers.reduce((sum, p) => sum + p.price, 0) + luggage_price
+  const discountAmt = discountPct > 0 ? parseFloat((baseTotal * discountPct).toFixed(2)) : 0
+  const serverTotal = parseFloat((baseTotal - discountAmt).toFixed(2))
 
   // ── Square payment charge ──────────────────────────────────────────────────
   let squarePaymentId: string | undefined
@@ -228,6 +236,7 @@ export async function POST(req: NextRequest) {
     origin_name,
     destination_name,
     departure_time,
+    ...(discountAmt > 0 && { notes: `Descuento lealtad ${Math.round(discountPct * 100)}% aplicado (-$${discountAmt.toFixed(2)})` }),
   }
   if (return_date)    bookingInsert.return_date      = return_date
   if (customerId)     bookingInsert.customer_id      = customerId
@@ -464,6 +473,8 @@ export async function POST(req: NextRequest) {
     booking_id:     booking.id,
     booking_number: booking.booking_number,
     total_charged:  serverTotal,
+    discount_amt:   discountAmt,
+    discount_pct:   discountPct,
     email_status:   emailStatus,
     email_error:    emailError || undefined,
   }, { status: 201 })

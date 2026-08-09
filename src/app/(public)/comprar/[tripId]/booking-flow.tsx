@@ -81,6 +81,21 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const [squareReady, setSquareReady] = useState(false)
   const [occupiedSeats, setOccupiedSeats]   = useState<string[]>([])
   const [seatsAvailable, setSeatsAvailable] = useState<number | null>(null)
+  const [userTier,     setUserTier]     = useState<string>('none')
+  const [discountPct,  setDiscountPct]  = useState(0)
+  const [chargedTotal, setChargedTotal] = useState(0)
+
+  useEffect(() => {
+    const TIER_DISCOUNTS: Record<string, number> = { bronze: 0.05, silver: 0.10, gold: 0.15, platinum: 0.20 }
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        const tier = d.loyalty_tier ?? 'none'
+        setUserTier(tier)
+        setDiscountPct(TIER_DISCOUNTS[tier] ?? 0)
+      })
+      .catch(() => {})
+  }, [])
 
   const updatePassenger = (i: number, field: keyof Passenger, value: string) => {
     setPassengers(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -94,6 +109,12 @@ export function BookingFlow({ tripId }: { tripId: string }) {
   const passengersTotal = passengers.reduce((sum, p) => sum + (p.type === 'adult' ? adultPrice : childPrice), 0)
   const luggageTotal    = luggage.price * passCount
   const grandTotal      = passengersTotal + luggageTotal
+  const discountAmt     = discountPct > 0 ? parseFloat((grandTotal * discountPct).toFixed(2)) : 0
+  const finalTotal      = parseFloat((grandTotal - discountAmt).toFixed(2))
+
+  const TIER_LABELS: Record<string, string> = {
+    bronze: 'Bronce', silver: 'Plata', gold: 'Oro', platinum: 'Platino',
+  }
 
   const boardingStopInfo = bus?.stops.find(s => s.code === boardingStop)
   const destStopInfo     = bus?.stops.find(s => s.code === destination)
@@ -145,6 +166,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
       if (!res.ok) throw new Error(data.error || 'Error al procesar')
       setBookingRef(data.booking_number)
       setBookingQr(data.qr_data_url || '')
+      setChargedTotal(data.total_charged ?? finalTotal)
       if (data.email_error) setBookingError(`Reservación creada, pero el email falló: ${data.email_error}`)
       setStep(3)
     } catch (err: any) {
@@ -173,10 +195,18 @@ export function BookingFlow({ tripId }: { tripId: string }) {
         </div>
       </div>
       <div className="text-right">
-        <div className="text-white font-black text-2xl">${grandTotal}</div>
+        {discountAmt > 0 && (
+          <div className="text-white/50 line-through text-sm">${grandTotal}</div>
+        )}
+        <div className="text-white font-black text-2xl">${finalTotal}</div>
+        {discountAmt > 0 && (
+          <div className="text-[#c8a951] text-xs font-semibold">
+            {TIER_LABELS[userTier]} -{Math.round(discountPct * 100)}%
+          </div>
+        )}
         <div className="flex items-center gap-1 text-white/40 text-xs justify-end mt-0.5">
           <Star className="w-3 h-3 fill-[#c8a951] text-[#c8a951]" />
-          {grandTotal} pts
+          {Math.floor(finalTotal)} pts
         </div>
       </div>
     </div>
@@ -437,9 +467,18 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                   <span>−${Math.round(passengers.reduce((s, p) => s + (p.type === 'adult' ? pricing.adult : pricing.child) * 2, 0) - passengersTotal)}</span>
                 </div>
               )}
+              {discountAmt > 0 && (
+                <div className="flex justify-between text-[#c8a951] text-sm font-bold bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  <span>Descuento {TIER_LABELS[userTier]} ({Math.round(discountPct * 100)}%)</span>
+                  <span>−${discountAmt.toFixed(2)}</span>
+                </div>
+              )}
               <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-800 text-base">
                 <span>Total{tripType === 'round_trip' ? ' (ida y vuelta)' : ''}</span>
-                <span className="text-[#c01515]">${grandTotal}</span>
+                <div className="flex items-center gap-2">
+                  {discountAmt > 0 && <span className="line-through text-slate-400 font-normal text-sm">${grandTotal}</span>}
+                  <span className="text-[#c01515]">${finalTotal}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -577,9 +616,18 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 <span className="font-semibold text-slate-700">+${luggageTotal}</span>
               </div>
             )}
+            {discountAmt > 0 && (
+              <div className="flex justify-between text-sm text-[#c8a951] font-bold bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <span>Descuento {TIER_LABELS[userTier]} ({Math.round(discountPct * 100)}%)</span>
+                <span>−${discountAmt.toFixed(2)}</span>
+              </div>
+            )}
             <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-800">
               <span>Total a pagar</span>
-              <span className="text-[#c01515]">${grandTotal}</span>
+              <div className="flex items-center gap-2">
+                {discountAmt > 0 && <span className="line-through text-slate-400 font-normal text-sm">${grandTotal}</span>}
+                <span className="text-[#c01515]">${finalTotal}</span>
+              </div>
             </div>
           </div>
 
@@ -598,7 +646,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                   </svg>
                   Procesando...
                 </span>
-              ) : <>Pagar ${grandTotal} <CheckCircle2 className="w-4 h-4 ml-2" /></>
+              ) : <>Pagar ${finalTotal} <CheckCircle2 className="w-4 h-4 ml-2" /></>
               }
             </Button>
           </div>
@@ -681,9 +729,18 @@ export function BookingFlow({ tripId }: { tripId: string }) {
               ))}
             </div>
             <div className="flex justify-between text-sm border-t border-slate-200 pt-2 mt-2">
-              <span className="text-slate-500 font-bold">Total</span>
-              <span className="font-black text-[#0f2c5c]">${grandTotal}</span>
+              <span className="text-slate-500 font-bold">Total cobrado</span>
+              <div className="flex items-center gap-2">
+                {discountAmt > 0 && <span className="line-through text-slate-400 font-normal text-sm">${grandTotal}</span>}
+                <span className="font-black text-[#0f2c5c]">${chargedTotal}</span>
+              </div>
             </div>
+            {discountAmt > 0 && (
+              <div className="flex justify-between text-sm text-[#c8a951] font-semibold">
+                <span>Descuento {TIER_LABELS[userTier]} aplicado</span>
+                <span>−${discountAmt.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Método de pago</span>
               <span className="font-bold text-slate-700">💳 Tarjeta</span>
@@ -692,7 +749,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
               <span className="text-slate-500 flex items-center gap-1">
                 <Star className="w-3.5 h-3.5 text-[#c8a951]" /> Puntos ganados
               </span>
-              <span className="font-bold text-[#c8a951]">+{grandTotal} pts</span>
+              <span className="font-bold text-[#c8a951]">+{Math.floor(chargedTotal)} pts</span>
             </div>
           </div>
 
@@ -710,7 +767,7 @@ export function BookingFlow({ tripId }: { tripId: string }) {
                 date,
                 departureTime:  bus?.departs || '',
                 tripType,
-                total:          grandTotal,
+                total:          chargedTotal,
                 paymentMethod,
                 email,
                 returnDate:     tripType === 'round_trip' ? returnDate : undefined,
