@@ -5,7 +5,9 @@ const MAX_ATTEMPTS = 10
 const WINDOW_MS    = 15 * 60 * 1000
 
 function secret(): string {
-  return process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
+  const s = process.env.ADMIN_SESSION_SECRET
+  if (!s) throw new Error('ADMIN_SESSION_SECRET no configurado')
+  return s
 }
 
 function signAdminToken(email: string): string {

@@ -15,12 +15,13 @@ const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 function verifyAdminSession(sessionValue: string | undefined): boolean {
   if (!sessionValue) return false
   try {
+    const secret    = process.env.ADMIN_SESSION_SECRET
+    if (!secret) return false
     const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
     const lastColon = decoded.lastIndexOf(':')
     if (lastColon < 0) return false
     const payload   = decoded.substring(0, lastColon)
     const sig       = decoded.substring(lastColon + 1)
-    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
     const expected  = createHmac('sha256', secret).update(payload).digest('hex')
     const sigBuf    = Buffer.from(sig,      'hex')
     const expBuf    = Buffer.from(expected, 'hex')
@@ -44,12 +45,13 @@ function verifyAdminSession(sessionValue: string | undefined): boolean {
 export function getAdminEmailFromSession(sessionValue: string | undefined): string | null {
   if (!sessionValue) return null
   try {
+    const secret    = process.env.ADMIN_SESSION_SECRET
+    if (!secret) return null
     const decoded   = Buffer.from(sessionValue, 'base64').toString('utf-8')
     const lastColon = decoded.lastIndexOf(':')
     if (lastColon < 0) return null
     const payload   = decoded.substring(0, lastColon)
     const sig       = decoded.substring(lastColon + 1)
-    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
     const expected  = createHmac('sha256', secret).update(payload).digest('hex')
     const sigBuf    = Buffer.from(sig,      'hex')
     const expBuf    = Buffer.from(expected, 'hex')

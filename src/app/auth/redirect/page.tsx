@@ -33,6 +33,9 @@ export default async function AuthRedirectPage({ searchParams }: { searchParams:
   } else if (role === 'developer') {
     redirect('/developer/dashboard')
   } else {
-    redirect(next || '/dashboard')
+    const safePath = next && next.startsWith('/') && !next.startsWith('//') && !next.includes('://')
+      ? next
+      : '/dashboard'
+    redirect(safePath)
   }
 }

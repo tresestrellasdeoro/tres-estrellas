@@ -26,12 +26,13 @@ function safeEqual(a: string, b: string): boolean {
 async function verifyAdminSession(sessionValue: string | undefined): Promise<boolean> {
   if (!sessionValue) return false
   try {
+    const secret = process.env.ADMIN_SESSION_SECRET
+    if (!secret) return false
     const decoded   = atob(sessionValue)
     const lastColon = decoded.lastIndexOf(':')
     if (lastColon < 0) return false
     const payload   = decoded.substring(0, lastColon)
     const sig       = decoded.substring(lastColon + 1)
-    const secret    = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
     const expected  = await hmacHex(secret, payload)
     if (!safeEqual(sig, expected)) return false
     if (!payload.startsWith((process.env.ADMIN_EMAIL ?? '') + ':')) return false

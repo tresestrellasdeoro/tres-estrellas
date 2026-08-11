@@ -5,8 +5,9 @@ import { redirect } from 'next/navigation'
 import { createHmac } from 'crypto'
 
 function signAdminToken(email: string): string {
+  const secret = process.env.ADMIN_SESSION_SECRET
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET no configurado')
   const payload = `${email}:${Date.now()}`
-  const secret  = process.env.ADMIN_SESSION_SECRET ?? 'tres-estrellas-secret-2026'
   const sig     = createHmac('sha256', secret).update(payload).digest('hex')
   return Buffer.from(`${payload}:${sig}`).toString('base64')
 }
