@@ -2,7 +2,47 @@ import { NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 
 const MAX_ATTEMPTS = 10
-const WINDOW_MS    = 15 * 60 * 1000
+const WINDOW_MS    = 15 * 60 * 1000 // 15 minutes
+
+// IP-based rate limiting via Upstash Redis REST API (no npm package needed).
+// Falls back gracefully to cookie-only limiting if env vars are not set.
+async function checkIpRateLimit(ip: string): Promise<boolean> {
+  const upstashUrl   = process.env.UPSTASH_REDIS_REST_URL
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!upstashUrl || !upstashToken) return false  // not configured — skip
+
+  const windowSlot = Math.floor(Date.now() / WINDOW_MS)
+  const key = `admin-login:${ip}:${windowSlot}`
+
+  try {
+    const res = await fetch(`${upstashUrl}/pipeline`, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${upstashToken}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, Math.ceil(WINDOW_MS / 1000)],
+      ]),
+    })
+    const data  = await res.json()
+    const count = data?.[0]?.result ?? 0
+    return count > MAX_ATTEMPTS
+  } catch {
+    return false  // on Upstash error, don't block — fail open
+  }
+}
+
+async function resetIpRateLimit(ip: string): Promise<void> {
+  const upstashUrl   = process.env.UPSTASH_REDIS_REST_URL
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!upstashUrl || !upstashToken) return
+  const windowSlot = Math.floor(Date.now() / WINDOW_MS)
+  const key = `admin-login:${ip}:${windowSlot}`
+  try {
+    await fetch(`${upstashUrl}/del/${key}`, {
+      headers: { Authorization: `Bearer ${upstashToken}` },
+    })
+  } catch { /* best-effort */ }
+}
 
 function secret(): string {
   const s = process.env.ADMIN_SESSION_SECRET
@@ -42,13 +82,22 @@ function makeFailCookie(count: number, resetAt: number): string {
 
 export async function POST(req: Request) {
   const base = new URL(req.url).origin
+
+  // Layer 1 — IP rate limit (Upstash, if configured)
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          ?? req.headers.get('x-real-ip')
+          ?? 'unknown'
+  const ipLimited = await checkIpRateLimit(ip)
+  if (ipLimited) {
+    return NextResponse.redirect(`${base}/auth/login?error=2`, { status: 303 })
+  }
+
+  // Layer 2 — cookie rate limit (stateless fallback, always active)
   const incomingCookies = req.headers.get('cookie') ?? ''
   const failCookieRaw   = incomingCookies.match(/(?:^|;\s*)_af=([^;]+)/)?.[1]
-
   const now = Date.now()
   let { count, resetAt } = readFailCookie(failCookieRaw)
   if (now > resetAt) { count = 0; resetAt = now + WINDOW_MS }
-
   if (count >= MAX_ATTEMPTS) {
     return NextResponse.redirect(`${base}/auth/login?error=2`, { status: 303 })
   }
@@ -71,6 +120,7 @@ export async function POST(req: Request) {
       path:     '/',
     })
     response.cookies.set('_af', '', { maxAge: 0, path: '/' })
+    await resetIpRateLimit(ip)
     return response
   }
 

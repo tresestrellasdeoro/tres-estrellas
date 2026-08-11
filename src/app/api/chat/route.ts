@@ -119,12 +119,31 @@ interface ChatMessage {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const { messages } = await req.json() as { messages: ChatMessage[] }
+  // Block external callers (bots/scripts) to protect Groq API budget.
+  // Browsers always send Origin on cross-origin fetches; same-origin browser
+  // fetches send Origin matching the host. Server-side calls have no Origin.
+  const origin = req.headers.get('origin')
+  const host   = req.nextUrl.host
+  if (origin && !origin.endsWith(host) && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
 
-    if (!messages?.length) {
+  try {
+    const body = await req.json()
+    const messages: unknown = body?.messages
+
+    if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages requerido' }, { status: 400 })
     }
+    if (messages.length > 20) {
+      return NextResponse.json({ error: 'Demasiados mensajes' }, { status: 400 })
+    }
+
+    // Sanitize: enforce role enum and cap message length
+    const sanitized: ChatMessage[] = (messages as any[]).slice(-12).map((m: any) => ({
+      role:    m?.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m?.content ?? '').slice(0, 600),
+    }))
 
     const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) {
@@ -144,7 +163,7 @@ export async function POST(req: NextRequest) {
         model:           MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          ...messages.slice(-12),
+          ...sanitized,
         ],
         response_format: { type: 'json_object' },
         temperature:     0.65,

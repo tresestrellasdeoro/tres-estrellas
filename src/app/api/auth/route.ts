@@ -9,9 +9,9 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('role, sucursal_id, permisos, full_name, loyalty_tier, loyalty_points')
     .eq('id', user.id)
     .maybeSingle()
 
-  return NextResponse.json({ user, profile })
+  return NextResponse.json({ profile })
 }
