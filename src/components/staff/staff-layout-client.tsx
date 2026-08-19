@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, MessageCircle, Clock } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, MessageCircle, Clock, History } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
@@ -16,6 +16,7 @@ const ALL_NAV = [
   { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation,    perm: 'checkin' },
   { href: '/personal/paquetes',      label: 'Paquetes',         icon: Package,       perm: 'paquetes' },
   { href: '/personal/gastos',        label: 'Gastos',           icon: Receipt,       perm: 'ventas' },
+  { href: '/personal/historico',     label: 'Boleto histórico',  icon: History,       perm: 'checkin' },
 ]
 
 export function StaffLayoutClient({
