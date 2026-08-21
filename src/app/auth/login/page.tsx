@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Suspense } from 'react'
 
@@ -30,11 +30,15 @@ function LoginForm() {
       // 1. Try Supabase auth first (cajeros, buseros, customers)
       // Race with 8-second timeout so it never hangs indefinitely
       const supabase = createClient()
+      // Si el usuario escribe solo el nombre (sin @), convertir a email de empleado
+      const resolvedEmail = email.includes('@')
+        ? email
+        : `${email.toLowerCase()}@tresestrellasdeorobus.com`
       const timeout = new Promise<{ data: { user: null }, error: Error }>(resolve =>
         setTimeout(() => resolve({ data: { user: null }, error: new Error('timeout') }), 8000)
       )
       const { data } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
+        supabase.auth.signInWithPassword({ email: resolvedEmail, password }),
         timeout,
       ])
 
@@ -90,16 +94,19 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-white/60 text-xs font-bold uppercase tracking-wider mb-1.5">
-                Correo electrónico
+                Usuario o correo
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="tu@correo.com"
+                  placeholder="scamacho  ·  tu@correo.com"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="w-full pl-10 pr-4 py-3 bg-white/6 border border-white/12 text-white placeholder:text-white/25 rounded-xl focus:outline-none focus:border-[#c8a951]/50 text-sm"
                 />
               </div>
@@ -159,7 +166,7 @@ function LoginForm() {
 
       {/* Hidden native form for admin cookie login fallback */}
       <form ref={adminFormRef} method="POST" action="/api/auth/admin-login" style={{ display: 'none' }}>
-        <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="email" value={email.includes('@') ? email : `${email.toLowerCase()}@tresestrellasdeorobus.com`} />
         <input type="hidden" name="password" value={password} />
       </form>
     </div>
