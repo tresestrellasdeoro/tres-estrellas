@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/refresh-qb",
-      "schedule": "*/50 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
