@@ -7,8 +7,9 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, BarChart3, Loader2, RefreshCw,
-  Bus, DollarSign, MapPin, Building2, ShoppingCart,
+  Bus, DollarSign, MapPin, Building2, ShoppingCart, History,
 } from 'lucide-react'
+import Link from 'next/link'
 
 const COLORS = ['#7c3aed', '#059669', '#2563eb', '#d97706', '#dc2626', '#0891b2', '#65a30d', '#9333ea']
 
@@ -85,9 +86,15 @@ export default function AnaliticaPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Últimos 12 meses · actualización en tiempo real</p>
         </div>
-        <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
-          <RefreshCw className="w-4 h-4" /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/analitica/historico"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#0f2c5c]/30 bg-[#0f2c5c]/5 text-[#0f2c5c] hover:bg-[#0f2c5c]/10 text-sm font-bold transition-colors">
+            <History className="w-4 h-4" /> Histórico 2018–2025
+          </Link>
+          <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors">
+            <RefreshCw className="w-4 h-4" /> Actualizar
+          </button>
+        </div>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
