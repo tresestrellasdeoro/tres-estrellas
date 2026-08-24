@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp, CalendarDays, Mail, Hash, CalendarClock,
   Ban, AlertTriangle, Luggage, Plus,
 } from 'lucide-react'
+import Link from 'next/link'
 
 const DEPARTURE_TIMES = [
   '3:20 AM','4:30 AM','5:00 AM','6:00 AM','7:00 AM','7:30 AM','8:00 AM',
@@ -54,6 +55,15 @@ function passengerTypeLabel(t: string) {
 }
 
 export default function ValidarPage() {
+  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/staff/turno')
+      .then(r => r.json())
+      .then(d => setTurnoActivo(!!d.turno))
+      .catch(() => setTurnoActivo(false))
+  }, [])
+
   // ── Scanner mode ──────────────────────────────────────────────────────
   const [query, setQuery]               = useState('')
   const [loading, setLoading]           = useState(false)
@@ -388,6 +398,26 @@ export default function ValidarPage() {
       return 'BOLETO VÁLIDO'
     }
     return 'BOLETO PENDIENTE'
+  }
+
+  if (turnoActivo === false) {
+    return (
+      <div className="p-6 max-w-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-4">
+          <Clock className="w-10 h-10 text-amber-500" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Sin turno activo</h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Debes iniciar tu turno antes de validar boletos.<br />
+          Ve a "Mi turno" para comenzar.
+        </p>
+        <Link href="/personal/turno"
+          className="inline-flex items-center gap-2 bg-[#0a1e42] hover:bg-[#0f2c5c] text-white font-bold px-8 py-3.5 rounded-xl transition-colors text-sm">
+          <Clock className="w-4 h-4" />
+          Ir a Mi turno
+        </Link>
+      </div>
+    )
   }
 
   return (

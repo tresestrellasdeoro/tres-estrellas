@@ -227,6 +227,14 @@ function LegacyPackages() {
 
 export default function StaffPaquetesPage() {
   const [tab, setTab] = useState<'current' | 'legacy'>('current')
+  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/staff/turno')
+      .then(r => r.json())
+      .then(d => setTurnoActivo(!!d.turno))
+      .catch(() => setTurnoActivo(false))
+  }, [])
 
   // Scanner input
   const [scanValue, setScanValue]   = useState('')
@@ -511,6 +519,25 @@ export default function StaffPaquetesPage() {
         </button>
       </div>
 
+      {turnoActivo === false && (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-4">
+            <Clock className="w-10 h-10 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Sin turno activo</h2>
+          <p className="text-slate-500 text-sm mb-6">
+            Debes iniciar tu turno antes de gestionar paquetes.<br />
+            Ve a "Mi turno" para comenzar.
+          </p>
+          <a href="/personal/turno"
+            className="inline-flex items-center gap-2 bg-[#0a1e42] hover:bg-[#0f2c5c] text-white font-bold px-8 py-3.5 rounded-xl transition-colors text-sm">
+            <Clock className="w-4 h-4" />
+            Ir a Mi turno
+          </a>
+        </div>
+      )}
+
+      {turnoActivo !== false && <>
       {tab === 'legacy' && <LegacyPackages />}
 
       {tab === 'current' && <>
@@ -985,6 +1012,7 @@ export default function StaffPaquetesPage() {
           }}
         />
       )}
+      </>}
       </>}
     </div>
   )
