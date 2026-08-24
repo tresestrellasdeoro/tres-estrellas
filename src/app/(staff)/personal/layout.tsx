@@ -25,7 +25,11 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     redirect('/dashboard')
   }
 
-  const permisos: string[] = profile.permisos ?? (profile.role === 'admin' || profile.role === 'super_admin' || profile.role === 'developer' ? ['all'] : [])
+  const DEFAULT_CAJERO_PERMISOS = ['ventas', 'checkin', 'paquetes']
+  const permisos: string[] =
+    profile.role === 'admin' || profile.role === 'super_admin' || profile.role === 'developer'
+      ? ['all']
+      : (profile.permisos && profile.permisos.length > 0 ? profile.permisos : DEFAULT_CAJERO_PERMISOS)
 
   return (
     <StaffLayoutClient permisos={permisos}>
