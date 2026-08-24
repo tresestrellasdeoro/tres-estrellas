@@ -40,12 +40,21 @@ export function CreateStaffForm({ sucursales }: Props) {
   const [role,        setRole]        = useState('cajero')
   const [sucursalId,  setSucursalId]  = useState('')
   const [depto,       setDepto]       = useState('')
-  const [permisos,    setPermisos]    = useState<string[]>([])
+  const [permisos,    setPermisos]    = useState<string[]>(['ventas', 'checkin', 'paquetes'])
   const [showPwd,     setShowPwd]     = useState(false)
   const [loading,     setLoading]     = useState(false)
   const [success,     setSuccess]     = useState('')
   const [error,       setError]       = useState('')
   const router = useRouter()
+
+  const DEFAULT_CAJERO = ['ventas', 'checkin', 'paquetes']
+  const isAdmin = (r: string) => ['admin', 'super_admin', 'developer'].includes(r)
+
+  const handleRoleChange = (newRole: string) => {
+    setRole(newRole)
+    if (isAdmin(newRole)) setPermisos(['all'])
+    else setPermisos(DEFAULT_CAJERO)
+  }
 
   const togglePermiso = (val: string) => {
     if (val === 'all') {
@@ -170,7 +179,7 @@ export function CreateStaffForm({ sucursales }: Props) {
                   : 'border-slate-200 hover:border-slate-300'
               }`}>
               <input type="radio" name="role" value={r.value} checked={role === r.value}
-                onChange={() => setRole(r.value)} className="accent-[#c01515]" />
+                onChange={() => handleRoleChange(r.value)} className="accent-[#c01515]" />
               <div>
                 <p className="text-sm font-bold text-slate-700">{r.label}</p>
                 <p className="text-xs text-slate-400">{r.desc}</p>
@@ -182,19 +191,27 @@ export function CreateStaffForm({ sucursales }: Props) {
 
       {/* Permisos */}
       <div>
-        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Permisos de acceso</Label>
+        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Permisos de acceso</Label>
+        {isAdmin(role) ? (
+          <p className="text-xs text-emerald-600 font-semibold mb-2">✓ Los admins tienen acceso total automáticamente</p>
+        ) : (
+          <p className="text-xs text-slate-400 mb-2">Preseleccionados para cajero — ajusta según el puesto</p>
+        )}
         <div className="space-y-2">
           {PERMISOS.map(p => {
             const checked = permisos.includes(p.value) || (p.value !== 'all' && permisos.includes('all'))
+            const disabled = isAdmin(role)
             return (
               <label key={p.value}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                  disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                } ${
                   checked
                     ? 'border-[#0a1e42] bg-[#0a1e42]/5'
                     : 'border-slate-200 hover:border-slate-300'
                 } ${p.value === 'all' ? 'border-dashed' : ''}`}>
-                <input type="checkbox" checked={checked} onChange={() => togglePermiso(p.value)}
-                  className="accent-[#0a1e42] rounded" />
+                <input type="checkbox" checked={checked} onChange={() => !disabled && togglePermiso(p.value)}
+                  disabled={disabled} className="accent-[#0a1e42] rounded" />
                 <div>
                   <p className="text-sm font-bold text-slate-700">{p.label}</p>
                   <p className="text-xs text-slate-400">{p.desc}</p>
