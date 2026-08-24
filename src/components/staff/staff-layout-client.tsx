@@ -3,20 +3,21 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, MessageCircle, Clock, History } from 'lucide-react'
+import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation, Package, Receipt, MessageCircle, Clock, History, KeyRound } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
 
 const ALL_NAV = [
-  { href: '/personal/turno',         label: 'Mi turno',         icon: Clock,         perm: null },
-  { href: '/personal/validar',       label: 'Validar boleto',   icon: ScanLine,      perm: 'checkin' },
-  { href: '/personal/venta',         label: 'Nueva venta',      icon: ShoppingCart,  perm: 'ventas' },
-  { href: '/personal/reservaciones', label: 'Pasajeros de hoy', icon: ClipboardList, perm: 'checkin' },
-  { href: '/personal/salidas',       label: 'Salidas',          icon: Navigation,    perm: 'checkin' },
-  { href: '/personal/paquetes',      label: 'Paquetes',         icon: Package,       perm: 'paquetes' },
-  { href: '/personal/gastos',        label: 'Gastos',           icon: Receipt,       perm: 'ventas' },
+  { href: '/personal/turno',         label: 'Mi turno',          icon: Clock,         perm: null },
+  { href: '/personal/validar',       label: 'Validar boleto',    icon: ScanLine,      perm: 'checkin' },
+  { href: '/personal/venta',         label: 'Nueva venta',       icon: ShoppingCart,  perm: 'ventas' },
+  { href: '/personal/reservaciones', label: 'Pasajeros de hoy',  icon: ClipboardList, perm: 'checkin' },
+  { href: '/personal/salidas',       label: 'Salidas',           icon: Navigation,    perm: 'checkin' },
+  { href: '/personal/paquetes',      label: 'Paquetes',          icon: Package,       perm: 'paquetes' },
+  { href: '/personal/gastos',        label: 'Gastos',            icon: Receipt,       perm: 'ventas' },
   { href: '/personal/historico',     label: 'Boleto histórico',  icon: History,       perm: 'checkin' },
+  { href: '/personal/perfil',        label: 'Cambiar contraseña', icon: KeyRound,     perm: null },
 ]
 
 export function StaffLayoutClient({
