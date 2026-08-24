@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X,
   Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
-  MessageCircle, TrendingUp, Monitor, ChevronDown,
+  MessageCircle, TrendingUp, Monitor, ChevronDown, ShoppingCart,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -36,6 +36,10 @@ const NAV: NavEntry[] = [
         { href: '/admin/choferes',  icon: UserCheck,  label: 'Choferes' },
       ],
     },
+  },
+  {
+    type: 'item',
+    item: { href: '/admin/venta', icon: ShoppingCart, label: 'Venta de boletos' },
   },
   {
     type: 'item',
