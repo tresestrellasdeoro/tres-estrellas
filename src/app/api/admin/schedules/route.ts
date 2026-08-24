@@ -9,6 +9,23 @@ function service() {
   )
 }
 
+export async function GET(req: NextRequest) {
+  const deny = await requireAdmin(req); if (deny) return deny
+  const { data, error } = await service()
+    .from('schedules')
+    .select(`
+      *,
+      route:routes(
+        id, code, name, duration_minutes,
+        origin_stop:stops!origin_stop_id(id, name, code),
+        destination_stop:stops!destination_stop_id(id, name, code)
+      )
+    `)
+    .order('departure_time', { ascending: true })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ schedules: data ?? [] })
+}
+
 export async function POST(req: NextRequest) {
   const deny = await requireAdmin(req); if (deny) return deny
   const body = await req.json()
