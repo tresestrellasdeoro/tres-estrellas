@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Package, ScanLine, CheckCircle2, AlertCircle, Plus, Printer,
   CreditCard, Banknote, Loader2, Search, Clock, ChevronRight, X, Wifi,
-  Ban, History, MapPin, AlertTriangle,
+  Ban, History, MapPin, AlertTriangle, ChevronDown, ChevronUp, Phone, User, RefreshCw,
 } from 'lucide-react'
 import { STATUS_META, PACKAGE_SIZES, type PackageStatus, type PackageSize } from '@/lib/packages'
 import { NewPackageModal } from '@/components/packages/new-package-modal'
@@ -46,7 +46,188 @@ interface Pkg {
   destination: { name: string; city: string } | null
 }
 
+// ── Legacy packages component ─────────────────────────────────────────────────
+
+interface LegacyPkg {
+  id: number; codigo: string; tipo: string | null; precio: number | null; peso: number | null
+  remitente: string | null; receptor: string | null; origen: string | null; destino: string | null
+  fecha_envio: string | null; descripcion: string | null; direccion: string | null
+  contacto: string | null; entregado: boolean; nombre_recibe: string | null; fecha_recepcion: string | null
+}
+
+function LegacyPackages() {
+  const [paquetes, setPaquetes] = useState<LegacyPkg[]>([])
+  const [total, setTotal]       = useState(0)
+  const [loading, setLoading]   = useState(false)
+  const [search, setSearch]     = useState('')
+  const [expanded, setExpanded] = useState<number | null>(null)
+  const [offset, setOffset]     = useState(0)
+  const PAGE = 60
+
+  const load = useCallback(async (q = '', off = 0) => {
+    setLoading(true)
+    const params = new URLSearchParams({ limit: String(PAGE), offset: String(off) })
+    if (q) params.set('q', q)
+    const res  = await fetch(`/api/admin/legacy-paquetes?${params}`)
+    const data = await res.json()
+    setPaquetes(data.paquetes ?? [])
+    setTotal(data.total ?? 0)
+    setLoading(false)
+  }, [])
+
+  const doSearch = (e: React.FormEvent) => { e.preventDefault(); setOffset(0); load(search, 0) }
+  const fmtDate  = (d: string | null) => d ? new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-slate-400 text-sm">{total > 0 ? `${total.toLocaleString('es-MX')} paquetes (2016–2025)` : 'Busca un paquete del sistema anterior'}</p>
+        {total > 0 && (
+          <button onClick={() => load(search, offset)} disabled={loading}
+            className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={doSearch} className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Código, remitente, receptor, origen o destino..."
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#c01515] focus:ring-1 focus:ring-[#c01515]/30 bg-white" />
+        </div>
+        <button type="submit" disabled={loading}
+          className="px-4 py-2.5 rounded-xl bg-[#0a1e42] hover:bg-[#0f2c5c] text-white text-sm font-bold transition-colors disabled:opacity-50">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buscar'}
+        </button>
+      </form>
+
+      {!loading && paquetes.length === 0 && search && (
+        <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
+          <Package className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+          <p className="text-slate-500 font-semibold text-sm">Sin resultados para "{search}"</p>
+        </div>
+      )}
+
+      {!loading && paquetes.length === 0 && !search && (
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+          <History className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+          <p className="text-slate-500 font-semibold">Historial de paquetes 2016–2025</p>
+          <p className="text-slate-400 text-sm mt-1">Escribe el nombre del remitente, receptor o código para buscar</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {paquetes.map(pkg => {
+          const isOpen = expanded === pkg.id
+          return (
+            <div key={pkg.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="px-4 py-3.5 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(isOpen ? null : pkg.id)}>
+                <div className="shrink-0 w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-mono font-black text-[#0a1628] text-sm">{pkg.codigo}</p>
+                    {pkg.tipo && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase">{pkg.tipo}</span>}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pkg.entregado ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {pkg.entregado ? 'Entregado' : 'Sin confirmar'}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs truncate mt-0.5">{pkg.remitente ?? '—'} → {pkg.receptor ?? '—'}</p>
+                  {(pkg.origen || pkg.destino) && (
+                    <p className="text-slate-400 text-[10px]">{pkg.origen} → {pkg.destino}{pkg.fecha_envio && ` · ${fmtDate(pkg.fecha_envio)}`}</p>
+                  )}
+                </div>
+                <div className="shrink-0 flex items-center gap-2">
+                  {pkg.precio != null && <span className="font-black text-slate-700 text-sm">${Number(pkg.precio).toFixed(2)}</span>}
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </div>
+              </div>
+
+              {isOpen && (
+                <div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="flex items-start gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Remitente</p>
+                        <p className="text-slate-700 font-semibold mt-0.5">{pkg.remitente ?? '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Receptor</p>
+                        <p className="text-slate-700 font-semibold mt-0.5">{pkg.receptor ?? '—'}</p>
+                        {pkg.nombre_recibe && pkg.nombre_recibe !== pkg.receptor && (
+                          <p className="text-slate-400">Recibió: {pkg.nombre_recibe}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Contacto</p>
+                        <p className="text-slate-700 font-semibold mt-0.5">{pkg.contacto ?? '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Ruta</p>
+                        <p className="text-slate-700 font-semibold mt-0.5">{pkg.origen ?? '—'} → {pkg.destino ?? '—'}</p>
+                        {pkg.direccion && <p className="text-slate-400 mt-0.5">{pkg.direccion}</p>}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-bold uppercase tracking-wider">Fechas</p>
+                      <p className="text-slate-700 font-semibold mt-0.5">Envío: {fmtDate(pkg.fecha_envio)}</p>
+                      {pkg.fecha_recepcion && <p className="text-slate-400">Recepción: {fmtDate(pkg.fecha_recepcion)}</p>}
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-bold uppercase tracking-wider">Detalles</p>
+                      {pkg.peso != null && <p className="text-slate-700 font-semibold mt-0.5">{pkg.peso} lbs · ${Number(pkg.precio ?? 0).toFixed(2)}</p>}
+                      {pkg.descripcion && <p className="text-slate-400 mt-0.5">{pkg.descripcion}</p>}
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">SISTEMA LEGACY — Solo lectura</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {total > PAGE && (
+        <div className="flex items-center justify-between">
+          <button onClick={() => { const o = Math.max(0, offset - PAGE); setOffset(o); load(search, o) }}
+            disabled={offset === 0 || loading}
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors">
+            ← Anterior
+          </button>
+          <span className="text-xs text-slate-400 font-semibold">
+            {offset + 1}–{Math.min(offset + PAGE, total)} de {total.toLocaleString('es-MX')}
+          </span>
+          <button onClick={() => { const o = offset + PAGE; setOffset(o); load(search, o) }}
+            disabled={offset + PAGE >= total || loading}
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors">
+            Siguiente →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function StaffPaquetesPage() {
+  const [tab, setTab] = useState<'current' | 'legacy'>('current')
+
   // Scanner input
   const [scanValue, setScanValue]   = useState('')
   const [scanLoading, setScanLoading] = useState(false)
@@ -292,26 +473,47 @@ export default function StaffPaquetesPage() {
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
         <div>
           <h1 className="font-black text-2xl text-[#0a1628] flex items-center gap-2">
             <ScanLine className="w-6 h-6 text-[#c01515]" />
             Paquetes
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">Escanea la etiqueta QR o busca por nombre, teléfono o correo</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {tab === 'current' ? 'Escanea la etiqueta QR o busca por nombre, teléfono o correo' : 'Historial del sistema anterior (2016–2025)'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
-            <Wifi className="w-3.5 h-3.5" />
-            Escáner listo
-          </div>
-          <button onClick={() => setShowNew(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#c01515] hover:bg-[#a01010] text-white text-sm font-bold transition-colors">
-            <Plus className="w-4 h-4" /> Nuevo envío
-          </button>
+          {tab === 'current' && (
+            <>
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                <Wifi className="w-3.5 h-3.5" />
+                Escáner listo
+              </div>
+              <button onClick={() => setShowNew(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#c01515] hover:bg-[#a01010] text-white text-sm font-bold transition-colors">
+                <Plus className="w-4 h-4" /> Nuevo envío
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit mb-5">
+        <button onClick={() => setTab('current')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'current' ? 'bg-white shadow-sm text-[#0a1628]' : 'text-slate-500 hover:text-slate-700'}`}>
+          <Package className="w-4 h-4" /> Actuales
+        </button>
+        <button onClick={() => setTab('legacy')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'legacy' ? 'bg-white shadow-sm text-[#0a1628]' : 'text-slate-500 hover:text-slate-700'}`}>
+          <History className="w-4 h-4" /> Histórico
+        </button>
+      </div>
+
+      {tab === 'legacy' && <LegacyPackages />}
+
+      {tab === 'current' && <>
       {/* ── SCANNER SECTION ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border-2 border-[#c01515]/20 focus-within:border-[#c01515] p-4 shadow-sm mb-4 transition-colors">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -778,11 +980,12 @@ export default function StaffPaquetesPage() {
           onClose={() => setShowNew(false)}
           onCreated={(pkg) => {
             setShowNew(false)
-            fetchPackages(search)          // refresh list
-            selectPkg(pkg as unknown as Pkg) // auto-select new package
+            fetchPackages(search)
+            selectPkg(pkg as unknown as Pkg)
           }}
         />
       )}
+      </>}
     </div>
   )
 }
