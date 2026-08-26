@@ -21,12 +21,26 @@ export async function GET(req: NextRequest) {
     .eq('booking_number', booking)
     .maybeSingle() as { data: any; error: any }
 
-  if (error || !data) return NextResponse.json({ error: 'Reservación no encontrada' }, { status: 404 })
+  if (error || !data) {
+    // Not in new system — try legacy_bookings
+    const normalized = booking.startsWith('TEO') ? booking.slice(3) : booking
+    const { data: legacy, error: legacyError } = await service
+      .from('legacy_bookings')
+      .select('id, ticket_id, booking_number, passenger_name, passenger_type, origin_code, destination_code, ticket_type, travel_date, travel_time, amount, payment_method, sold_by, cancelled')
+      .or(`booking_number.ilike.${booking},ticket_id.eq.${normalized}`)
+      .maybeSingle()
+
+    if (legacyError || !legacy) {
+      return NextResponse.json({ error: 'Reservación no encontrada en ningún sistema' }, { status: 404 })
+    }
+
+    return NextResponse.json({ ...legacy, source: 'legacy' })
+  }
 
   // Flatten departure_date from the trips join so the client gets a simple string
   const departure_date = (data.trips as { departure_date: string } | null)?.departure_date ?? null
 
-  return NextResponse.json({ ...data, departure_date })
+  return NextResponse.json({ ...data, departure_date, source: 'new' })
 }
 
 export async function POST(req: NextRequest) {

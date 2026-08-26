@@ -44,6 +44,25 @@ interface BookingResult {
   destination_name: string | null
   notes:            string | null
   passengers:       Passenger[]
+  source?:          'new' | 'legacy'
+}
+
+interface LegacyBookingResult {
+  id:               number
+  ticket_id:        string
+  booking_number:   string
+  passenger_name:   string
+  passenger_type:   string
+  origin_code:      string
+  destination_code: string
+  ticket_type:      string
+  travel_date:      string
+  travel_time:      string | null
+  amount:           number
+  payment_method:   string
+  sold_by:          string | null
+  cancelled:        boolean | null
+  source:           'legacy'
 }
 
 const AUTO_RESET_SECONDS = 8
@@ -69,6 +88,7 @@ export default function ValidarPage() {
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
   const [result, setResult]             = useState<BookingResult | null>(null)
+  const [legacyResult, setLegacyResult] = useState<LegacyBookingResult | null>(null)
   const [checkingInLeg, setCheckingInLeg] = useState<'outbound' | 'return' | null>(null)
   const [countdown, setCountdown]       = useState<number | null>(null)
   const inputRef                        = useRef<HTMLInputElement>(null)
@@ -146,12 +166,17 @@ export default function ValidarPage() {
     setLoading(true)
     setError('')
     setResult(null)
+    setLegacyResult(null)
     cancelCountdown()
     try {
       const res  = await fetch(`/api/staff/validate?booking=${encodeURIComponent(q)}`)
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'No encontrado'); refocusInput(); return }
-      setResult(data)
+      if (data.source === 'legacy') {
+        setLegacyResult(data as LegacyBookingResult)
+      } else {
+        setResult(data as BookingResult)
+      }
     } catch {
       setError('Error de conexión')
       refocusInput()
@@ -314,6 +339,7 @@ export default function ValidarPage() {
   const handleReset = () => {
     cancelCountdown()
     setResult(null)
+    setLegacyResult(null)
     setQuery('')
     setError('')
     setSearchResults([])
@@ -589,6 +615,109 @@ export default function ValidarPage() {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 mb-5">
           <XCircle className="w-5 h-5 text-red-500 shrink-0" />
           <p className="text-red-700 font-semibold text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* ── LEGACY BOOKING RESULT ─────────────────────────────────────── */}
+      {legacyResult && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-5">
+
+          {/* Header bar */}
+          <div className={`px-6 py-4 flex items-center justify-between ${legacyResult.cancelled ? 'bg-red-600' : 'bg-amber-600'}`}>
+            <div className="flex items-center gap-2">
+              {legacyResult.cancelled
+                ? <XCircle className="w-5 h-5 text-white" />
+                : <CheckCircle2 className="w-5 h-5 text-white" />
+              }
+              <span className="text-white font-black text-sm">
+                {legacyResult.cancelled ? 'BOLETO CANCELADO' : 'BOLETO VÁLIDO — SISTEMA ANTERIOR'}
+              </span>
+            </div>
+            <span className="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full">
+              SISTEMA ANTERIOR
+            </span>
+          </div>
+
+          <div className="p-5 space-y-4">
+
+            {/* Aviso informativo */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-amber-800 text-xs font-semibold">
+                Este boleto fue vendido en el sistema anterior. Verifica los datos y permite el abordaje si es válido.
+              </p>
+            </div>
+
+            {/* Pasajero */}
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pasajero</p>
+              <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-black text-slate-800 text-sm">{legacyResult.passenger_name}</p>
+                  <p className="text-slate-400 text-xs">
+                    {legacyResult.passenger_type === 'adult' ? 'Adulto' : legacyResult.passenger_type === 'child' ? 'Menor' : legacyResult.passenger_type}
+                    {' · '}
+                    <span className="font-mono">{legacyResult.booking_number}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ruta y fecha */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                  <ArrowRight className="w-3 h-3" /> Ruta
+                </p>
+                <p className="font-black text-slate-800 text-base">
+                  {legacyResult.origin_code} → {legacyResult.destination_code}
+                </p>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  {legacyResult.ticket_type === 'round_trip' ? 'Ida y vuelta' : 'Sólo ida'}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                  <CalendarDays className="w-3 h-3" /> Fecha de viaje
+                </p>
+                <p className="font-black text-slate-800">
+                  {new Date(legacyResult.travel_date + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+                {legacyResult.travel_time && (
+                  <p className="text-slate-500 text-xs mt-0.5 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {legacyResult.travel_time.slice(0, 5)}
+                  </p>
+                )}
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                  <CreditCard className="w-3 h-3" /> Total pagado
+                </p>
+                <p className="font-black text-slate-800">${Number(legacyResult.amount).toFixed(2)}</p>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  {legacyResult.payment_method === 'cash' ? '💵 Efectivo' : '💳 Tarjeta'}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                  <User className="w-3 h-3" /> Vendido por
+                </p>
+                <p className="font-black text-slate-800 text-sm">{legacyResult.sold_by || '—'}</p>
+                <p className="text-slate-400 text-xs mt-0.5">Sistema anterior</p>
+              </div>
+            </div>
+
+            {/* Botón resetear */}
+            <button onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 text-sm font-semibold transition-colors">
+              <RotateCcw className="w-4 h-4" />
+              Buscar otro boleto
+            </button>
+          </div>
         </div>
       )}
 
