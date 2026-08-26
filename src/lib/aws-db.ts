@@ -37,38 +37,40 @@ export interface AwsTicket {
 export async function findAwsTicket(booking: string): Promise<AwsTicket | null> {
   if (!process.env.AWS_MYSQL_HOST) return null
 
+  // bolcodigo may be stored as plain number or with TEO prefix
   const normalized = booking.startsWith('TEO') ? booking.slice(3) : booking
 
   try {
     const db = getPool()
-    // Query the table — adjust column names if needed after first test
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT
-         ticket_id, booking_number, passenger_name, passenger_type,
-         origin_code, destination_code, ticket_type,
-         travel_date, travel_time, amount,
-         payment_method, sold_by, cancelled
-       FROM tickets
-       WHERE booking_number = ? OR ticket_id = ?
+         bolid, bolcodigo, codBolImp, cod_antiguo,
+         bolclinombre, bolorigen, boldestino, boltipo,
+         bolfecha1, hrsal, bolcosto, usuario,
+         cancelado, bolCheckin
+       FROM boletos
+       WHERE bolcodigo = ? OR bolcodigo = ?
+          OR codBolImp = ? OR codBolImp = ?
+          OR cod_antiguo = ? OR bolid = ?
        LIMIT 1`,
-      [booking, normalized]
+      [booking, normalized, booking, normalized, normalized, normalized]
     )
     if (!rows.length) return null
     const r = rows[0]
     return {
-      ticket_id:        String(r.ticket_id),
-      booking_number:   String(r.booking_number),
-      passenger_name:   String(r.passenger_name),
-      passenger_type:   String(r.passenger_type ?? 'adult'),
-      origin_code:      String(r.origin_code),
-      destination_code: String(r.destination_code),
-      ticket_type:      String(r.ticket_type ?? 'one_way'),
-      travel_date:      String(r.travel_date ?? ''),
-      travel_time:      r.travel_time ? String(r.travel_time) : null,
-      amount:           Number(r.amount ?? 0),
-      payment_method:   String(r.payment_method ?? 'cash'),
-      sold_by:          r.sold_by ? String(r.sold_by) : null,
-      cancelled:        Boolean(r.cancelled),
+      ticket_id:        String(r.bolid),
+      booking_number:   String(r.codBolImp ?? r.bolcodigo ?? r.bolid),
+      passenger_name:   String(r.bolclinombre ?? ''),
+      passenger_type:   'adult',
+      origin_code:      String(r.bolorigen ?? ''),
+      destination_code: String(r.boldestino ?? ''),
+      ticket_type:      String(r.boltipo ?? 'one_way'),
+      travel_date:      r.bolfecha1 ? String(r.bolfecha1).split('T')[0] : '',
+      travel_time:      r.hrsal ? String(r.hrsal) : null,
+      amount:           Number(r.bolcosto ?? 0),
+      payment_method:   'cash',
+      sold_by:          r.usuario ? String(r.usuario) : null,
+      cancelled:        Number(r.cancelado ?? 0) !== 0,
     }
   } catch (err) {
     console.error('[AWS MySQL] Error:', err)
@@ -80,7 +82,7 @@ export async function getAwsTableColumns(): Promise<string[]> {
   try {
     const db = getPool()
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      `SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE()
        ORDER BY TABLE_NAME, ORDINAL_POSITION`
     )
