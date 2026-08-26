@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { requireStaff } from '@/lib/api-auth'
+import { findAwsTicket } from '@/lib/aws-db'
 
 function getService() {
   return createServiceClient(
@@ -31,7 +32,12 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
 
     if (legacyError || !legacy) {
-      return NextResponse.json({ error: 'Reservación no encontrada en ningún sistema' }, { status: 404 })
+      // Last resort — query AWS MySQL directly (tickets sold after Supabase migration)
+      const awsTicket = await findAwsTicket(booking)
+      if (!awsTicket) {
+        return NextResponse.json({ error: 'Reservación no encontrada en ningún sistema' }, { status: 404 })
+      }
+      return NextResponse.json({ ...awsTicket, source: 'legacy' })
     }
 
     return NextResponse.json({ ...legacy, source: 'legacy' })
