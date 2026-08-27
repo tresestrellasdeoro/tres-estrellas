@@ -542,11 +542,35 @@ export default function StaffPaquetesPage() {
       {tab === 'legacy' && <LegacyPackages />}
 
       {tab === 'current' && <>
+      {/* ── SEARCH SECTION ───────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border-2 border-[#0a1628]/20 focus-within:border-[#0a1628] p-4 shadow-sm mb-4 transition-colors">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Search className="w-3.5 h-3.5 text-[#0a1628]" />
+          Buscar paquete por código, nombre o teléfono
+        </p>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Código, nombre, teléfono o # TEO..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0a1628]/20 focus:border-[#0a1628] bg-slate-50"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {(searching || listLoading) && <Loader2 className="self-center w-4 h-4 text-slate-400 animate-spin" />}
+        </div>
+      </div>
+
       {/* ── SCANNER SECTION ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border-2 border-[#c01515]/20 focus-within:border-[#c01515] p-4 shadow-sm mb-4 transition-colors">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <ScanLine className="w-3.5 h-3.5 text-[#c01515]" />
-          Escanear etiqueta de paquete
+          Escanear etiqueta QR (nuevos paquetes TEO)
         </p>
         <div className="flex gap-2">
           <input
@@ -571,7 +595,6 @@ export default function StaffPaquetesPage() {
             <ScanLine className="w-3 h-3" />
             El escáner enviará Enter automáticamente — solo apunta y dispara
           </p>
-          <p className="text-slate-300 text-xs">o escribe el # manualmente</p>
         </div>
         {scanError && (
           <div className="mt-2 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
@@ -584,25 +607,6 @@ export default function StaffPaquetesPage() {
 
         {/* ── LEFT: search + list ── */}
         <div className="lg:w-96 shrink-0 space-y-3">
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Nombre, teléfono, correo o # TEO..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#c01515] focus:ring-1 focus:ring-[#c01515]/30 bg-white"
-            />
-            {(searching || (search && listLoading)) && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
-            )}
-            {search && !searching && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
 
           {/* List */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
