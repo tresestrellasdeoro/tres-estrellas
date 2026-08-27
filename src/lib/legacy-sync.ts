@@ -25,28 +25,25 @@ function getPool(): mysql.Pool {
 
 export interface SyncResult {
   synced:      number
-  lastBolId:   number
+  lastId:      number
   totalSynced: number
-  done:        boolean  // true = no more records to pull
+  done:        boolean
   error?:      string
 }
 
 export async function runLegacySync(): Promise<SyncResult> {
-  const db  = svc()
-
-  // Get current sync state
+  const db = svc()
   const { data: state } = await db
     .from('legacy_sync_state')
     .select('last_bol_id, total_synced')
     .eq('id', 'boletos')
     .single() as { data: { last_bol_id: number; total_synced: number } | null }
 
-  const lastBolId    = state?.last_bol_id    ?? 0
-  const prevTotal    = state?.total_synced   ?? 0
-
+  const lastId    = state?.last_bol_id  ?? 0
+  const prevTotal = state?.total_synced ?? 0
   const pool = getPool()
+
   try {
-    // Fetch batch from MySQL — one row per ticket (first detail row via MIN)
     const [rows] = await pool.execute<mysql.RowDataPacket[]>(
       `SELECT bv.bolId, bv.bolVenta, bv.nombreCliente, bv.contacto, bv.bolCosto,
               bv.tipoCliente, bv.bolUsuario, bv.terminalVenta,
@@ -63,61 +60,135 @@ export async function runLegacySync(): Promise<SyncResult> {
        WHERE bv.bolId > ?
        ORDER BY bv.bolId ASC
        LIMIT ?`,
-      [lastBolId, BATCH_SIZE]
+      [lastId, BATCH_SIZE]
     )
 
     if (!rows.length) {
       await db.from('legacy_sync_state').update({ last_synced_at: new Date().toISOString(), last_error: null }).eq('id', 'boletos')
-      return { synced: 0, lastBolId, totalSynced: prevTotal, done: true }
+      return { synced: 0, lastId, totalSynced: prevTotal, done: true }
     }
 
     const records = rows.map(r => ({
       bol_id:         Number(r.bolId),
-      bol_venta:      r.bolVenta   ? Number(r.bolVenta)   : null,
+      bol_venta:      r.bolVenta      ? Number(r.bolVenta)                    : null,
       nombre_cliente: String(r.nombreCliente ?? '').trim(),
-      contacto:       r.contacto   ? String(r.contacto)   : null,
-      bol_costo:      r.bolCosto   ? Number(r.bolCosto)   : null,
-      tipo_cliente:   r.tipoCliente ? Number(r.tipoCliente) : 1,
-      bol_usuario:    r.bolUsuario  ? String(r.bolUsuario)  : null,
-      terminal_venta: r.terminalVenta ? Number(r.terminalVenta) : null,
-      fecha_venta:    r.fechaVenta  ? String(r.fechaVenta).split('T')[0]  : null,
-      hora_venta:     r.horaVenta   ? String(r.horaVenta)   : null,
+      contacto:       r.contacto      ? String(r.contacto)                    : null,
+      bol_costo:      r.bolCosto      ? Number(r.bolCosto)                    : null,
+      tipo_cliente:   r.tipoCliente   ? Number(r.tipoCliente)                 : 1,
+      bol_usuario:    r.bolUsuario    ? String(r.bolUsuario)                  : null,
+      terminal_venta: r.terminalVenta ? Number(r.terminalVenta)               : null,
+      fecha_venta:    r.fechaVenta    ? String(r.fechaVenta).split('T')[0]    : null,
+      hora_venta:     r.horaVenta     ? String(r.horaVenta)                   : null,
       es_cancelado:   Number(r.esCancelado ?? 0) !== 0,
-      det_fecha:      r.bolDetFecha ? String(r.bolDetFecha).split('T')[0] : null,
-      det_hora:       r.bolDetHora  ? String(r.bolDetHora)  : null,
-      det_origen:     r.bolDetOrigen  ? Number(r.bolDetOrigen)  : null,
-      det_destino:    r.bolDetDestino ? Number(r.bolDetDestino) : null,
-      det_asiento:    r.bolDetAsiento ? Number(r.bolDetAsiento) : null,
-      tipo_viaje:     r.tipoViaje    ? Number(r.tipoViaje)    : 1,
-      origen_nombre:  r.origen_nombre ? String(r.origen_nombre) : null,
-      origen_clave:   r.origen_clave  ? String(r.origen_clave)  : null,
-      destino_nombre: r.destino_nombre ? String(r.destino_nombre) : null,
-      destino_clave:  r.destino_clave  ? String(r.destino_clave)  : null,
+      det_fecha:      r.bolDetFecha   ? String(r.bolDetFecha).split('T')[0]   : null,
+      det_hora:       r.bolDetHora    ? String(r.bolDetHora)                  : null,
+      det_origen:     r.bolDetOrigen  ? Number(r.bolDetOrigen)                : null,
+      det_destino:    r.bolDetDestino ? Number(r.bolDetDestino)               : null,
+      det_asiento:    r.bolDetAsiento ? Number(r.bolDetAsiento)               : null,
+      tipo_viaje:     r.tipoViaje     ? Number(r.tipoViaje)                   : 1,
+      origen_nombre:  r.origen_nombre ? String(r.origen_nombre)               : null,
+      origen_clave:   r.origen_clave  ? String(r.origen_clave)                : null,
+      destino_nombre: r.destino_nombre ? String(r.destino_nombre)             : null,
+      destino_clave:  r.destino_clave  ? String(r.destino_clave)              : null,
       synced_at:      new Date().toISOString(),
     }))
 
-    const { error: upsertErr } = await db
-      .from('legacy_boletos_mirror')
-      .upsert(records, { onConflict: 'bol_id' })
-
+    const { error: upsertErr } = await db.from('legacy_boletos_mirror').upsert(records, { onConflict: 'bol_id' })
     if (upsertErr) throw new Error(upsertErr.message)
 
-    const newLastId    = records[records.length - 1].bol_id
-    const newTotal     = prevTotal + records.length
-    const done         = records.length < BATCH_SIZE
+    const newLastId  = records[records.length - 1].bol_id
+    const newTotal   = prevTotal + records.length
+    const done       = records.length < BATCH_SIZE
 
     await db.from('legacy_sync_state').update({
-      last_bol_id:    newLastId,
-      total_synced:   newTotal,
-      last_synced_at: new Date().toISOString(),
-      last_error:     null,
+      last_bol_id: newLastId, total_synced: newTotal,
+      last_synced_at: new Date().toISOString(), last_error: null,
     }).eq('id', 'boletos')
 
-    return { synced: records.length, lastBolId: newLastId, totalSynced: newTotal, done }
-
+    return { synced: records.length, lastId: newLastId, totalSynced: newTotal, done }
   } catch (err: any) {
     await db.from('legacy_sync_state').update({ last_error: err.message }).eq('id', 'boletos')
-    return { synced: 0, lastBolId, totalSynced: prevTotal, done: false, error: err.message }
+    return { synced: 0, lastId, totalSynced: prevTotal, done: false, error: err.message }
+  } finally {
+    await pool.end()
+  }
+}
+
+export async function runLegacyPackageSync(): Promise<SyncResult> {
+  const db = svc()
+  const { data: state } = await db
+    .from('legacy_sync_state')
+    .select('last_bol_id, total_synced')
+    .eq('id', 'paquetes')
+    .single() as { data: { last_bol_id: number; total_synced: number } | null }
+
+  const lastId    = state?.last_bol_id  ?? 0
+  const prevTotal = state?.total_synced ?? 0
+  const pool = getPool()
+
+  try {
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT p.id_paquete, p.codigo, p.id_tipopaquete, p.precio, p.peso, p.calculo, p.status,
+              u.usrnombre AS vendedor,
+              r.ras_remitente, r.ras_receptor, r.ras_receptor_2,
+              r.ras_fechaenvio, r.ras_horaenvio, r.ras_destino, r.ras_envio,
+              r.numeroContacto, r.ras_numrastreo, r.direccion,
+              r.status AS descripcion, r.nombre_recibe, r.fecha_recepcion
+       FROM paquetes p
+       LEFT JOIN usuarios u ON u.usrid = p.usuario
+       LEFT JOIN rastreo r ON r.ras_numrastreo = p.codigo
+       WHERE p.id_paquete > ?
+       ORDER BY p.id_paquete ASC
+       LIMIT ?`,
+      [lastId, BATCH_SIZE]
+    )
+
+    if (!rows.length) {
+      await db.from('legacy_sync_state').update({ last_synced_at: new Date().toISOString(), last_error: null }).eq('id', 'paquetes')
+      return { synced: 0, lastId, totalSynced: prevTotal, done: true }
+    }
+
+    const records = rows.map(r => ({
+      id_paquete:      Number(r.id_paquete),
+      codigo:          r.codigo          ? String(r.codigo)                          : null,
+      tipo:            r.id_tipopaquete  ? Number(r.id_tipopaquete)                  : null,
+      precio:          Number(r.calculo ?? r.precio ?? 0),
+      peso:            r.peso            ? Number(r.peso)                            : null,
+      status:          r.status          ? Number(r.status)                          : 0,
+      vendedor:        r.vendedor        ? String(r.vendedor)                        : null,
+      ras_remitente:   r.ras_remitente   ? String(r.ras_remitente)                  : null,
+      ras_receptor:    r.ras_receptor    ? String(r.ras_receptor)                   : null,
+      ras_receptor_2:  r.ras_receptor_2  ? String(r.ras_receptor_2)                 : null,
+      numero_contacto: r.numeroContacto  ? String(r.numeroContacto)                 : null,
+      ras_fechaenvio:  r.ras_fechaenvio  ? String(r.ras_fechaenvio).split('T')[0]   : null,
+      ras_horaenvio:   r.ras_horaenvio   ? String(r.ras_horaenvio)                  : null,
+      ras_destino:     r.ras_destino     ? String(r.ras_destino)                    : null,
+      ras_envio:       r.ras_envio       ? String(r.ras_envio)                      : null,
+      ras_numrastreo:  r.ras_numrastreo  ? String(r.ras_numrastreo)                 : null,
+      descripcion:     r.descripcion     ? String(r.descripcion)                    : null,
+      direccion:       r.direccion       ? String(r.direccion)                      : null,
+      nombre_recibe:   r.nombre_recibe   ? String(r.nombre_recibe)                  : null,
+      fecha_recepcion: r.fecha_recepcion && !String(r.fecha_recepcion).startsWith('1901')
+        ? String(r.fecha_recepcion).split('T')[0] : null,
+      synced_at: new Date().toISOString(),
+    }))
+
+    const { error: upsertErr } = await db.from('legacy_paquetes_mirror').upsert(records, { onConflict: 'id_paquete' })
+    if (upsertErr) throw new Error(upsertErr.message)
+
+    const newLastId = records[records.length - 1].id_paquete
+    const newTotal  = prevTotal + records.length
+    const done      = records.length < BATCH_SIZE
+
+    await db.from('legacy_sync_state').update({
+      last_bol_id: newLastId, total_synced: newTotal,
+      last_synced_at: new Date().toISOString(), last_error: null,
+    }).eq('id', 'paquetes')
+
+    return { synced: records.length, lastId: newLastId, totalSynced: newTotal, done }
+  } catch (err: any) {
+    await db.from('legacy_sync_state').update({ last_error: err.message }).eq('id', 'paquetes')
+    return { synced: 0, lastId, totalSynced: prevTotal, done: false, error: err.message }
   } finally {
     await pool.end()
   }

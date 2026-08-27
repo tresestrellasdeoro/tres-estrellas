@@ -32,12 +32,52 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
 
     if (legacyError || !legacy) {
-      // Last resort — query AWS MySQL directly (tickets sold after Supabase migration)
+      // Query AWS via PHP proxy
       const awsTicket = await findAwsTicket(booking)
-      if (!awsTicket) {
-        return NextResponse.json({ error: 'Reservación no encontrada en ningún sistema' }, { status: 404 })
+      if (awsTicket) {
+        return NextResponse.json({ ...awsTicket, source: 'legacy' })
       }
-      return NextResponse.json({ ...awsTicket, source: 'legacy' })
+
+      // PHP proxy failed or not found — try Supabase mirror (offline fallback)
+      const normalized = booking.startsWith('TEO') ? booking.slice(3) : booking
+      const bolId = Number(normalized)
+      if (bolId) {
+        const { data: mirror } = await service
+          .from('legacy_boletos_mirror')
+          .select('*')
+          .eq('bol_id', bolId)
+          .maybeSingle()
+
+        if (mirror) {
+          const tc = Number(mirror.tipo_cliente ?? 1)
+          return NextResponse.json({
+            ticket_id:        String(mirror.bol_id),
+            booking_number:   String(mirror.bol_id),
+            folio:            mirror.bol_venta ? String(mirror.bol_venta) : null,
+            passenger_name:   mirror.nombre_cliente ?? '',
+            passenger_type:   tc === 2 ? 'senior' : tc === 3 ? 'child' : 'adult',
+            phone:            mirror.contacto ?? null,
+            origin_code:      mirror.origen_clave  ?? '',
+            origin_name:      mirror.origen_nombre ?? null,
+            destination_code: mirror.destino_clave  ?? '',
+            destination_name: mirror.destino_nombre ?? null,
+            ticket_type:      Number(mirror.tipo_viaje) === 2 ? 'round_trip' : 'one_way',
+            travel_date:      mirror.det_fecha ?? '',
+            travel_time:      mirror.det_hora  ?? null,
+            amount:           Number(mirror.bol_costo ?? 0),
+            payment_method:   'cash',
+            sold_by:          mirror.bol_usuario ?? null,
+            cancelled:        !!mirror.es_cancelado,
+            seat:             mirror.det_asiento ? Number(mirror.det_asiento) : null,
+            sale_date:        mirror.fecha_venta ?? null,
+            luggage:          [],
+            source:           'legacy',
+            from_mirror:      true,
+          })
+        }
+      }
+
+      return NextResponse.json({ error: 'Reservación no encontrada en ningún sistema' }, { status: 404 })
     }
 
     return NextResponse.json({ ...legacy, source: 'legacy' })
