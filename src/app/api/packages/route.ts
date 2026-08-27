@@ -70,10 +70,10 @@ export async function GET(req: NextRequest) {
         const legacyData = await res.json() as { paquetes: any[] }
         legacyPackages = (legacyData.paquetes ?? []).map((p: any) => ({
           id:              `legacy-${p.id_paquete}`,
-          tracking_number: p.codigo,
-          sender_name:     p.vendedor ?? '—',
-          sender_phone:    '',
-          recipient_name:  '—',
+          tracking_number: p.ras_numrastreo ?? p.codigo,
+          sender_name:     p.ras_remitente ?? p.vendedor ?? '—',
+          sender_phone:    p.numeroContacto ?? '',
+          recipient_name:  p.ras_receptor ?? '—',
           recipient_phone: '',
           status:          'delivered',
           payment_status:  'paid',
@@ -81,9 +81,9 @@ export async function GET(req: NextRequest) {
           paid_at:         null,
           price:           Number(p.calculo ?? p.precio ?? 0),
           size:            'medium',
-          created_at:      new Date().toISOString(),
-          origin:          null,
-          destination:     null,
+          created_at:      p.ras_fechaenvio ?? new Date().toISOString(),
+          origin:          p.ras_envio ? { name: p.ras_envio, city: p.ras_envio } : null,
+          destination:     p.ras_destino ? { name: p.ras_destino, city: p.ras_destino } : null,
           legacy:          true,
         }))
       }

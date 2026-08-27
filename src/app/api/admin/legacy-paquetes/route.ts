@@ -27,6 +27,13 @@ async function queryProxy(q: string, limit: number) {
       peso:           Number(p.peso ?? 0),
       status:         Number(p.status ?? 0),
       vendedor:       p.vendedor ?? null,
+      remitente:      p.ras_remitente ?? null,
+      receptor:       p.ras_receptor ?? null,
+      contacto:       p.numeroContacto ?? null,
+      fecha_envio:    p.ras_fechaenvio ?? null,
+      origen:         p.ras_envio ?? null,
+      destino:        p.ras_destino ?? null,
+      num_rastreo:    p.ras_numrastreo ?? null,
       source:         'legacy',
     }))
   } catch { return [] }
