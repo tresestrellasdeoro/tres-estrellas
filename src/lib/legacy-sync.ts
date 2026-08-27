@@ -181,7 +181,7 @@ export async function runLegacyPackageSync(): Promise<SyncResult> {
               r.status AS descripcion, r.nombre_recibe, r.fecha_recepcion
        FROM paquetes p
        LEFT JOIN usuarios u ON u.usrid = p.usuario
-       LEFT JOIN rastreo r ON r.ras_numrastreo = p.codigo
+       LEFT JOIN rastreo r ON r.ras_id = (SELECT MAX(x.ras_id) FROM rastreo x WHERE x.ras_numrastreo = p.codigo)
        WHERE p.id_paquete > ?
        ORDER BY p.id_paquete ASC
        LIMIT ?`,
