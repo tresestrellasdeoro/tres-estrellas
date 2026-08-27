@@ -3,6 +3,23 @@ import { createClient } from '@supabase/supabase-js'
 
 const BATCH_SIZE = 100
 
+function toDateStr(val: unknown): string | null {
+  if (!val) return null
+  if (val instanceof Date) return val.toISOString().split('T')[0]
+  const s = String(val)
+  if (s.startsWith('1901') || s === '0000-00-00') return null
+  // "Mon Aug 13 2018 00:00:00 GMT..." → parse as Date
+  const d = new Date(s)
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
+  return null
+}
+
+function toTimeStr(val: unknown): string | null {
+  if (!val) return null
+  const s = String(val)
+  return s.length >= 5 ? s.substring(0, 5) : s
+}
+
 function svc() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,11 +109,11 @@ export async function runLegacySync(): Promise<SyncResult> {
         tipo_cliente:   r.tipoCliente   ? Number(r.tipoCliente)               : 1,
         bol_usuario:    r.bolUsuario    ? String(r.bolUsuario)                : null,
         terminal_venta: r.terminalVenta ? Number(r.terminalVenta)             : null,
-        fecha_venta:    r.fechaVenta    ? String(r.fechaVenta).split('T')[0]  : null,
-        hora_venta:     r.horaVenta     ? String(r.horaVenta)                 : null,
+        fecha_venta:    toDateStr(r.fechaVenta),
+        hora_venta:     toTimeStr(r.horaVenta),
         es_cancelado:   Number(r.esCancelado ?? 0) !== 0,
-        det_fecha:      det?.bolDetFecha   ? String(det.bolDetFecha).split('T')[0] : null,
-        det_hora:       det?.bolDetHora    ? String(det.bolDetHora)                : null,
+        det_fecha:      toDateStr(det?.bolDetFecha),
+        det_hora:       toTimeStr(det?.bolDetHora),
         det_origen:     det?.bolDetOrigen  ? Number(det.bolDetOrigen)              : null,
         det_destino:    det?.bolDetDestino ? Number(det.bolDetDestino)             : null,
         det_asiento:    det?.bolDetAsiento ? Number(det.bolDetAsiento)             : null,
@@ -176,16 +193,15 @@ export async function runLegacyPackageSync(): Promise<SyncResult> {
       ras_receptor:    r.ras_receptor    ? String(r.ras_receptor)                   : null,
       ras_receptor_2:  r.ras_receptor_2  ? String(r.ras_receptor_2)                 : null,
       numero_contacto: r.numeroContacto  ? String(r.numeroContacto)                 : null,
-      ras_fechaenvio:  r.ras_fechaenvio  ? String(r.ras_fechaenvio).split('T')[0]   : null,
-      ras_horaenvio:   r.ras_horaenvio   ? String(r.ras_horaenvio)                  : null,
+      ras_fechaenvio:  toDateStr(r.ras_fechaenvio),
+      ras_horaenvio:   toTimeStr(r.ras_horaenvio),
       ras_destino:     r.ras_destino     ? String(r.ras_destino)                    : null,
       ras_envio:       r.ras_envio       ? String(r.ras_envio)                      : null,
       ras_numrastreo:  r.ras_numrastreo  ? String(r.ras_numrastreo)                 : null,
       descripcion:     r.descripcion     ? String(r.descripcion)                    : null,
       direccion:       r.direccion       ? String(r.direccion)                      : null,
       nombre_recibe:   r.nombre_recibe   ? String(r.nombre_recibe)                  : null,
-      fecha_recepcion: r.fecha_recepcion && !String(r.fecha_recepcion).startsWith('1901')
-        ? String(r.fecha_recepcion).split('T')[0] : null,
+      fecha_recepcion: toDateStr(r.fecha_recepcion),
       synced_at: new Date().toISOString(),
     }))
 
