@@ -166,7 +166,7 @@ export async function getAwsSales(opts: {
   try {
     const db = getPool()
     const conditions: string[] = []
-    const params: unknown[] = []
+    const params: (string | number)[] = []
     if (from) { conditions.push('fechaVenta >= ?'); params.push(from) }
     if (to)   { conditions.push('fechaVenta <= ?'); params.push(to) }
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
@@ -240,7 +240,7 @@ export async function getAwsPaquetes(opts: { limit?: number; offset?: number; st
   const { limit = 50, offset = 0, status } = opts
   try {
     const db = getPool()
-    const params: unknown[] = []
+    const params: (string | number)[] = []
     const where = status !== undefined ? 'WHERE status = ?' : ''
     if (status !== undefined) params.push(status)
     params.push(limit, offset)
