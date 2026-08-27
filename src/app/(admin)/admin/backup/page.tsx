@@ -79,7 +79,7 @@ export default function BackupPage() {
   const runSync = async (type: 'boletos' | 'paquetes', runAll = false) => {
     setSyncing(type)
     setLog([])
-    const maxIter = runAll ? 500 : 1
+    const maxIter = runAll ? 10000 : 1
     let i = 0
 
     try {
