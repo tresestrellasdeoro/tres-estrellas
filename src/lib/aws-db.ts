@@ -75,54 +75,28 @@ export interface AwsPaquete {
 // ─── Boletos (tickets) — production table: boletoventas + boletodetalles ──────
 
 export async function findAwsTicket(booking: string): Promise<AwsTicket | null> {
-  if (!process.env.AWS_MYSQL_HOST) return null
+  const proxyBase = process.env.AWS_PROXY_URL ?? 'http://54.212.85.161/api/boleto.php'
+  const proxyKey  = process.env.AWS_PROXY_KEY  ?? 'teo2026'
 
-  // Strip TEO prefix if present; bolId is a plain number
   const normalized = booking.startsWith('TEO') ? booking.slice(3) : booking
   const bolId = Number(normalized)
+  if (!bolId) return null
 
   try {
-    const db = getPool()
+    const res = await fetch(`${proxyBase}?bolId=${bolId}&key=${proxyKey}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return null
+    const r = await res.json() as Record<string, string | null>
 
-    // Primary lookup: boletoventas joined with boletodetalles + city names
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT
-         bv.bolId, bv.bolVenta, bv.nombreCliente, bv.bolCosto,
-         bv.fechaVenta, bv.horaVenta, bv.esCancelado, bv.contacto,
-         bv.tipoCliente, bv.bolUsuario,
-         bd.bolDetFecha, bd.bolDetHora, bd.bolDetAsiento, bd.tipoViaje,
-         bd.corridaId, bd.esCancelado as detCancelado,
-         o.orinombre as origen_nombre, o.clave as origen_clave,
-         d.desnombre as destino_nombre, d.clave_des as destino_clave
-       FROM boletoventas bv
-       LEFT JOIN boletodetalles bd ON bd.bolVenta = bv.bolVenta
-       LEFT JOIN origen o ON o.oriid = bd.bolDetOrigen
-       LEFT JOIN destino d ON d.desid = bd.bolDetDestino
-       WHERE bv.bolId = ? OR bv.bolVenta = ?
-       ORDER BY bd.bolDetID ASC
-       LIMIT 1`,
-      [bolId, bolId]
-    )
-    if (!rows.length) return null
-    const r = rows[0]
-
-    // Luggage from equipaje_descripcion (linked by bolVenta)
-    const [lugRows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT exc_id, numero_maletas, peso_total, bicicletas, electronicos,
-              costo_exceso, fecha_exceso
-       FROM boleto_equipaje
-       WHERE ebolID = ?`,
-      [r.bolId]
-    )
-
-    const luggage: AwsLuggage[] = lugRows.map(l => ({
+    const luggage: AwsLuggage[] = ((r.luggage as unknown as Record<string, string>[]) ?? []).map(l => ({
       exc_id:         Number(l.exc_id),
       numero_maletas: Number(l.numero_maletas ?? 0),
       peso_total:     Number(l.peso_total ?? 0),
       bicicletas:     Number(l.bicicletas ?? 0),
       electronicos:   Number(l.electronicos ?? 0),
       costo_exceso:   Number(l.costo_exceso ?? 0),
-      fecha_exceso:   l.fecha_exceso ? String(l.fecha_exceso) : null,
+      fecha_exceso:   l.fecha_exceso ?? null,
     }))
 
     const clienteType = Number(r.tipoCliente ?? 1)
@@ -138,17 +112,17 @@ export async function findAwsTicket(booking: string): Promise<AwsTicket | null> 
       destination_code: String(r.destino_clave ?? r.destino_nombre ?? ''),
       ticket_type:      tripType,
       travel_date:      r.bolDetFecha ? String(r.bolDetFecha).split('T')[0] : '',
-      travel_time:      r.bolDetHora ? String(r.bolDetHora) : null,
+      travel_time:      r.bolDetHora ?? null,
       amount:           Number(r.bolCosto ?? 0),
       payment_method:   'cash',
-      sold_by:          r.bolUsuario ? String(r.bolUsuario) : null,
+      sold_by:          r.bolUsuario ?? null,
       cancelled:        Number(r.esCancelado ?? 0) !== 0,
       seat:             r.bolDetAsiento ? Number(r.bolDetAsiento) : null,
       sale_date:        r.fechaVenta ? String(r.fechaVenta).split('T')[0] : null,
       luggage,
     }
   } catch (err) {
-    console.error('[AWS MySQL] findAwsTicket error:', err)
+    console.error('[AWS Proxy] findAwsTicket error:', err)
     return null
   }
 }
