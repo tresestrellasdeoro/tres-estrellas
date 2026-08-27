@@ -47,6 +47,16 @@ interface BookingResult {
   source?:          'new' | 'legacy'
 }
 
+interface LegacyLuggage {
+  exc_id:         number
+  numero_maletas: number
+  peso_total:     number
+  bicicletas:     number
+  electronicos:   number
+  costo_exceso:   number
+  fecha_exceso:   string | null
+}
+
 interface LegacyBookingResult {
   id:               number
   ticket_id:        string
@@ -62,6 +72,9 @@ interface LegacyBookingResult {
   payment_method:   string
   sold_by:          string | null
   cancelled:        boolean | null
+  seat:             number | null
+  sale_date:        string | null
+  luggage:          LegacyLuggage[]
   source:           'legacy'
 }
 
@@ -707,9 +720,46 @@ export default function ValidarPage() {
                   <User className="w-3 h-3" /> Vendido por
                 </p>
                 <p className="font-black text-slate-800 text-sm">{legacyResult.sold_by || '—'}</p>
-                <p className="text-slate-400 text-xs mt-0.5">Sistema anterior</p>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  {legacyResult.sale_date ? `Venta: ${legacyResult.sale_date}` : 'Sistema anterior'}
+                </p>
               </div>
+              {legacyResult.seat && (
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <p className="text-slate-400 text-xs mb-1">Asiento</p>
+                  <p className="font-black text-slate-800 text-sm">#{legacyResult.seat}</p>
+                </div>
+              )}
             </div>
+
+            {/* Equipaje del sistema anterior */}
+            {legacyResult.luggage?.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Luggage className="w-3.5 h-3.5" /> Equipaje registrado
+                </p>
+                <div className="space-y-2">
+                  {legacyResult.luggage.map(l => (
+                    <div key={l.exc_id} className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-3 text-xs text-amber-800 font-semibold">
+                          {l.numero_maletas > 0 && <span>🧳 {l.numero_maletas} maleta{l.numero_maletas > 1 ? 's' : ''}</span>}
+                          {l.bicicletas > 0 && <span>🚲 {l.bicicletas} bici</span>}
+                          {l.electronicos > 0 && <span>📦 {l.electronicos} electrónico{l.electronicos > 1 ? 's' : ''}</span>}
+                          {l.peso_total > 0 && <span>{l.peso_total} kg</span>}
+                        </div>
+                        {l.costo_exceso > 0 && (
+                          <span className="font-black text-amber-700">${l.costo_exceso}</span>
+                        )}
+                      </div>
+                      {l.fecha_exceso && (
+                        <p className="text-amber-600 text-xs mt-1">{l.fecha_exceso}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Botón resetear */}
             <button onClick={handleReset}
