@@ -7,6 +7,10 @@ import { ScanLine, ClipboardList, LogOut, Bus, Menu, X, ShoppingCart, Navigation
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SupportWidget } from '@/components/support/support-widget'
+import { ShiftContext, type ActiveShift } from '@/lib/shift-context'
+
+// Páginas que no requieren turno activo
+const SHIFT_EXEMPT = ['/personal/turno', '/personal/perfil', '/personal/soporte']
 
 const ALL_NAV = [
   { href: '/personal/turno',         label: 'Mi turno',          icon: Clock,         perm: null },
@@ -29,15 +33,33 @@ export function StaffLayoutClient({
 }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const [open, setOpen]           = useState(false)
-  const [turnoActivo, setTurnoActivo] = useState<boolean | null>(null)
+  const [open, setOpen]       = useState(false)
+  const [activeShift, setActiveShift] = useState<ActiveShift | null | undefined>(undefined)
+
+  const turnoActivo = activeShift !== undefined ? !!activeShift : null
 
   useEffect(() => {
     fetch('/api/staff/turno')
       .then(r => r.json())
-      .then(d => setTurnoActivo(!!d.turno))
-      .catch(() => setTurnoActivo(null))
-  }, [pathname])
+      .then(d => {
+        if (d.turno) {
+          setActiveShift({
+            id:            d.turno.id,
+            inicio:        d.turno.inicio,
+            sucursal_id:   d.turno.sucursal_id ?? null,
+            sucursal_code: d.turno.sucursales?.code ?? null,
+            sucursal_name: d.turno.sucursales?.name ?? null,
+          })
+        } else {
+          setActiveShift(null)
+          // Redirigir a turno si la página actual lo requiere
+          if (!SHIFT_EXEMPT.includes(pathname)) {
+            router.replace('/personal/turno')
+          }
+        }
+      })
+      .catch(() => setActiveShift(null))
+  }, [pathname, router])
 
   const hasAll   = permisos.includes('all')
   const navItems = ALL_NAV.filter(item => !item.perm || hasAll || permisos.includes(item.perm))
@@ -140,7 +162,9 @@ export function StaffLayoutClient({
 
       {/* Main */}
       <main className="flex-1 md:pt-0 pt-14 overflow-auto">
-        {children}
+        <ShiftContext.Provider value={activeShift ?? null}>
+          {children}
+        </ShiftContext.Provider>
       </main>
 
       <SupportWidget />

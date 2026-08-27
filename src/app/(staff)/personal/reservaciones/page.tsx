@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useShift } from '@/lib/shift-context'
 import {
   ClipboardList, CheckCircle2, Clock, Users, Bus, Search,
   Loader2, RefreshCw, ChevronDown, ChevronUp, Phone, User,
-  ArrowRight, AlertTriangle,
+  ArrowRight, AlertTriangle, MapPin,
 } from 'lucide-react'
 
 interface Pasajero {
@@ -42,8 +43,12 @@ function fmt12(t: string) {
 }
 
 export default function ReservacionesPage() {
+  const shift = useShift()
+  const shiftApplied = useRef(false)
+
   const [date, setDate]           = useState(today)
   const [horaFilter, setHoraFilter] = useState('')
+  const [origenFilter, setOrigenFilter] = useState('')
   const [search, setSearch]       = useState('')
   const [data, setData]           = useState<{ pasajeros: Pasajero[]; hours: string[] } | null>(null)
   const [loading, setLoading]     = useState(false)
@@ -62,6 +67,14 @@ export default function ReservacionesPage() {
     } catch { /* silently ignore */ }
     finally { setLoading(false) }
   }, [])
+
+  // Pre-seleccionar la sucursal del turno activo la primera vez que llega el contexto
+  useEffect(() => {
+    if (shift?.sucursal_code && !shiftApplied.current) {
+      shiftApplied.current = true
+      setOrigenFilter(shift.sucursal_code)
+    }
+  }, [shift])
 
   useEffect(() => { load(date, horaFilter) }, [date, horaFilter, load])
 
@@ -96,7 +109,13 @@ export default function ReservacionesPage() {
     finally { setBoardingLoading(null) }
   }
 
+  // Available origins for dropdown (derived from all loaded passengers)
+  const availableOrigins = [...new Map(
+    (data?.pasajeros ?? []).map(p => [p.origin_code, { code: p.origin_code, name: p.origin_name }])
+  ).values()].filter(o => o.code).sort((a, b) => a.name.localeCompare(b.name))
+
   const pasajeros = (data?.pasajeros ?? []).filter(p => {
+    if (origenFilter && p.origin_code !== origenFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return p.passenger_name.toLowerCase().includes(q) ||
@@ -112,9 +131,9 @@ export default function ReservacionesPage() {
     return acc
   }, {})
 
-  const totalBoarded = (data?.pasajeros ?? []).filter(p => p.boarded).length
-  const total        = data?.pasajeros.length ?? 0
-  const legacy       = (data?.pasajeros ?? []).filter(p => p.source === 'legacy').length
+  const totalBoarded = pasajeros.filter(p => p.boarded).length
+  const total        = pasajeros.length
+  const legacy       = pasajeros.filter(p => p.source === 'legacy').length
   const newSys       = total - legacy
 
   return (
@@ -127,7 +146,10 @@ export default function ReservacionesPage() {
             <Bus className="w-6 h-6 text-[#c01515]" />
             Lista de pasajeros
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">Sistema nuevo + sistema anterior combinados</p>
+          {shift?.sucursal_name
+            ? <p className="text-slate-500 text-sm mt-0.5 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{shift.sucursal_name}</p>
+            : <p className="text-slate-500 text-sm mt-0.5">Sistema nuevo + sistema anterior combinados</p>
+          }
         </div>
         <button onClick={() => load(date, horaFilter)} disabled={loading}
           className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40">
@@ -154,6 +176,33 @@ export default function ReservacionesPage() {
             </select>
           </div>
         </div>
+        {/* Origin filter — only shown when multiple origins exist */}
+        {availableOrigins.length > 1 && (
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3" /> Sucursal / Origen
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => setOrigenFilter('')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                  !origenFilter ? 'bg-[#0a1628] text-white border-[#0a1628]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                }`}>
+                Todas ({data?.pasajeros.length ?? 0})
+              </button>
+              {availableOrigins.map(o => {
+                const count = (data?.pasajeros ?? []).filter(p => p.origin_code === o.code).length
+                return (
+                  <button key={o.code} onClick={() => setOrigenFilter(o.code)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                      origenFilter === o.code ? 'bg-[#c01515] text-white border-[#c01515]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                    }`}>
+                    {o.name} ({count})
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
