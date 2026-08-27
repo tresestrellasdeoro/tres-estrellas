@@ -5,7 +5,7 @@ import {
   ScanLine, Search, CheckCircle2, XCircle, User, CreditCard, Banknote,
   Loader2, RotateCcw, ArrowRight, ArrowLeft, Clock, Wifi,
   ChevronDown, ChevronUp, CalendarDays, Mail, Hash, CalendarClock,
-  Ban, AlertTriangle, Luggage, Plus,
+  Ban, AlertTriangle, Luggage, Plus, Phone,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -82,6 +82,23 @@ interface LegacyBookingResult {
   source:           'legacy'
 }
 
+interface LegacySearchResult {
+  bolId:          string
+  bolVenta:       string | null
+  nombreCliente:  string
+  contacto:       string | null
+  bolCosto:       string
+  tipoCliente:    string
+  bolDetFecha:    string
+  bolDetHora:     string | null
+  bolDetAsiento:  string | null
+  tipoViaje:      string
+  origen_nombre:  string
+  origen_clave:   string
+  destino_nombre: string
+  destino_clave:  string
+}
+
 interface BoardingInfo {
   boarded_at:      string
   boarded_by_name: string | null
@@ -148,12 +165,13 @@ export default function ValidarPage() {
   const [extraError,    setExtraError]    = useState('')
 
   // ── Search mode ───────────────────────────────────────────────────────
-  const [searchOpen, setSearchOpen]     = useState(false)
-  const [searchQ, setSearchQ]           = useState('')
-  const [searchDate, setSearchDate]     = useState('')
-  const [searching, setSearching]       = useState(false)
-  const [searchResults, setSearchResults] = useState<BookingResult[]>([])
-  const [searchError, setSearchError]   = useState('')
+  const [searchOpen, setSearchOpen]         = useState(false)
+  const [searchQ, setSearchQ]               = useState('')
+  const [searchDate, setSearchDate]         = useState('')
+  const [searching, setSearching]           = useState(false)
+  const [searchResults, setSearchResults]   = useState<BookingResult[]>([])
+  const [legacySearchResults, setLegacySearchResults] = useState<LegacySearchResult[]>([])
+  const [searchError, setSearchError]       = useState('')
 
   // Keep focus on scanner input
   const refocusInput = useCallback(() => {
@@ -257,23 +275,41 @@ export default function ValidarPage() {
     finally { setBoardingLoading(false) }
   }
 
-  // ── Advanced search ───────────────────────────────────────────────────
+  // ── Advanced search (new system + legacy in parallel) ────────────────
   const handleAdvancedSearch = async () => {
     if (!searchQ.trim() && !searchDate) return
     setSearching(true)
     setSearchError('')
     setSearchResults([])
+    setLegacySearchResults([])
     setResult(null)
     cancelCountdown()
     try {
       const params = new URLSearchParams()
       if (searchQ.trim()) params.set('q', searchQ.trim())
       if (searchDate)      params.set('date', searchDate)
-      const res  = await fetch(`/api/staff/bookings?${params}`)
-      const data = await res.json()
-      if (!res.ok) { setSearchError(data.error || 'Error al buscar'); return }
-      setSearchResults(data.bookings ?? [])
-      if ((data.bookings ?? []).length === 0) setSearchError('Sin resultados para esa búsqueda')
+
+      // Buscar en ambos sistemas en paralelo
+      const [newRes, legacyRes] = await Promise.allSettled([
+        fetch(`/api/staff/bookings?${params}`),
+        searchQ.trim().length >= 2
+          ? fetch(`/api/staff/legacy-search?q=${encodeURIComponent(searchQ.trim())}`)
+          : Promise.resolve(null),
+      ])
+
+      const newData = newRes.status === 'fulfilled' && newRes.value?.ok
+        ? await newRes.value.json()
+        : { bookings: [] }
+
+      const legacyData = legacyRes.status === 'fulfilled' && legacyRes.value?.ok
+        ? await legacyRes.value.json()
+        : { resultados: [] }
+
+      setSearchResults(newData.bookings ?? [])
+      setLegacySearchResults(legacyData.resultados ?? [])
+
+      const total = (newData.bookings?.length ?? 0) + (legacyData.resultados?.length ?? 0)
+      if (total === 0) setSearchError('Sin resultados para esa búsqueda')
     } catch {
       setSearchError('Error de conexión')
     } finally {
@@ -640,10 +676,12 @@ export default function ValidarPage() {
               </div>
             )}
 
-            {/* Search results */}
+            {/* New system results */}
             {searchResults.length > 0 && (
               <div className="space-y-2 pt-1">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{searchResults.length} resultado{searchResults.length > 1 ? 's' : ''}</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Sistema TEO — {searchResults.length} resultado{searchResults.length > 1 ? 's' : ''}
+                </p>
                 {searchResults.map(b => (
                   <button key={b.id} onClick={() => selectSearchResult(b)}
                     className={`w-full text-left p-3 rounded-xl border-2 transition-all hover:border-[#c01515]/40 hover:bg-[#c01515]/5 ${
@@ -674,6 +712,51 @@ export default function ValidarPage() {
                       {' · '}
                       <span className="font-bold text-[#c01515]">${b.total_amount}</span>
                     </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Legacy system results */}
+            {legacySearchResults.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">
+                  Sistema anterior — {legacySearchResults.length} resultado{legacySearchResults.length > 1 ? 's' : ''}
+                </p>
+                {legacySearchResults.map(r => (
+                  <button key={r.bolId}
+                    onClick={() => { handleSearch(r.bolId); setSearchOpen(false) }}
+                    className="w-full text-left p-3 rounded-xl border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-all">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono font-black text-sm text-[#0a1628]">#{r.bolId}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                          Sis. anterior
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          {Number(r.tipoViaje) === 2 ? 'Ida y vuelta' : 'Sólo ida'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 mt-1">{r.nombreCliente}</p>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <ArrowRight className="w-3 h-3" />
+                        {r.origen_clave} → {r.destino_clave}
+                      </p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(r.bolDetFecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {r.bolDetHora && ` · ${r.bolDetHora.slice(0, 5)}`}
+                        {r.bolDetAsiento && ` · Asiento ${r.bolDetAsiento}`}
+                      </p>
+                      {r.contacto && (
+                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />{r.contacto}
+                        </p>
+                      )}
+                      <span className="text-xs font-bold text-[#c01515]">${Number(r.bolCosto).toFixed(0)}</span>
+                    </div>
                   </button>
                 ))}
               </div>
