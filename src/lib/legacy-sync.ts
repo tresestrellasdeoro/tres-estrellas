@@ -44,54 +44,70 @@ export async function runLegacySync(): Promise<SyncResult> {
   const pool = getPool()
 
   try {
-    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT bv.bolId, bv.bolVenta, bv.nombreCliente, bv.contacto, bv.bolCosto,
-              bv.tipoCliente, bv.bolUsuario, bv.terminalVenta,
-              bv.fechaVenta, bv.horaVenta, bv.esCancelado,
-              bd.bolDetFecha, bd.bolDetHora, bd.bolDetOrigen, bd.bolDetDestino,
-              bd.bolDetAsiento, bd.tipoViaje,
-              o.orinombre AS origen_nombre, o.clave AS origen_clave,
-              d.orinombre AS destino_nombre, d.clave AS destino_clave
-       FROM boletoventas bv
-       LEFT JOIN boletodetalles bd
-         ON bd.bolDetID = (SELECT MIN(x.bolDetID) FROM boletodetalles x WHERE x.bolVenta = bv.bolVenta)
-       LEFT JOIN origen o ON o.oriid = bd.bolDetOrigen
-       LEFT JOIN origen d ON d.oriid = bd.bolDetDestino
-       WHERE bv.bolId > ?
-       ORDER BY bv.bolId ASC
+    // Query 1: get boletoventas batch (simple, no JOINs — fast even on 700k rows)
+    const [ventas] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT bolId, bolVenta, nombreCliente, contacto, bolCosto,
+              tipoCliente, bolUsuario, terminalVenta,
+              fechaVenta, horaVenta, esCancelado
+       FROM boletoventas
+       WHERE bolId > ?
+       ORDER BY bolId ASC
        LIMIT ?`,
       [lastId, BATCH_SIZE]
     )
 
-    if (!rows.length) {
+    if (!ventas.length) {
       await db.from('legacy_sync_state').update({ last_synced_at: new Date().toISOString(), last_error: null }).eq('id', 'boletos')
       return { synced: 0, lastId, totalSynced: prevTotal, done: true }
     }
 
-    const records = rows.map(r => ({
-      bol_id:         Number(r.bolId),
-      bol_venta:      r.bolVenta      ? Number(r.bolVenta)                    : null,
-      nombre_cliente: String(r.nombreCliente ?? '').trim(),
-      contacto:       r.contacto      ? String(r.contacto)                    : null,
-      bol_costo:      r.bolCosto      ? Number(r.bolCosto)                    : null,
-      tipo_cliente:   r.tipoCliente   ? Number(r.tipoCliente)                 : 1,
-      bol_usuario:    r.bolUsuario    ? String(r.bolUsuario)                  : null,
-      terminal_venta: r.terminalVenta ? Number(r.terminalVenta)               : null,
-      fecha_venta:    r.fechaVenta    ? String(r.fechaVenta).split('T')[0]    : null,
-      hora_venta:     r.horaVenta     ? String(r.horaVenta)                   : null,
-      es_cancelado:   Number(r.esCancelado ?? 0) !== 0,
-      det_fecha:      r.bolDetFecha   ? String(r.bolDetFecha).split('T')[0]   : null,
-      det_hora:       r.bolDetHora    ? String(r.bolDetHora)                  : null,
-      det_origen:     r.bolDetOrigen  ? Number(r.bolDetOrigen)                : null,
-      det_destino:    r.bolDetDestino ? Number(r.bolDetDestino)               : null,
-      det_asiento:    r.bolDetAsiento ? Number(r.bolDetAsiento)               : null,
-      tipo_viaje:     r.tipoViaje     ? Number(r.tipoViaje)                   : 1,
-      origen_nombre:  r.origen_nombre ? String(r.origen_nombre)               : null,
-      origen_clave:   r.origen_clave  ? String(r.origen_clave)                : null,
-      destino_nombre: r.destino_nombre ? String(r.destino_nombre)             : null,
-      destino_clave:  r.destino_clave  ? String(r.destino_clave)              : null,
-      synced_at:      new Date().toISOString(),
-    }))
+    // Query 2: get first detail row for each venta (by bolVenta ID list)
+    const ventaIds = ventas.map(v => Number(v.bolVenta)).filter(Boolean)
+    const detMap = new Map<number, mysql.RowDataPacket>()
+    if (ventaIds.length) {
+      const placeholders = ventaIds.map(() => '?').join(',')
+      const [dets] = await pool.execute<mysql.RowDataPacket[]>(
+        `SELECT bd.bolVenta, bd.bolDetFecha, bd.bolDetHora,
+                bd.bolDetOrigen, bd.bolDetDestino, bd.bolDetAsiento, bd.tipoViaje,
+                o.orinombre AS origen_nombre, o.clave AS origen_clave,
+                d.orinombre AS destino_nombre, d.clave AS destino_clave
+         FROM boletodetalles bd
+         LEFT JOIN origen o ON o.oriid = bd.bolDetOrigen
+         LEFT JOIN origen d ON d.oriid = bd.bolDetDestino
+         WHERE bd.bolVenta IN (${placeholders})
+         GROUP BY bd.bolVenta`,
+        ventaIds
+      )
+      for (const det of dets) detMap.set(Number(det.bolVenta), det)
+    }
+
+    const records = ventas.map(r => {
+      const det = detMap.get(Number(r.bolVenta))
+      return {
+        bol_id:         Number(r.bolId),
+        bol_venta:      r.bolVenta      ? Number(r.bolVenta)                  : null,
+        nombre_cliente: String(r.nombreCliente ?? '').trim(),
+        contacto:       r.contacto      ? String(r.contacto)                  : null,
+        bol_costo:      r.bolCosto      ? Number(r.bolCosto)                  : null,
+        tipo_cliente:   r.tipoCliente   ? Number(r.tipoCliente)               : 1,
+        bol_usuario:    r.bolUsuario    ? String(r.bolUsuario)                : null,
+        terminal_venta: r.terminalVenta ? Number(r.terminalVenta)             : null,
+        fecha_venta:    r.fechaVenta    ? String(r.fechaVenta).split('T')[0]  : null,
+        hora_venta:     r.horaVenta     ? String(r.horaVenta)                 : null,
+        es_cancelado:   Number(r.esCancelado ?? 0) !== 0,
+        det_fecha:      det?.bolDetFecha   ? String(det.bolDetFecha).split('T')[0] : null,
+        det_hora:       det?.bolDetHora    ? String(det.bolDetHora)                : null,
+        det_origen:     det?.bolDetOrigen  ? Number(det.bolDetOrigen)              : null,
+        det_destino:    det?.bolDetDestino ? Number(det.bolDetDestino)             : null,
+        det_asiento:    det?.bolDetAsiento ? Number(det.bolDetAsiento)             : null,
+        tipo_viaje:     det?.tipoViaje     ? Number(det.tipoViaje)                 : 1,
+        origen_nombre:  det?.origen_nombre ? String(det.origen_nombre)             : null,
+        origen_clave:   det?.origen_clave  ? String(det.origen_clave)              : null,
+        destino_nombre: det?.destino_nombre ? String(det.destino_nombre)           : null,
+        destino_clave:  det?.destino_clave  ? String(det.destino_clave)            : null,
+        synced_at:      new Date().toISOString(),
+      }
+    })
 
     const { error: upsertErr } = await db.from('legacy_boletos_mirror').upsert(records, { onConflict: 'bol_id' })
     if (upsertErr) throw new Error(upsertErr.message)
