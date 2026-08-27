@@ -19,23 +19,34 @@ async function queryProxy(q: string, limit: number) {
     })
     if (!res.ok) return []
     const data = await res.json() as { paquetes: unknown[] }
-    return (data.paquetes ?? []).map((p: any) => ({
-      id:             p.id_paquete,
-      codigo:         p.codigo,
-      tipo:           p.id_tipopaquete,
-      precio:         Number(p.calculo ?? p.precio ?? 0),
-      peso:           Number(p.peso ?? 0),
-      status:         Number(p.status ?? 0),
-      vendedor:       p.vendedor ?? null,
-      remitente:      p.ras_remitente ?? null,
-      receptor:       p.ras_receptor ?? null,
-      contacto:       p.numeroContacto ?? null,
-      fecha_envio:    p.ras_fechaenvio ?? null,
-      origen:         p.ras_envio ?? null,
-      destino:        p.ras_destino ?? null,
-      num_rastreo:    p.ras_numrastreo ?? null,
-      source:         'legacy',
-    }))
+    return (data.paquetes ?? []).map((p: any) => {
+    const recibio = !!(p.nombre_recibe && String(p.nombre_recibe).trim().length > 0)
+    const fechaRec = p.fecha_recepcion ? String(p.fecha_recepcion) : null
+    const entregado = recibio || !!(fechaRec && !fechaRec.startsWith('1901'))
+    return {
+      id:              p.id_paquete,
+      codigo:          p.codigo,
+      tipo:            p.id_tipopaquete,
+      precio:          Number(p.calculo ?? p.precio ?? 0),
+      peso:            Number(p.peso ?? 0),
+      vendedor:        p.vendedor ?? null,
+      remitente:       p.ras_remitente ?? null,
+      receptor:        p.ras_receptor ?? null,
+      receptor2:       p.ras_receptor_2 ?? null,
+      contacto:        p.numeroContacto ?? null,
+      fecha_envio:     p.ras_fechaenvio ?? null,
+      hora_envio:      p.ras_horaenvio ?? null,
+      origen:          p.ras_envio ?? null,
+      destino:         p.ras_destino ?? null,
+      num_rastreo:     p.ras_numrastreo ?? null,
+      descripcion:     p.descripcion ?? null,
+      direccion:       p.direccion ?? null,
+      entregado,
+      nombre_recibe:   p.nombre_recibe ?? null,
+      fecha_recepcion: fechaRec,
+      source:          'legacy',
+    }
+  })
   } catch { return [] }
 }
 

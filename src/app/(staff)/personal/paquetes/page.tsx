@@ -51,9 +51,12 @@ interface Pkg {
 
 interface LegacyPkg {
   id: number; codigo: string; tipo: string | null; precio: number | null; peso: number | null
-  remitente: string | null; receptor: string | null; origen: string | null; destino: string | null
-  fecha_envio: string | null; descripcion: string | null; direccion: string | null
-  contacto: string | null; entregado: boolean; nombre_recibe: string | null; fecha_recepcion: string | null
+  remitente: string | null; receptor: string | null; receptor2: string | null
+  origen: string | null; destino: string | null
+  fecha_envio: string | null; hora_envio: string | null
+  descripcion: string | null; direccion: string | null
+  contacto: string | null; vendedor: string | null; num_rastreo: string | null
+  entregado: boolean; nombre_recibe: string | null; fecha_recepcion: string | null
 }
 
 function LegacyPackages() {
@@ -148,52 +151,94 @@ function LegacyPackages() {
               </div>
 
               {isOpen && (
-                <div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 space-y-3">
+
+                  {/* Descripción del contenido */}
+                  {pkg.descripcion && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-0.5">Contenido del paquete</p>
+                      <p className="text-sm font-semibold text-amber-900">{pkg.descripcion}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+
+                    {/* Remitente */}
                     <div className="flex items-start gap-1.5">
                       <User className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-slate-400 font-bold uppercase tracking-wider">Remitente</p>
                         <p className="text-slate-700 font-semibold mt-0.5">{pkg.remitente ?? '—'}</p>
+                        {pkg.contacto && (
+                          <p className="text-slate-500 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3" />{pkg.contacto}
+                          </p>
+                        )}
+                        {pkg.vendedor && <p className="text-slate-400 mt-0.5">Registró: {pkg.vendedor}</p>}
                       </div>
                     </div>
+
+                    {/* Receptor */}
                     <div className="flex items-start gap-1.5">
                       <User className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-slate-400 font-bold uppercase tracking-wider">Receptor</p>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Destinatario</p>
                         <p className="text-slate-700 font-semibold mt-0.5">{pkg.receptor ?? '—'}</p>
-                        {pkg.nombre_recibe && pkg.nombre_recibe !== pkg.receptor && (
-                          <p className="text-slate-400">Recibió: {pkg.nombre_recibe}</p>
+                        {pkg.receptor2 && pkg.receptor2 !== pkg.receptor && (
+                          <p className="text-slate-400">Alt: {pkg.receptor2}</p>
+                        )}
+                        {pkg.entregado && pkg.nombre_recibe && (
+                          <p className="text-emerald-600 font-semibold mt-0.5">✓ Recibió: {pkg.nombre_recibe}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-start gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase tracking-wider">Contacto</p>
-                        <p className="text-slate-700 font-semibold mt-0.5">{pkg.contacto ?? '—'}</p>
-                      </div>
-                    </div>
+
+                    {/* Ruta */}
                     <div className="flex items-start gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-slate-400 font-bold uppercase tracking-wider">Ruta</p>
                         <p className="text-slate-700 font-semibold mt-0.5">{pkg.origen ?? '—'} → {pkg.destino ?? '—'}</p>
-                        {pkg.direccion && <p className="text-slate-400 mt-0.5">{pkg.direccion}</p>}
+                        {pkg.direccion && <p className="text-slate-500 mt-0.5 leading-tight">{pkg.direccion}</p>}
                       </div>
                     </div>
-                    <div>
-                      <p className="text-slate-400 font-bold uppercase tracking-wider">Fechas</p>
-                      <p className="text-slate-700 font-semibold mt-0.5">Envío: {fmtDate(pkg.fecha_envio)}</p>
-                      {pkg.fecha_recepcion && <p className="text-slate-400">Recepción: {fmtDate(pkg.fecha_recepcion)}</p>}
+
+                    {/* Fechas */}
+                    <div className="flex items-start gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider">Fechas</p>
+                        <p className="text-slate-700 font-semibold mt-0.5">
+                          Envío: {fmtDate(pkg.fecha_envio)}{pkg.hora_envio ? ` ${pkg.hora_envio.slice(0,5)}` : ''}
+                        </p>
+                        {pkg.entregado && pkg.fecha_recepcion && !pkg.fecha_recepcion.startsWith('1901') && (
+                          <p className="text-emerald-600 mt-0.5">Entregado: {fmtDate(pkg.fecha_recepcion)}</p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-slate-400 font-bold uppercase tracking-wider">Detalles</p>
-                      {pkg.peso != null && <p className="text-slate-700 font-semibold mt-0.5">{pkg.peso} lbs · ${Number(pkg.precio ?? 0).toFixed(2)}</p>}
-                      {pkg.descripcion && <p className="text-slate-400 mt-0.5">{pkg.descripcion}</p>}
+
+                    {/* Precio y peso */}
+                    <div className="col-span-2 flex items-center gap-4 bg-white rounded-xl px-3 py-2 border border-slate-200">
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Precio</p>
+                        <p className="font-black text-lg text-[#c01515]">${Number(pkg.precio ?? 0).toFixed(2)}</p>
+                      </div>
+                      {pkg.peso != null && pkg.peso > 0 && (
+                        <div>
+                          <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Peso</p>
+                          <p className="font-bold text-slate-700">{pkg.peso} lbs</p>
+                        </div>
+                      )}
+                      {pkg.num_rastreo && (
+                        <div className="ml-auto">
+                          <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Código</p>
+                          <p className="font-mono font-bold text-slate-700 text-xs">{pkg.num_rastreo}</p>
+                        </div>
+                      )}
                     </div>
+
                   </div>
-                  <div className="mt-3 pt-3 border-t border-slate-200">
+                  <div className="pt-2 border-t border-slate-200">
                     <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">SISTEMA LEGACY — Solo lectura</span>
                   </div>
                 </div>
