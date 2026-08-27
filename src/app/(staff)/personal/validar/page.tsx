@@ -182,7 +182,10 @@ export default function ValidarPage() {
     setLegacyResult(null)
     cancelCountdown()
     try {
-      const res  = await fetch(`/api/staff/validate?booking=${encodeURIComponent(q)}`)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 12000)
+      const res  = await fetch(`/api/staff/validate?booking=${encodeURIComponent(q)}`, { signal: controller.signal })
+      clearTimeout(timer)
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'No encontrado'); refocusInput(); return }
       if (data.source === 'legacy') {
