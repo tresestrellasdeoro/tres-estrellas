@@ -5,19 +5,31 @@ const BATCH_SIZE = 100
 
 function toDateStr(val: unknown): string | null {
   if (!val) return null
-  if (val instanceof Date) return val.toISOString().split('T')[0]
-  const s = String(val)
-  if (s.startsWith('1901') || s === '0000-00-00') return null
-  // "Mon Aug 13 2018 00:00:00 GMT..." → parse as Date
-  const d = new Date(s)
-  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
-  return null
+  try {
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return null
+      return val.toISOString().split('T')[0]
+    }
+    const s = String(val)
+    if (s.startsWith('1901') || s.startsWith('0000') || s === '') return null
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return null
+    return d.toISOString().split('T')[0]
+  } catch { return null }
 }
 
 function toTimeStr(val: unknown): string | null {
   if (!val) return null
-  const s = String(val)
-  return s.length >= 5 ? s.substring(0, 5) : s
+  try {
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return null
+      const h = val.getUTCHours().toString().padStart(2, '0')
+      const m = val.getUTCMinutes().toString().padStart(2, '0')
+      return `${h}:${m}`
+    }
+    const s = String(val)
+    return s.length >= 5 ? s.substring(0, 5) : null
+  } catch { return null }
 }
 
 function svc() {
