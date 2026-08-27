@@ -72,38 +72,47 @@ export interface AwsPaquete {
   status:       number
 }
 
-// ─── Boletos (tickets) ────────────────────────────────────────────────────────
+// ─── Boletos (tickets) — production table: boletoventas + boletodetalles ──────
 
 export async function findAwsTicket(booking: string): Promise<AwsTicket | null> {
   if (!process.env.AWS_MYSQL_HOST) return null
 
+  // Strip TEO prefix if present; bolId is a plain number
   const normalized = booking.startsWith('TEO') ? booking.slice(3) : booking
+  const bolId = Number(normalized)
 
   try {
     const db = getPool()
+
+    // Primary lookup: boletoventas joined with boletodetalles + city names
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT
-         b.bolid, b.bolcodigo, b.codBolImp, b.cod_antiguo,
-         b.bolclinombre, b.bolorigen, b.boldestino, b.boltipo,
-         b.bolfecha1, b.hrsal, b.bolcosto, b.usuario,
-         b.cancelado, b.bolCheckIn, b.bolasiento, b.fechaventa
-       FROM boletos b
-       WHERE b.bolcodigo = ? OR b.bolcodigo = ?
-          OR b.codBolImp = ? OR b.codBolImp = ?
-          OR b.cod_antiguo = ? OR b.bolid = ?
+         bv.bolId, bv.bolVenta, bv.nombreCliente, bv.bolCosto,
+         bv.fechaVenta, bv.horaVenta, bv.esCancelado, bv.contacto,
+         bv.tipoCliente, bv.bolUsuario,
+         bd.bolDetFecha, bd.bolDetHora, bd.bolDetAsiento, bd.tipoViaje,
+         bd.corridaId, bd.esCancelado as detCancelado,
+         o.orinombre as origen_nombre, o.clave as origen_clave,
+         d.desnombre as destino_nombre, d.clave_des as destino_clave
+       FROM boletoventas bv
+       LEFT JOIN boletodetalles bd ON bd.bolVenta = bv.bolVenta
+       LEFT JOIN origen o ON o.oriid = bd.bolDetOrigen
+       LEFT JOIN destino d ON d.desid = bd.bolDetDestino
+       WHERE bv.bolId = ? OR bv.bolVenta = ?
+       ORDER BY bd.bolDetID ASC
        LIMIT 1`,
-      [booking, normalized, booking, normalized, normalized, normalized]
+      [bolId, bolId]
     )
     if (!rows.length) return null
     const r = rows[0]
 
-    // Fetch luggage linked to this ticket
+    // Luggage from equipaje_descripcion (linked by bolVenta)
     const [lugRows] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT exc_id, numero_maletas, peso_total, bicicletas, electronicos,
               costo_exceso, fecha_exceso
        FROM boleto_equipaje
        WHERE ebolID = ?`,
-      [r.bolid]
+      [r.bolId]
     )
 
     const luggage: AwsLuggage[] = lugRows.map(l => ({
@@ -116,22 +125,26 @@ export async function findAwsTicket(booking: string): Promise<AwsTicket | null> 
       fecha_exceso:   l.fecha_exceso ? String(l.fecha_exceso) : null,
     }))
 
+    const clienteType = Number(r.tipoCliente ?? 1)
+    const passengerType = clienteType === 2 ? 'senior' : clienteType === 3 ? 'child' : 'adult'
+    const tripType = Number(r.tipoViaje ?? 1) === 2 ? 'round_trip' : 'one_way'
+
     return {
-      ticket_id:        String(r.bolid),
-      booking_number:   String(r.codBolImp ?? r.bolcodigo ?? r.bolid),
-      passenger_name:   String(r.bolclinombre ?? ''),
-      passenger_type:   'adult',
-      origin_code:      String(r.bolorigen ?? ''),
-      destination_code: String(r.boldestino ?? ''),
-      ticket_type:      String(r.boltipo ?? 'one_way'),
-      travel_date:      r.bolfecha1 ? String(r.bolfecha1).split('T')[0] : '',
-      travel_time:      r.hrsal ? String(r.hrsal) : null,
-      amount:           Number(r.bolcosto ?? 0),
+      ticket_id:        String(r.bolId),
+      booking_number:   String(r.bolId),
+      passenger_name:   String(r.nombreCliente ?? '').trim(),
+      passenger_type:   passengerType,
+      origin_code:      String(r.origen_clave ?? r.origen_nombre ?? ''),
+      destination_code: String(r.destino_clave ?? r.destino_nombre ?? ''),
+      ticket_type:      tripType,
+      travel_date:      r.bolDetFecha ? String(r.bolDetFecha).split('T')[0] : '',
+      travel_time:      r.bolDetHora ? String(r.bolDetHora) : null,
+      amount:           Number(r.bolCosto ?? 0),
       payment_method:   'cash',
-      sold_by:          r.usuario ? String(r.usuario) : null,
-      cancelled:        Number(r.cancelado ?? 0) !== 0,
-      seat:             r.bolasiento ? Number(r.bolasiento) : null,
-      sale_date:        r.fechaventa ? String(r.fechaventa) : null,
+      sold_by:          r.bolUsuario ? String(r.bolUsuario) : null,
+      cancelled:        Number(r.esCancelado ?? 0) !== 0,
+      seat:             r.bolDetAsiento ? Number(r.bolDetAsiento) : null,
+      sale_date:        r.fechaVenta ? String(r.fechaVenta).split('T')[0] : null,
       luggage,
     }
   } catch (err) {
@@ -160,21 +173,27 @@ export async function getAwsSales(opts: {
     params.push(limit, offset)
 
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT bolId, bolVenta, nombreCliente, bolOrigen, bolDestino,
-              bolTipo, bolCosto, fechaVenta, horaVenta, esCancelado, terminalVenta
-       FROM boletoventa
+      `SELECT bv.bolId, bv.bolVenta, bv.nombreCliente, bv.bolCosto,
+              bv.fechaVenta, bv.horaVenta, bv.esCancelado, bv.terminalVenta,
+              bv.tipoCliente, bv.contacto,
+              o.orinombre as origen_nombre, d.desnombre as destino_nombre
+       FROM boletoventas bv
+       LEFT JOIN boletodetalles bd ON bd.bolVenta = bv.bolVenta
+       LEFT JOIN origen o ON o.oriid = bd.bolDetOrigen
+       LEFT JOIN destino d ON d.desid = bd.bolDetDestino
        ${where}
-       ORDER BY fechaVenta DESC, horaVenta DESC
+       GROUP BY bv.bolId
+       ORDER BY bv.bolId DESC
        LIMIT ? OFFSET ?`,
       params
     )
     return rows.map(r => ({
       id:             Number(r.bolId),
       venta_id:       Number(r.bolVenta),
-      passenger_name: String(r.nombreCliente ?? ''),
-      origin_id:      Number(r.bolOrigen ?? 0),
-      destination_id: Number(r.bolDestino ?? 0),
-      ticket_type:    Number(r.bolTipo ?? 0),
+      passenger_name: String(r.nombreCliente ?? '').trim(),
+      origin_id:      0,
+      destination_id: 0,
+      ticket_type:    Number(r.tipoCliente ?? 1),
       amount:         Number(r.bolCosto ?? 0),
       sale_date:      r.fechaVenta ? String(r.fechaVenta).split('T')[0] : null,
       sale_time:      r.horaVenta ? String(r.horaVenta) : null,
