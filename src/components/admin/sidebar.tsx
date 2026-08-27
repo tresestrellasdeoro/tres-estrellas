@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Bus, LayoutDashboard, Map, Clock, Users, BarChart3, LogOut, Menu, X,
   Settings, UserCog, Package, BookOpen, Store, Route, UserCheck,
-  MessageCircle, TrendingUp, Monitor, ChevronDown, ShoppingCart,
+  MessageCircle, TrendingUp, Monitor, ChevronDown, ShoppingCart, DatabaseBackup,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -79,10 +79,11 @@ const NAV: NavEntry[] = [
     group: {
       label: 'Configuración',
       icon: Settings,
-      basePaths: ['/admin/sucursales', '/admin/configuracion'],
+      basePaths: ['/admin/sucursales', '/admin/configuracion', '/admin/backup'],
       items: [
-        { href: '/admin/sucursales',    icon: Store,    label: 'Sucursales' },
-        { href: '/admin/configuracion', icon: Settings, label: 'Configuración' },
+        { href: '/admin/sucursales',    icon: Store,           label: 'Sucursales' },
+        { href: '/admin/backup',        icon: DatabaseBackup,  label: 'Backup MySQL' },
+        { href: '/admin/configuracion', icon: Settings,        label: 'Configuración' },
       ],
     },
   },

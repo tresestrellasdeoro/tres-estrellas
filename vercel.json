@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/refresh-qb",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/sync-legacy",
+      "schedule": "0 10 * * *"
     }
   ]
 }
