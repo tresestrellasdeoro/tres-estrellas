@@ -32,6 +32,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
     recipient_name:      '',
     recipient_phone:     '',
     recipient_email:     '',
+    recipient_address:   '',
     origin_stop_id:      defaultOriginId,
     destination_stop_id: '',
     size:                'mediano' as PackageSize,
@@ -131,6 +132,7 @@ export function NewPackageModal({ onClose, onCreated, defaultSenderName = '', de
                 <input required value={form.recipient_phone} onChange={e => set('recipient_phone', e.target.value)} placeholder="Teléfono *" className={INPUT} />
                 <input value={form.recipient_email} onChange={e => set('recipient_email', e.target.value)} placeholder="Email (opcional)" className={INPUT} />
               </div>
+              <input value={form.recipient_address} onChange={e => set('recipient_address', e.target.value)} placeholder="Dirección de entrega (opcional)" className={INPUT} />
             </div>
           </div>
 

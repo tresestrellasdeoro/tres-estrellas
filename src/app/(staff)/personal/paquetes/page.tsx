@@ -11,10 +11,11 @@ import { NewPackageModal } from '@/components/packages/new-package-modal'
 import { SquareCard, type SquareCardHandle } from '@/components/public/square-card'
 
 interface PackageEvent {
-  status:     string
-  location:   string | null
-  notes:      string | null
-  created_at: string
+  status:      string
+  location:    string | null
+  notes:       string | null
+  received_by: string | null
+  created_at:  string
 }
 
 const SCAN_STATUSES: { value: PackageStatus; label: string; desc: string; color: string }[] = [
@@ -34,6 +35,7 @@ interface Pkg {
   recipient_name: string
   recipient_phone: string
   recipient_email?: string
+  recipient_address?: string
   status: PackageStatus
   payment_status: 'pending' | 'paid' | 'refunded'
   payment_method: string | null
@@ -302,6 +304,7 @@ export default function StaffPaquetesPage() {
   const [newStatus, setNewStatus]   = useState<PackageStatus | ''>('')
   const [location, setLocation]     = useState('')
   const [statusNotes, setStatusNotes] = useState('')
+  const [receivedBy, setReceivedBy] = useState('')
   const [saving, setSaving]         = useState(false)
   const [statusSuccess, setStatusSuccess] = useState('')
 
@@ -380,6 +383,7 @@ export default function StaffPaquetesPage() {
     setLookupErr('')
     setNewStatus('')
     setStatusSuccess('')
+    setReceivedBy('')
     setPayMode(null)
     setPayError('')
     setPaySuccess('')
@@ -456,7 +460,12 @@ export default function StaffPaquetesPage() {
     const res  = await fetch('/api/packages', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id: selected.id, status: newStatus, location: location || null, notes: statusNotes || null }),
+      body:    JSON.stringify({
+        id: selected.id, status: newStatus,
+        location:    location || null,
+        notes:       statusNotes || null,
+        received_by: newStatus === 'delivered' ? (receivedBy || null) : null,
+      }),
     })
     const data = await res.json()
     if (res.ok) {
@@ -467,6 +476,7 @@ export default function StaffPaquetesPage() {
       setNewStatus('')
       setLocation('')
       setStatusNotes('')
+      setReceivedBy('')
     } else {
       setLookupErr(data.error ?? 'Error al actualizar')
     }
@@ -750,10 +760,16 @@ export default function StaffPaquetesPage() {
                   <p className="text-slate-700 font-semibold mt-0.5">{selected.recipient_name}</p>
                   <p className="text-slate-400">{selected.recipient_phone}</p>
                   {selected.recipient_email && <p className="text-slate-400">{selected.recipient_email}</p>}
+                  {selected.recipient_address && (
+                    <p className="text-slate-500 mt-0.5 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" />{selected.recipient_address}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-slate-400 font-bold uppercase tracking-wider">Tamaño</p>
                   <p className="text-slate-700 font-semibold mt-0.5">{PACKAGE_SIZES[selected.size]?.label ?? selected.size}</p>
+                  {selected.notes && <p className="text-slate-400 mt-0.5 italic">"{selected.notes}"</p>}
                 </div>
                 <div>
                   <p className="text-slate-400 font-bold uppercase tracking-wider">Total</p>
@@ -882,6 +898,11 @@ export default function StaffPaquetesPage() {
 
               {newStatus && (
                 <div className="space-y-2">
+                  {newStatus === 'delivered' && (
+                    <input value={receivedBy} onChange={e => setReceivedBy(e.target.value)}
+                      placeholder="Nombre de quien recibió el paquete *"
+                      className="w-full px-4 py-2.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300 font-semibold" />
+                  )}
                   <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Ubicación (opcional)"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#c01515] focus:ring-1 focus:ring-[#c01515]/30" />
                   <textarea value={statusNotes} onChange={e => setStatusNotes(e.target.value)} placeholder="Notas del evento (opcional)" rows={2}
@@ -940,6 +961,7 @@ export default function StaffPaquetesPage() {
                                     </span>
                                   )}
                                 </div>
+                                {ev.received_by && <p className="text-xs text-emerald-600 font-semibold mt-0.5">Recibió: {ev.received_by}</p>}
                                 {ev.notes && <p className="text-xs text-slate-500 mt-0.5 italic">"{ev.notes}"</p>}
                                 <p className="text-[10px] text-slate-400 mt-0.5">
                                   {new Date(ev.created_at).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

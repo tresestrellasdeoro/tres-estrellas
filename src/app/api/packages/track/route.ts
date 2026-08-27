@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const { data: events } = await db
     .from('package_events')
-    .select('status, location, notes, created_at')
+    .select('status, location, notes, received_by, created_at')
     .eq('package_id', pkg.id)
     .order('created_at', { ascending: false })
 

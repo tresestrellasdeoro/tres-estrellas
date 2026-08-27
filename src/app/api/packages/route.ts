@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     .from('packages')
     .select(`
       id, tracking_number, sender_name, sender_phone,
-      recipient_name, recipient_phone,
+      recipient_name, recipient_phone, recipient_address,
       size, weight_lbs, price, status, payment_status, payment_method, paid_at, created_at, notes,
       origin:stops!origin_stop_id(name, city),
       destination:stops!destination_stop_id(name, city)
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     sender_name, sender_phone, sender_email,
-    recipient_name, recipient_phone, recipient_email,
+    recipient_name, recipient_phone, recipient_email, recipient_address,
     origin_stop_id, destination_stop_id,
     size, weight_lbs, declared_value, notes,
     payment_method, source_id,
@@ -173,6 +173,7 @@ export async function POST(req: NextRequest) {
       recipient_name,
       recipient_phone,
       recipient_email:     recipient_email ?? null,
+      recipient_address:   recipient_address ?? null,
       origin_stop_id,
       destination_stop_id,
       size,
@@ -223,7 +224,7 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const { id, tracking_number, status, location, notes } = await req.json()
+  const { id, tracking_number, status, location, notes, received_by } = await req.json()
   if ((!id && !tracking_number) || !status) {
     return NextResponse.json({ error: 'Faltan campos' }, { status: 422 })
   }
@@ -247,11 +248,12 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await db.from('package_events').insert({
-    package_id: pkgId,
+    package_id:  pkgId,
     status,
-    location:   location ?? null,
-    notes:      notes ?? null,
-    created_by: user.id,
+    location:    location ?? null,
+    notes:       notes ?? null,
+    received_by: received_by ?? null,
+    created_by:  user.id,
   })
 
   return NextResponse.json({ package: pkg })
