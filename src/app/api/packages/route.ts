@@ -56,7 +56,41 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ packages: data ?? [] })
+
+  // When staff searches, also include matching legacy packages from old system
+  let legacyPackages: unknown[] = []
+  if (isAdmin && search) {
+    try {
+      const base = (process.env.AWS_PROXY_URL ?? 'http://54.212.85.161/api/boleto.php').replace('boleto.php', 'paquete.php')
+      const key  = process.env.AWS_PROXY_KEY ?? 'teo2026'
+      const res  = await fetch(`${base}?q=${encodeURIComponent(search)}&key=${key}&limit=20`, {
+        signal: AbortSignal.timeout(10000),
+      })
+      if (res.ok) {
+        const legacyData = await res.json() as { paquetes: any[] }
+        legacyPackages = (legacyData.paquetes ?? []).map((p: any) => ({
+          id:              `legacy-${p.id_paquete}`,
+          tracking_number: p.codigo,
+          sender_name:     p.vendedor ?? '—',
+          sender_phone:    '',
+          recipient_name:  '—',
+          recipient_phone: '',
+          status:          'delivered',
+          payment_status:  'paid',
+          payment_method:  'cash',
+          paid_at:         null,
+          price:           Number(p.calculo ?? p.precio ?? 0),
+          size:            'medium',
+          created_at:      new Date().toISOString(),
+          origin:          null,
+          destination:     null,
+          legacy:          true,
+        }))
+      }
+    } catch { /* silently skip if proxy unreachable */ }
+  }
+
+  return NextResponse.json({ packages: [...(data ?? []), ...legacyPackages] })
 }
 
 // POST — create new package (staff/admin at counter, or authenticated customer online)

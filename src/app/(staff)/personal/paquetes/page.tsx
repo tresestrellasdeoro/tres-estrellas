@@ -44,6 +44,7 @@ interface Pkg {
   created_at: string
   origin: { name: string; city: string } | null
   destination: { name: string; city: string } | null
+  legacy?: boolean
 }
 
 // ── Legacy packages component ─────────────────────────────────────────────────
@@ -633,8 +634,10 @@ export default function StaffPaquetesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="font-mono font-bold text-xs text-[#0a1628]">{pkg.tracking_number}</p>
-                          {statusBadge(pkg)}
-                          {paymentBadge(pkg)}
+                          {pkg.legacy
+                            ? <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Sistema anterior</span>
+                            : <>{statusBadge(pkg)}{paymentBadge(pkg)}</>
+                          }
                         </div>
                         <p className="text-xs text-slate-600 truncate mt-0.5">
                           {pkg.sender_name} → {pkg.recipient_name}
