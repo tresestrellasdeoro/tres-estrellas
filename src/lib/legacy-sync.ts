@@ -1,7 +1,7 @@
 import mysql from 'mysql2/promise'
 import { createClient } from '@supabase/supabase-js'
 
-const BATCH_SIZE = 200
+const BATCH_SIZE = 100
 
 function svc() {
   return createClient(

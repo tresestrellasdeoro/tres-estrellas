@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/api-auth'
 import { runLegacySync, runLegacyPackageSync } from '@/lib/legacy-sync'
 
+export const maxDuration = 60
+
 function svc() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
