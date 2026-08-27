@@ -33,10 +33,14 @@ export interface AwsLuggage {
 export interface AwsTicket {
   ticket_id:        string
   booking_number:   string
+  folio:            string | null
   passenger_name:   string
   passenger_type:   string
+  phone:            string | null
   origin_code:      string
+  origin_name:      string | null
   destination_code: string
+  destination_name: string | null
   ticket_type:      string
   travel_date:      string
   travel_time:      string | null
@@ -106,10 +110,14 @@ export async function findAwsTicket(booking: string): Promise<AwsTicket | null> 
     return {
       ticket_id:        String(r.bolId),
       booking_number:   String(r.bolId),
+      folio:            r.bolVenta ? String(r.bolVenta) : null,
       passenger_name:   String(r.nombreCliente ?? '').trim(),
       passenger_type:   passengerType,
-      origin_code:      String(r.origen_clave ?? r.origen_nombre ?? ''),
-      destination_code: String(r.destino_clave ?? r.destino_nombre ?? ''),
+      phone:            r.contacto ? String(r.contacto) : null,
+      origin_code:      String(r.origen_clave ?? ''),
+      origin_name:      r.origen_nombre ? String(r.origen_nombre) : null,
+      destination_code: String(r.destino_clave ?? ''),
+      destination_name: r.destino_nombre ? String(r.destino_nombre) : null,
       ticket_type:      tripType,
       travel_date:      r.bolDetFecha ? String(r.bolDetFecha).split('T')[0] : '',
       travel_time:      r.bolDetHora ?? null,

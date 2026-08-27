@@ -61,10 +61,14 @@ interface LegacyBookingResult {
   id:               number
   ticket_id:        string
   booking_number:   string
+  folio:            string | null
   passenger_name:   string
   passenger_type:   string
+  phone:            string | null
   origin_code:      string
+  origin_name:      string | null
   destination_code: string
+  destination_name: string | null
   ticket_type:      string
   travel_date:      string
   travel_time:      string | null
@@ -76,6 +80,13 @@ interface LegacyBookingResult {
   sale_date:        string | null
   luggage:          LegacyLuggage[]
   source:           'legacy'
+}
+
+interface BoardingInfo {
+  boarded_at:      string
+  boarded_by_name: string | null
+  seat:            number | null
+  notes:           string | null
 }
 
 const AUTO_RESET_SECONDS = 8
@@ -103,6 +114,10 @@ export default function ValidarPage() {
   const [result, setResult]             = useState<BookingResult | null>(null)
   const [legacyResult, setLegacyResult] = useState<LegacyBookingResult | null>(null)
   const [checkingInLeg, setCheckingInLeg] = useState<'outbound' | 'return' | null>(null)
+  const [boardingInfo, setBoardingInfo]   = useState<BoardingInfo | null>(null)
+  const [boardingChecked, setBoardingChecked] = useState(false)
+  const [boardingLoading, setBoardingLoading] = useState(false)
+  const [boardingDone, setBoardingDone]   = useState(false)
   const [countdown, setCountdown]       = useState<number | null>(null)
   const inputRef                        = useRef<HTMLInputElement>(null)
   const countdownRef                    = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -180,6 +195,9 @@ export default function ValidarPage() {
     setError('')
     setResult(null)
     setLegacyResult(null)
+    setBoardingInfo(null)
+    setBoardingChecked(false)
+    setBoardingDone(false)
     cancelCountdown()
     try {
       const controller = new AbortController()
@@ -189,7 +207,17 @@ export default function ValidarPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'No encontrado'); refocusInput(); return }
       if (data.source === 'legacy') {
-        setLegacyResult(data as LegacyBookingResult)
+        const lr = data as LegacyBookingResult
+        setLegacyResult(lr)
+        // Check boarding status for legacy tickets
+        if (lr.travel_date) {
+          const bp = await fetch(`/api/staff/boarding?booking=${lr.booking_number}&date=${lr.travel_date}`)
+          if (bp.ok) {
+            const bd = await bp.json()
+            setBoardingInfo(bd.boarding)
+            setBoardingChecked(true)
+          }
+        }
       } else {
         setResult(data as BookingResult)
       }
@@ -200,6 +228,34 @@ export default function ValidarPage() {
       setLoading(false)
     }
   }, [query, refocusInput])
+
+  // ── Mark as boarded (legacy tickets) ─────────────────────────────────
+  const markBoarded = async () => {
+    if (!legacyResult) return
+    setBoardingLoading(true)
+    try {
+      const res = await fetch('/api/staff/boarding', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          booking_number:   legacyResult.booking_number,
+          travel_date:      legacyResult.travel_date,
+          source:           'legacy',
+          passenger_name:   legacyResult.passenger_name,
+          origin_code:      legacyResult.origin_code,
+          destination_code: legacyResult.destination_code,
+          travel_time:      legacyResult.travel_time,
+          seat:             legacyResult.seat,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setBoardingInfo(data.boarding)
+        setBoardingDone(true)
+      }
+    } catch { /* silently ignore */ }
+    finally { setBoardingLoading(false) }
+  }
 
   // ── Advanced search ───────────────────────────────────────────────────
   const handleAdvancedSearch = async () => {
@@ -664,21 +720,65 @@ export default function ValidarPage() {
               </p>
             </div>
 
-            {/* Pasajero */}
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pasajero</p>
-              <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-black text-slate-800 text-sm">{legacyResult.passenger_name}</p>
-                  <p className="text-slate-400 text-xs">
-                    {legacyResult.passenger_type === 'adult' ? 'Adulto' : legacyResult.passenger_type === 'child' ? 'Menor' : legacyResult.passenger_type}
-                    {' · '}
-                    <span className="font-mono">{legacyResult.booking_number}</span>
+            {/* Boarding status — YA ABORDÓ o botón ABORDAR */}
+            {boardingChecked && !legacyResult.cancelled && (
+              boardingInfo ? (
+                <div className="bg-red-50 border-2 border-red-400 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="w-5 h-5 text-red-600 shrink-0" />
+                    <p className="font-black text-red-700 text-base">ESTE PASAJERO YA ABORDÓ</p>
+                  </div>
+                  <p className="text-red-600 text-sm">
+                    Abordó el {new Date(boardingInfo.boarded_at).toLocaleString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {boardingInfo.boarded_by_name && ` · Registrado por ${boardingInfo.boarded_by_name}`}
                   </p>
+                  <p className="text-red-500 text-xs mt-1 font-bold">NO PERMITIR SEGUNDO ABORDAJE</p>
                 </div>
+              ) : (
+                <div className={`rounded-2xl p-4 ${boardingDone ? 'bg-emerald-50 border-2 border-emerald-400' : 'bg-slate-50 border-2 border-slate-200'}`}>
+                  {boardingDone ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <p className="font-black text-emerald-700">Abordaje registrado</p>
+                        <p className="text-emerald-600 text-xs">El pasajero ha abordado correctamente</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-slate-500 text-xs font-bold mb-2">Este boleto aún no ha sido escaneado hoy</p>
+                      <button onClick={markBoarded} disabled={boardingLoading}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-base rounded-xl transition-colors">
+                        {boardingLoading
+                          ? <Loader2 className="w-5 h-5 animate-spin" />
+                          : <CheckCircle2 className="w-5 h-5" />
+                        }
+                        PERMITIR ABORDAJE
+                      </button>
+                    </>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* Pasajero */}
+            <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <User className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-slate-800 text-base">{legacyResult.passenger_name}</p>
+                <p className="text-slate-500 text-xs">
+                  {legacyResult.passenger_type === 'adult' ? 'Adulto' : legacyResult.passenger_type === 'child' ? 'Menor' : 'Senior'}
+                  {' · '}
+                  <span className="font-mono">#{legacyResult.booking_number}</span>
+                  {legacyResult.folio && legacyResult.folio !== legacyResult.booking_number && (
+                    <span className="ml-1 text-slate-400">· Folio {legacyResult.folio}</span>
+                  )}
+                </p>
+                {legacyResult.phone && (
+                  <p className="text-slate-600 text-sm font-semibold mt-0.5">📞 {legacyResult.phone}</p>
+                )}
               </div>
             </div>
 
@@ -690,6 +790,11 @@ export default function ValidarPage() {
                 </p>
                 <p className="font-black text-slate-800 text-base">
                   {legacyResult.origin_code} → {legacyResult.destination_code}
+                </p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  {legacyResult.origin_name ?? legacyResult.origin_code}
+                  {' → '}
+                  {legacyResult.destination_name ?? legacyResult.destination_code}
                 </p>
                 <p className="text-slate-400 text-xs mt-0.5">
                   {legacyResult.ticket_type === 'round_trip' ? 'Ida y vuelta' : 'Sólo ida'}
@@ -714,9 +819,7 @@ export default function ValidarPage() {
                   <CreditCard className="w-3 h-3" /> Total pagado
                 </p>
                 <p className="font-black text-slate-800">${Number(legacyResult.amount).toFixed(2)}</p>
-                <p className="text-slate-400 text-xs mt-0.5">
-                  {legacyResult.payment_method === 'cash' ? '💵 Efectivo' : '💳 Tarjeta'}
-                </p>
+                <p className="text-slate-400 text-xs mt-0.5">💵 Efectivo</p>
               </div>
               <div className="bg-slate-50 rounded-xl p-3">
                 <p className="text-slate-400 text-xs mb-1 flex items-center gap-1">
@@ -730,12 +833,12 @@ export default function ValidarPage() {
               {legacyResult.seat && (
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-slate-400 text-xs mb-1">Asiento</p>
-                  <p className="font-black text-slate-800 text-sm">#{legacyResult.seat}</p>
+                  <p className="font-black text-slate-800 text-2xl">#{legacyResult.seat}</p>
                 </div>
               )}
             </div>
 
-            {/* Equipaje del sistema anterior */}
+            {/* Equipaje */}
             {legacyResult.luggage?.length > 0 && (
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -751,13 +854,9 @@ export default function ValidarPage() {
                           {l.electronicos > 0 && <span>📦 {l.electronicos} electrónico{l.electronicos > 1 ? 's' : ''}</span>}
                           {l.peso_total > 0 && <span>{l.peso_total} kg</span>}
                         </div>
-                        {l.costo_exceso > 0 && (
-                          <span className="font-black text-amber-700">${l.costo_exceso}</span>
-                        )}
+                        {l.costo_exceso > 0 && <span className="font-black text-amber-700">${l.costo_exceso}</span>}
                       </div>
-                      {l.fecha_exceso && (
-                        <p className="text-amber-600 text-xs mt-1">{l.fecha_exceso}</p>
-                      )}
+                      {l.fecha_exceso && <p className="text-amber-600 text-xs mt-1">{l.fecha_exceso}</p>}
                     </div>
                   ))}
                 </div>
