@@ -78,9 +78,10 @@ CREATE POLICY IF NOT EXISTS "customers_own_packages"
   USING (customer_id = auth.uid());
 
 -- Clientes: pueden crear paquetes (el customer_id se asigna en la API)
-CREATE POLICY IF NOT EXISTS "customers_insert_packages"
-  ON packages FOR INSERT
-  WITH CHECK (true);
+-- Removed 2026-10-26: open to anon. APIs use service_role (bypasses RLS). See security-hardening-2026-10-26.sql
+-- CREATE POLICY IF NOT EXISTS "customers_insert_packages"
+--   ON packages FOR INSERT
+--   WITH CHECK (true);
 
 -- Staff/admin: acceso total vía service role (las APIs usan service role key, bypassea RLS)
 -- Clientes: ven eventos de sus propios paquetes

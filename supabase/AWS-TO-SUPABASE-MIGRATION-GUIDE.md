@@ -124,8 +124,8 @@ RESEND_API_KEY=re_<key_real>
 EMAIL_FROM=boletos@tresestrellasdeorobus.com
 
 # QuickBooks (conectar vía /admin/dashboard → Contabilidad → QuickBooks)
-QUICKBOOKS_CLIENT_ID=ABrS5ygwypQi2MMAz8i3IolzyjK4rb7StOOJwA6kHvBGqnlLXp
-QUICKBOOKS_CLIENT_SECRET=GPfxy3k8QzKfRxaOpL0z3ZA20S15be0JjGIU2clz
+QUICKBOOKS_CLIENT_ID=tu-client-id
+QUICKBOOKS_CLIENT_SECRET=tu-client-secret
 
 # IMPORTANTE: cambiar antes de producción
 ADMIN_EMAIL=<correo_real_admin>

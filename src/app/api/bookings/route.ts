@@ -6,7 +6,7 @@ import QRCode from 'qrcode'
 import { Resend } from 'resend'
 import { ticketEmailHtml } from '@/lib/email/ticket-template'
 import { SquareClient, SquareEnvironment } from 'square'
-import { ROUTE_PRICES, LUGGAGE_OPTIONS } from '@/lib/data/bus-config'
+import { ALL_STOPS, LUGGAGE_OPTIONS, getPrice, type StopCode } from '@/lib/data/bus-config'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -98,22 +98,26 @@ export async function POST(req: NextRequest) {
 
   // ── Server-side price validation (non-staff only) ──────────────────────────
   if (!isStaff) {
-    if (boarding_stop_code && destination_stop_code) {
-      const priceKey     = `${boarding_stop_code}:${destination_stop_code}`
-      const officialPrices = ROUTE_PRICES[priceKey]
-      if (officialPrices) {
-        const multiplier    = ticket_type === 'round_trip' ? 1.5 : 1
-        const expectedAdult = Math.round(officialPrices.adult * multiplier)
-        const expectedChild = Math.round(officialPrices.child * multiplier)
-        for (const p of passengers) {
-          if (p.is_promo) {
-            return NextResponse.json({ error: 'Precios especiales solo para personal autorizado' }, { status: 403 })
-          }
-          const expectedPrice = p.passenger_type === 'adult' ? expectedAdult : expectedChild
-          if (Math.abs(p.price - expectedPrice) > 0.01) {
-            return NextResponse.json({ error: 'Precio de pasajero no válido' }, { status: 422 })
-          }
-        }
+    // Always validate — missing or unknown stop codes used to skip this check
+    // and let the client set any passenger price.
+    if (
+      !boarding_stop_code || !destination_stop_code ||
+      !(boarding_stop_code in ALL_STOPS) || !(destination_stop_code in ALL_STOPS)
+    ) {
+      return NextResponse.json({ error: 'Ruta no válida' }, { status: 422 })
+    }
+    // Same lookup (and fallback) the booking flow uses to show the price
+    const officialPrices = getPrice(boarding_stop_code as StopCode, destination_stop_code as StopCode)
+    const multiplier    = ticket_type === 'round_trip' ? 1.5 : 1
+    const expectedAdult = Math.round(officialPrices.adult * multiplier)
+    const expectedChild = Math.round(officialPrices.child * multiplier)
+    for (const p of passengers) {
+      if (p.is_promo) {
+        return NextResponse.json({ error: 'Precios especiales solo para personal autorizado' }, { status: 403 })
+      }
+      const expectedPrice = p.passenger_type === 'adult' ? expectedAdult : expectedChild
+      if (Math.abs(p.price - expectedPrice) > 0.01) {
+        return NextResponse.json({ error: 'Precio de pasajero no válido' }, { status: 422 })
       }
     }
 

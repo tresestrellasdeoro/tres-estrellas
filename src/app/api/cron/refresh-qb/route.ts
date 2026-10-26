@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   // Vercel cron sends this header; reject external calls
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+  const cronSecret = process.env.CRON_SECRET
+  if (process.env.NODE_ENV === 'production' && (!cronSecret || authHeader !== `Bearer ${cronSecret}`)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

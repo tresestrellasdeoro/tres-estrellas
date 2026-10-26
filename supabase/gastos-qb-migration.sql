@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS qb_transactions (
 ALTER TABLE gastos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qb_transactions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "gastos_staff_insert" ON gastos FOR INSERT WITH CHECK (true);
-CREATE POLICY "gastos_staff_select" ON gastos FOR SELECT USING (true);
-CREATE POLICY "qb_transactions_select" ON qb_transactions FOR SELECT USING (true);
-CREATE POLICY "qb_transactions_insert" ON qb_transactions FOR INSERT WITH CHECK (true);
+-- Removed 2026-10-26: open to anon. APIs use service_role (bypasses RLS). See security-hardening-2026-10-26.sql
+-- CREATE POLICY "gastos_staff_insert" ON gastos FOR INSERT WITH CHECK (true);
+-- CREATE POLICY "gastos_staff_select" ON gastos FOR SELECT USING (true);
+-- CREATE POLICY "qb_transactions_select" ON qb_transactions FOR SELECT USING (true);
+-- CREATE POLICY "qb_transactions_insert" ON qb_transactions FOR INSERT WITH CHECK (true);
 
 NOTIFY pgrst, 'reload schema';

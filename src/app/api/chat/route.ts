@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
   // Browsers always send Origin on cross-origin fetches; same-origin browser
   // fetches send Origin matching the host. Server-side calls have no Origin.
   const origin = req.headers.get('origin')
-  const host   = req.nextUrl.host
-  if (origin && !origin.endsWith(host) && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+  let originHost = ''
+  try { originHost = origin ? new URL(origin).hostname : '' } catch {}
+  if (origin && originHost !== req.nextUrl.hostname && originHost !== 'localhost' && originHost !== '127.0.0.1') {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 

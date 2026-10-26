@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS public.presupuestos (
 );
 
 ALTER TABLE public.presupuestos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "presupuestos_staff_all" ON public.presupuestos FOR ALL USING (true) WITH CHECK (true);
+-- Removed 2026-10-26: open to anon. APIs use service_role (bypasses RLS). See security-hardening-2026-10-26.sql
+-- CREATE POLICY "presupuestos_staff_all" ON public.presupuestos FOR ALL USING (true) WITH CHECK (true);
 
 -- 3. Bucket de Storage para recibos (ejecutar por separado si ya existe)
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('recibos', 'recibos', true)

@@ -11,10 +11,12 @@ export async function GET(req: NextRequest) {
   const code    = searchParams.get('code')
   const realmId = searchParams.get('realmId')
   const error   = searchParams.get('error')
+  const state   = searchParams.get('state')
+  const expectedState = req.cookies.get('qb_oauth_state')?.value
 
   const adminUrl = new URL('/admin/configuracion', req.url)
 
-  if (error || !code || !realmId) {
+  if (error || !code || !realmId || !state || state !== expectedState) {
     adminUrl.searchParams.set('qb', 'error')
     return NextResponse.redirect(adminUrl)
   }
