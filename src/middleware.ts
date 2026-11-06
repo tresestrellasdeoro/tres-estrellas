@@ -3,6 +3,39 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
+// Site-wide temporary block — set to false (or revert this commit) to bring the site back
+const MAINTENANCE_MODE = true
+
+const MAINTENANCE_HEADERS = { 'Retry-After': '3600', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }
+
+const MAINTENANCE_HTML = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tres Estrellas de Oro | Sitio temporalmente no disponible</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: #0a1628; color: #e2e8f0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; text-align: center; }
+  main { max-width: 480px; }
+  img { width: 160px; height: auto; margin-bottom: 28px; }
+  h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.25; color: #f0b429; }
+  p { margin: 0 0 12px; font-size: 16px; line-height: 1.5; }
+  .en { margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(226, 232, 240, .15); font-size: 14px; opacity: .75; }
+  a { color: #f0b429; font-weight: 600; text-decoration: none; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/logo.png" alt="Tres Estrellas de Oro">
+  <h1>Sitio temporalmente no disponible</h1>
+  <p>Nuestro sitio web no está disponible por el momento. Volveremos pronto.</p>
+  <p>Para información sobre tu viaje, llama al <a href="tel:+18003378745">1 800 337-8745</a>.</p>
+  <p class="en">Our website is temporarily unavailable. For trip information, call <a href="tel:+18003378745">1 800 337-8745</a>.</p>
+</main>
+</body>
+</html>`
+
 // Web Crypto HMAC-SHA256 — works in Next.js Edge Runtime (no Node.js crypto needed)
 async function hmacHex(secret: string, data: string): Promise<string> {
   const enc = new TextEncoder()
@@ -48,7 +81,18 @@ async function verifyAdminSession(sessionValue: string | undefined): Promise<boo
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  const protectedCustomer   = pathname.startsWith('/dashboard') || pathname.startsWith('/mis-tickets') || pathname.startsWith('/puntos') || pathname.startsWith('/perfil')
+  // Vercel crons stay up (they require CRON_SECRET) so QuickBooks tokens and the legacy sync keep running
+  if (MAINTENANCE_MODE && !pathname.startsWith('/api/cron/')) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503, headers: MAINTENANCE_HEADERS })
+    }
+    return new NextResponse(MAINTENANCE_HTML, {
+      status: 503,
+      headers: { ...MAINTENANCE_HEADERS, 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  }
+
+  const protectedCustomer  = pathname.startsWith('/dashboard') || pathname.startsWith('/mis-tickets') || pathname.startsWith('/puntos') || pathname.startsWith('/perfil')
   const protectedAdmin      = pathname.startsWith('/admin')
   const protectedDriver     = pathname.startsWith('/conductor')
   const protectedStaff      = pathname.startsWith('/personal')
